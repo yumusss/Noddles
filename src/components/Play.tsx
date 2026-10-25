@@ -4,7 +4,7 @@ import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
 import { Avatar } from '../avatar';
 import type { Piece } from '../bowl';
-import Stove from './Stove';
+import Kamado from './Kamado';
 import { BOWLS, bowlsUpTo } from '../bowls';
 import { ChangePanel, RegisterDecor, TipJar } from './Cash';
 import {
@@ -978,7 +978,7 @@ export default function Play({
           {/* STOVE */}
           <section className="station stove2">
             <div className="donabe-wrap">
-              <Stove
+              <Kamado
                 mode={lifting ? 'lift' : stage === 'pot' ? 'boil' : 'idle'}
                 noodle={stage === 'ready' ? undefined : bowl.noodle}
                 thick={bowl.thick}
@@ -1006,24 +1006,6 @@ export default function Play({
             </div>
             {stage === 'pot' && (
               <div className="cook-panel">
-                <div className="cook-gauge">
-                  <i className="cz raw" style={{ width: '32.3%' }}>
-                    Çiğ
-                  </i>
-                  <i className="cz dente" style={{ width: '12.3%' }}>
-                    Diri
-                  </i>
-                  <i className="cz perfect" style={{ width: '16.9%' }}>
-                    Tam
-                  </i>
-                  <i className="cz soft" style={{ width: '15.4%' }}>
-                    Yumuşak
-                  </i>
-                  <i className="cz burnt" style={{ flex: 1 }}>
-                    Lapa
-                  </i>
-                  <b style={{ left: `${Math.min(100, (cookP / 130) * 100)}%` }} />
-                </div>
                 <div className={`cook-now cb-${cookNow}`}>{COOK_LABEL[cookNow]}</div>
                 <button className="btn big primary" onClick={takeOut}>
                   Çıkar!
