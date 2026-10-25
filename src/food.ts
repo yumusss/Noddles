@@ -27,7 +27,87 @@ export interface BowlDraw {
   pieces: PieceLike[];
   cook?: 'raw' | 'dente' | 'perfect' | 'soft' | 'burnt';
   takeaway?: boolean;
+  style?: string;
 }
+
+// ---------- Japanese bowl styles ----------
+export interface BowlStyle {
+  id: string;
+  name: string;
+  rim: [string, string, string]; // light, mid, dark glaze
+  lip: string;
+  inner: [string, string, string];
+  pattern: 'dash' | 'wave' | 'sakura' | 'gold' | 'speckle' | 'none' | 'ring';
+  body: string; // css gradient for the side view
+}
+
+export const BOWLS: BowlStyle[] = [
+  {
+    id: 'kirmizi',
+    name: 'Kırmızı lake',
+    rim: ['#e2553d', '#a8301f', '#6e1a10'],
+    lip: '#f4ebdd',
+    inner: ['#fbf7f0', '#e9e0d2', '#a39380'],
+    pattern: 'dash',
+    body: 'linear-gradient(90deg,#5e150c,#b8341f 30%,#d9452b 45%,#a52c1b 70%,#4e110a)',
+  },
+  {
+    id: 'dalga',
+    name: 'Mavi dalga',
+    rim: ['#f4f6fa', '#d8e0ec', '#9fb0c8'],
+    lip: '#1f3c88',
+    inner: ['#ffffff', '#eef2f8', '#aab6c8'],
+    pattern: 'wave',
+    body: 'radial-gradient(18px 10px at 20px 100%, transparent 60%, #1f3c88 62% 72%, transparent 74%) 0 0/40px 20px, linear-gradient(90deg,#9fb0c8,#f4f6fa 40%,#ffffff 50%,#d8e0ec 70%,#8796ad)',
+  },
+  {
+    id: 'siyah',
+    name: 'Siyah & altın',
+    rim: ['#3a3a40', '#1a1a1e', '#050507'],
+    lip: '#d4a017',
+    inner: ['#c0392b', '#9e2a1c', '#5e150c'],
+    pattern: 'gold',
+    body: 'linear-gradient(90deg,#050507,#2a2a30 30%,#4a4a52 45%,#1a1a1e 70%,#050507)',
+  },
+  {
+    id: 'seladon',
+    name: 'Seladon yeşili',
+    rim: ['#cfe3cf', '#9cc2a5', '#5f8f6c'],
+    lip: '#e6f0e2',
+    inner: ['#eef6ec', '#d4e6d2', '#93b39a'],
+    pattern: 'ring',
+    body: 'linear-gradient(90deg,#4f7a5b,#9cc2a5 30%,#cfe3cf 45%,#8fb898 70%,#3f6a4c)',
+  },
+  {
+    id: 'sakura',
+    name: 'Sakura',
+    rim: ['#fde4ea', '#f6c1cf', '#d98aa0'],
+    lip: '#ffffff',
+    inner: ['#fffafa', '#fbecef', '#d9b5bf'],
+    pattern: 'sakura',
+    body: 'radial-gradient(circle at 30% 40%, #e2557a 0 3px, transparent 4px) 0 0/34px 30px, linear-gradient(90deg,#d98aa0,#f6c1cf 30%,#fde4ea 45%,#f2b3c3 70%,#c97a90)',
+  },
+  {
+    id: 'tenmoku',
+    name: 'Tenmoku',
+    rim: ['#8a5a32', '#4e2c16', '#24130a'],
+    lip: '#c98a4a',
+    inner: ['#5a3a22', '#3a2414', '#1a0f08'],
+    pattern: 'speckle',
+    body: 'linear-gradient(180deg,#c98a4a 0 8%,transparent 14%), linear-gradient(90deg,#1a0f08,#4e2c16 30%,#8a5a32 45%,#3a2414 70%,#140a05)',
+  },
+  {
+    id: 'beyaz',
+    name: 'Sade beyaz',
+    rim: ['#ffffff', '#efe9df', '#c9bfae'],
+    lip: '#c0392b',
+    inner: ['#ffffff', '#f3eee6', '#bdb2a2'],
+    pattern: 'none',
+    body: 'linear-gradient(90deg,#b9ae9c,#efe9df 30%,#ffffff 45%,#e6dfd3 70%,#a99d8a)',
+  },
+];
+
+export const bowlStyle = (id?: string) => BOWLS.find((b) => b.id === id) ?? BOWLS[0];
 
 // ---------- helpers ----------
 export function rng(seed: number) {
@@ -734,9 +814,16 @@ export function sprite(id: string, variant = 0): HTMLCanvasElement {
   const key = id + ':' + (variant % 4);
   let cv = sprites.get(key);
   if (cv) return cv;
+  const raw = mk(S, S);
+  (DRAW[id] ?? egg)(raw.getContext('2d')!, rng(hash(key)));
+  // bake a soft contact shadow into the sprite so hundreds of pieces stay cheap to draw
   cv = mk(S, S);
   const c = cv.getContext('2d')!;
-  (DRAW[id] ?? egg)(c, rng(hash(key)));
+  c.shadowColor = 'rgba(30,12,0,.5)';
+  c.shadowBlur = 6;
+  c.shadowOffsetX = 2;
+  c.shadowOffsetY = 3;
+  c.drawImage(raw, S * 0.06, S * 0.06, S * 0.88, S * 0.88);
   sprites.set(key, cv);
   return cv;
 }
@@ -768,10 +855,6 @@ export function drawPiece(c: Ctx, p: PieceLike) {
   c.save();
   c.translate(p.x, p.y);
   c.rotate((p.r * Math.PI) / 180);
-  c.shadowColor = 'rgba(30,12,0,.45)';
-  c.shadowBlur = 5;
-  c.shadowOffsetX = 1.5;
-  c.shadowOffsetY = 2.5;
   c.drawImage(img, -size / 2, -size / 2, size, size);
   c.restore();
 }
@@ -887,6 +970,78 @@ function mixHex(a: string, b: string, t: number) {
 // ---------- bowl ----------
 export const BOWL_R = 122;
 
+function rimPattern(c: Ctx, st: BowlStyle) {
+  const cx = 150;
+  const cy = 150;
+  c.save();
+  if (st.pattern === 'dash') {
+    c.strokeStyle = 'rgba(30,40,70,.55)';
+    c.lineWidth = 1.4;
+    c.setLineDash([6, 5]);
+    c.beginPath();
+    c.arc(cx, cy, 142, 0, TAU);
+    c.stroke();
+  } else if (st.pattern === 'wave') {
+    c.strokeStyle = '#1f3c88';
+    c.lineWidth = 1.6;
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * TAU;
+      const x = cx + Math.cos(a) * 141;
+      const y = cy + Math.sin(a) * 141;
+      for (const r of [5.5, 3.2]) {
+        c.beginPath();
+        c.arc(x, y, r, a + Math.PI * 0.05, a + Math.PI * 0.95);
+        c.stroke();
+      }
+    }
+  } else if (st.pattern === 'gold') {
+    c.strokeStyle = '#d4a017';
+    c.lineWidth = 2;
+    for (const r of [140, 144]) {
+      c.beginPath();
+      c.arc(cx, cy, r, 0, TAU);
+      c.stroke();
+    }
+    c.fillStyle = '#e9c46a';
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      c.beginPath();
+      c.arc(cx + Math.cos(a) * 142, cy + Math.sin(a) * 142, 2.2, 0, TAU);
+      c.fill();
+    }
+  } else if (st.pattern === 'sakura') {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU;
+      const x = cx + Math.cos(a) * 141;
+      const y = cy + Math.sin(a) * 141;
+      for (let k = 0; k < 5; k++) {
+        const pa = (k / 5) * TAU + a;
+        c.fillStyle = '#e2557a';
+        c.beginPath();
+        c.ellipse(x + Math.cos(pa) * 2.6, y + Math.sin(pa) * 2.6, 2.4, 1.4, pa, 0, TAU);
+        c.fill();
+      }
+    }
+  } else if (st.pattern === 'speckle') {
+    const r = rng(42);
+    for (let i = 0; i < 140; i++) {
+      const a = r() * TAU;
+      const d = 137 + r() * 9;
+      c.fillStyle = r() < 0.5 ? 'rgba(220,160,90,.6)' : 'rgba(0,0,0,.4)';
+      c.fillRect(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1.6, 1.6);
+    }
+  } else if (st.pattern === 'ring') {
+    c.strokeStyle = 'rgba(60,100,70,.5)';
+    c.lineWidth = 1.2;
+    for (const r of [139, 143]) {
+      c.beginPath();
+      c.arc(cx, cy, r, 0, TAU);
+      c.stroke();
+    }
+  }
+  c.restore();
+}
+
 export function drawBowl(c: Ctx, b: BowlDraw) {
   const cx = 150;
   const cy = 150;
@@ -898,7 +1053,8 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
   c.shadowOffsetY = 10;
   c.beginPath();
   c.arc(cx, cy, 146, 0, TAU);
-  c.fillStyle = b.takeaway ? '#cdb48a' : '#7a1c12';
+  const st = bowlStyle(b.style);
+  c.fillStyle = b.takeaway ? '#cdb48a' : st.rim[2];
   c.fill();
   c.restore();
   // rim (outer glaze)
@@ -909,9 +1065,9 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
     rg.addColorStop(0, '#efe2c8');
     rg.addColorStop(1, '#b8996a');
   } else {
-    rg.addColorStop(0, '#e2553d');
-    rg.addColorStop(0.7, '#a8301f');
-    rg.addColorStop(1, '#6e1a10');
+    rg.addColorStop(0, st.rim[0]);
+    rg.addColorStop(0.7, st.rim[1]);
+    rg.addColorStop(1, st.rim[2]);
   }
   c.fillStyle = rg;
   c.fill(rim);
@@ -920,25 +1076,17 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
   c.beginPath();
   c.arc(cx, cy, 136, 0, TAU);
   c.lineWidth = 8;
-  c.strokeStyle = b.takeaway ? '#f6ecd8' : '#f4ebdd';
+  c.strokeStyle = b.takeaway ? '#f6ecd8' : st.lip;
   c.stroke();
-  if (!b.takeaway) {
-    c.strokeStyle = 'rgba(30,40,70,.55)';
-    c.lineWidth = 1.4;
-    c.setLineDash([6, 5]);
-    c.beginPath();
-    c.arc(cx, cy, 142, 0, TAU);
-    c.stroke();
-    c.setLineDash([]);
-  }
+  if (!b.takeaway) rimPattern(c, st);
   // interior with depth
   const inner = new Path2D();
   inner.arc(cx, cy, 132, 0, TAU);
   const ig = c.createRadialGradient(cx + 10, cy + 14, 10, cx, cy, 134);
-  ig.addColorStop(0, '#fbf7f0');
-  ig.addColorStop(0.75, '#e9e0d2');
-  ig.addColorStop(0.93, '#c6b9a6');
-  ig.addColorStop(1, '#a39380');
+  const inn = b.takeaway ? ['#fbf7f0', '#e9e0d2', '#a39380'] : st.inner;
+  ig.addColorStop(0, inn[0]);
+  ig.addColorStop(0.8, inn[1]);
+  ig.addColorStop(1, inn[2]);
   c.fillStyle = ig;
   c.fill(inner);
   gloss(c, cx - 70, cy - 78, 40, 14, -0.7, 0.55);

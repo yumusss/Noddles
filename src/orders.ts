@@ -43,7 +43,7 @@ const MALE = [
   'Deniz',
 ];
 import type { CookState, Piece } from './bowl';
-import { THICK_LABEL, type Thick } from './food';
+import { BOWLS, THICK_LABEL, bowlStyle, type Thick } from './food';
 
 // ---------- order model ----------
 
@@ -65,6 +65,7 @@ export interface Order {
   noodle: string | null;
   broth: string | null; // a broth (soup) or a sauce (dry noodles)
   thick?: Thick | null;
+  bowl?: string | null;
   reqs: Req[];
   rules: Rule[];
   cook: CookPref;
@@ -149,6 +150,7 @@ export function orderText(o: Order): string {
     if (r.t === 'variety') s += ` Gerisi sende şef, ama en az ${r.n} çeşit malzeme olsun.`;
     if (r.t === 'free') s += ' Gerisini sen süsle şef!';
   }
+  if (o.bowl) s += ` ${bowlStyle(o.bowl).name} kasede olsun lütfen.`;
   if (o.cook === 'dente') s += ' Erişte diri kalsın.';
   if (o.cook === 'soft') s += ' Erişte iyice yumuşak olsun.';
   return s;
@@ -180,6 +182,7 @@ export function randomOrder(levelId: number): Order {
     rules: [],
     cook: 'perfect',
   };
+  if (levelId >= 3 && Math.random() < 0.18) o.bowl = pick(BOWLS).id;
   if (levelId >= 4 && Math.random() < 0.3) o.cook = Math.random() < 0.5 ? 'dente' : 'soft';
 
   const roll = Math.random();
@@ -436,6 +439,7 @@ export function dayCustomers(levelId: number): Customer[] {
 export interface Bowl {
   noodle?: string;
   thick?: Thick;
+  style?: string;
   broth?: string;
   fill: number;
   pieces: Piece[];
@@ -485,6 +489,10 @@ export function judge(o: Order, b: Bowl, waitSec: number, bonus: number): Verdic
   if (b.noodle && o.thick && b.thick !== o.thick) {
     score -= 8;
     notes.push(`${THICK_LABEL[o.thick]} erişte istemiştim`);
+  }
+  if (o.bowl && (b.style ?? 'kirmizi') !== o.bowl) {
+    score -= 8;
+    notes.push(`${bowlStyle(o.bowl).name} kase istemiştim`);
   }
   // broth 15 + fill 10
   const wantCat = o.broth ? INGREDIENTS[o.broth].cat : 'broth';

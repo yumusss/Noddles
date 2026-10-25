@@ -21,7 +21,10 @@ Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devra
 - Canvas ile çizilen gerçekçi yemekler (tel tel erişte, yağ damlalı su, dokulu malzemeler), içi dolu malzeme küvetleri
 - İnce / orta / kalın erişte, 6 çeşit su ve kuru noodle için 4 sos
 - Gün açılış planı, kamera geçişleri, yakın plan diyaloglar, sinema bantları ve film greni
-- Karakterler: [Avataaars](https://avataaars.com/) (Pablo Stanley, kişisel ve ticari kullanıma serbest) ile [DiceBear](https://www.dicebear.com/) üzerinden
+- Tam ekran, telefon ve tablete uyumlu yerleşim
+- Arkada tam restoran ve dekorasyon dükkânı (duvar, zemin, tablolar, lambalar, masalar, bitkiler, neon, akvaryum…)
+- 7 Japon kase stili, kaseyi parmakla tutup Good Pizza tarzı fırına taşıma
+- Karakterler: "Toon Head" — Johan Melin, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), [DiceBear](https://www.dicebear.com/) üzerinden
 
 ## Geliştirme
 

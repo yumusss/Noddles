@@ -1,0 +1,10 @@
+{
+  "name": "Noddles",
+  "short_name": "Noddles",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#1b1030",
+  "theme_color": "#1b1030",
+  "icons": [{ "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

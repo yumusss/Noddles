@@ -1,4 +1,5 @@
 import { CatArt } from '../art';
+import FullscreenButton, { enterFullscreen } from './Fullscreen';
 import { BowlSide } from './FoodCanvas';
 import { Rain, Lanterns } from './Scenery';
 
@@ -52,13 +53,19 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
               { id: 'bambu', x: 86, y: 146, r: 70, s: 0.9, k: 9 },
             ],
           }}
-          width={290}
+          width={Math.round(Math.min(window.innerWidth * 0.7, window.innerHeight * 0.48, 520))}
         />
         <div className="title-cat">
           <CatArt size={86} />
         </div>
       </div>
-      <button className="btn big primary pulse" onClick={onPlay}>
+      <FullscreenButton className="corner" />
+      <button
+        className="btn big primary pulse"
+        onClick={() => {
+          enterFullscreen();
+          onPlay();
+        }}>
         {hasSave ? 'Devam Et' : 'Dükkânı Aç'}
       </button>
       <div className="title-foot">10 bölüm • 26 malzeme • bir mahalleyi kurtar</div>

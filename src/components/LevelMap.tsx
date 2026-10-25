@@ -12,12 +12,14 @@ export default function LevelMap({
   onBack,
   onToggle,
   onEnding,
+  onDecor,
 }: {
   save: Save;
   onPick: (id: number) => void;
   onBack: () => void;
   onToggle: (k: 'sfx' | 'music') => void;
   onEnding: () => void;
+  onDecor: () => void;
 }) {
   const total = save.stars.reduce((a, b) => a + b, 0);
   const current = Math.min(10, save.reached);
@@ -35,6 +37,9 @@ export default function LevelMap({
         </div>
       </div>
       <div className="map-toggles">
+        <button className="chip on decor-chip" onClick={onDecor}>
+          🎨 Dükkânı dekore et
+        </button>
         <button className={`chip ${save.sfx ? 'on' : ''}`} onClick={() => onToggle('sfx')}>
           🔊 Efekt
         </button>

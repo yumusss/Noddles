@@ -3,7 +3,6 @@ import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
 import { Avatar } from '../avatar';
 import type { Piece } from '../bowl';
-import Stove from './Stove';
 import { ChangePanel, RegisterDecor, TipJar } from './Cash';
 import {
   RENT,
@@ -15,7 +14,7 @@ import {
   tipCents,
   type DayLedger,
 } from '../money';
-import { BOWL_R, THICK_LABEL, THICK_W, type Thick } from '../food';
+import { BOWL_R, BOWLS, THICK_LABEL, THICK_W, type Thick } from '../food';
 import { BowlCanvas, BowlSide, Tray } from './FoodCanvas';
 import {
   COOK_LABEL,
@@ -29,7 +28,10 @@ import {
   type Verdict,
 } from '../orders';
 import { buzz, sfx } from '../audio';
-import { ShopWall } from './Scenery';
+import Restaurant from './Restaurant';
+import Oven from './Oven';
+import FullscreenButton from './Fullscreen';
+import { DEFAULT_DECOR, tipBonus } from '../decor';
 import Establishing from './Establishing';
 import type { Save } from '../App';
 
@@ -46,8 +48,8 @@ export interface DayResult {
 }
 
 type Phase = 'walkin' | 'talk' | 'waiting' | 'eating' | 'react' | 'pay' | 'leave';
-type Tool = { kind: 'noodle' | 'broth' | 'topping'; id: string } | null;
-type Tab = 'noodle' | 'broth' | 'topping';
+type Tool = { kind: 'bowl' | 'noodle' | 'broth' | 'topping'; id: string } | null;
+type Tab = 'bowl' | 'noodle' | 'broth' | 'topping';
 type Stage = 'prep' | 'pot' | 'ready';
 
 const SCATTER = new Set(['yesil', 'susam', 'citir', 'filiz', 'misir', 'aciyag', 'biber']);
@@ -114,6 +116,20 @@ export default function Play({
     paid: boolean;
   } | null>(null);
   const [lifting, setLifting] = useState(false);
+  const [kase, setKase] = useState('kirmizi');
+  const [drag, setDrag] = useState<{ x: number; y: number; over: boolean } | null>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const [stageH, setStageH] = useState(600);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const decor = save.decor ?? DEFAULT_DECOR;
+  const decorTip = tipBonus(decor);
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setStageH(el.getBoundingClientRect().height));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [scores, setScores] = useState<number[]>([]);
   const [nudge, setNudge] = useState<string | null>(null);
   const [orderAt, setOrderAt] = useState(0);
@@ -280,7 +296,7 @@ export default function Play({
     setBowl(emptyBowl());
     setStage('prep');
     setCookP(0);
-    setTab('noodle');
+    setTab('bowl');
     setTool(null);
     sfx('ding');
     window.setTimeout(() => go(1), 350);
@@ -301,7 +317,7 @@ export default function Play({
     }
     const id = tool.id;
     setBowl((b) => {
-      if (b.pieces.filter((p) => p.id === id).length >= 16 || b.pieces.length >= 90) return b;
+      if (b.pieces.filter((p) => p.id === id).length >= 200 || b.pieces.length >= 450) return b;
       const p: Piece = {
         id,
         x,
@@ -393,13 +409,13 @@ export default function Play({
 
   const serveIt = () => {
     const wait = (performance.now() - orderAt) / 1000;
-    const v = judge(c.order, bowl, wait, c.bonus);
+    const v = judge(c.order, { ...bowl, style: kase }, wait, c.bonus);
     setVerdict(v);
     setPhase('eating');
     setScores((s) => [...s, v.score]);
     const due = priceCents(c.order);
     const paid = v.score >= 30;
-    const tip = paid ? tipCents(v.score, due) : 0;
+    const tip = paid ? Math.round((tipCents(v.score, due) * (1 + decorTip / 100)) / 25) * 25 : 0;
     const bonus = paid ? v.bonus * 10 : 0;
     setBill({ due, given: c.phone ? due : cashGiven(due, levelId), tip, bonus, paid });
     const cost = costCents(bowl);
@@ -468,7 +484,8 @@ export default function Play({
         : 'happy';
   const cookNow = cookStateAt(cookP);
   const hint = tutorial();
-  const drawBowl = { ...bowl, liquid: bowl.broth, takeaway: c.phone };
+  const drawBowl = { ...bowl, liquid: bowl.broth, takeaway: c.phone, style: kase };
+  const guestSize = Math.round(Math.max(220, Math.min(420, stageH * 0.47)));
   const closeUp = station === 0 && (phase === 'talk' || phase === 'react');
   const liquidIsSauce = bowl.broth ? INGREDIENTS[bowl.broth].cat === 'sauce' : false;
 
@@ -480,12 +497,14 @@ export default function Play({
     if (station === 0) return '➡ Hazırlık istasyonuna geç.';
     if (station === 1) {
       if (stage !== 'prep') return '➡ Kase ocakta! Ocak istasyonuna geç.';
+      if (!bowl.noodle && tab === 'bowl')
+        return '0️⃣ Beğendiğin Japon kasesini seç, sonra Erişte sekmesine geç.';
       if (!bowl.noodle) return '1️⃣ Kalınlığı seç, erişte küvetine dokun, sonra kaseye dokun.';
       if (!bowl.broth || bowl.fill < 0.72)
         return '2️⃣ Suyu ya da sosu seç, kaseye BASILI TUT, çizgiye kadar doldur.';
       if (!bowl.pieces.length)
         return '3️⃣ Malzeme küvetini seç, kaseye dokun ya da parmağını sürükle.';
-      return '4️⃣ Sipariş tamamsa “Ocağa koy”a bas.';
+      return '4️⃣ Kaseyi tut ve sağdaki fırına sürükle!';
     }
     if (stage === 'pot') return '🔥 İbre yeşil “Tam kıvam”a gelince Çıkar!';
     if (stage === 'ready') return '🛎 Servis et!';
@@ -512,6 +531,7 @@ export default function Play({
             ))}
           </div>
         </div>
+        <FullscreenButton className="in-hud" />
         <div className="hud-coins">
           <Coin size={18} />
           <b key={coins} className="bump">
@@ -532,31 +552,36 @@ export default function Play({
       )}
 
       {/* STATIONS */}
-      <div className="stage-window">
+      <div className="stage-window" ref={stageRef}>
         <div
           className={`track ${panning ? 'panning' : ''}`}
           style={{ transform: `translateX(${-station * 100}%)` }}>
           {/* SALON */}
           <section className="station salon2">
             <div className="salon-cam">
-              <ShopWall
-                rain={L.id === 5}
-                menu={noodles.map((n) => INGREDIENTS[n].name).join(' • ')}
-                cat={<CatArt size={58} sleepy={phase === 'waiting'} />}
+              <Restaurant
+                decor={decor}
+                rain={L.id === 3 || L.id === 5 || L.id === 9}
+                menu={[...noodles.map((n) => INGREDIENTS[n].name), 'Kuru noodle']}
               />
-              <div className="light-cone a" />
-              <div className="light-cone b" />
+              <div className="salon-cat">
+                <CatArt size={64} sleepy={phase === 'waiting'} />
+              </div>
               {custs.length - idx - 1 > 0 && (
                 <div className="queue-chip">👥 Kapıda {custs.length - idx - 1} müşteri</div>
               )}
               {!c.phone && (
                 <div key={c.id} className={`guest ph-${phase}`}>
-                  <Avatar look={c.look} mood={mood} size={250} eating={phase === 'eating'} />
+                  <Avatar look={c.look} mood={mood} size={guestSize} eating={phase === 'eating'} />
                 </div>
               )}
               {c.phone && (phase === 'eating' || phase === 'react' || phase === 'leave') && (
                 <div className={`guest courier-guest ph-${phase}`}>
-                  <Avatar look={{ ...c.look, special: 'ruzgar' }} mood="happy" size={230} />
+                  <Avatar
+                    look={{ ...c.look, special: 'ruzgar' }}
+                    mood="happy"
+                    size={Math.round(guestSize * 0.92)}
+                  />
                 </div>
               )}
               <div className="counter2">
@@ -570,6 +595,113 @@ export default function Play({
                 display={bill && (phase === 'react' || phase === 'pay') ? fmt(bill.due) : '$0.00'}
               />
               <TipJar amount={jar} bump={jarBump} />
+              {decor.tezgah === 'tezgah-maneki' && (
+                <div className="counter-deco2">
+                  <svg viewBox="0 0 80 100">
+                    <ellipse
+                      cx="40"
+                      cy="70"
+                      rx="28"
+                      ry="26"
+                      fill="#fff"
+                      stroke="#e0d6c8"
+                      strokeWidth="2"
+                    />
+                    <circle cx="40" cy="38" r="24" fill="#fff" stroke="#e0d6c8" strokeWidth="2" />
+                    <path
+                      d="M20 26 L22 8 L34 18z M60 26 L58 8 L46 18z"
+                      fill="#fff"
+                      stroke="#e0d6c8"
+                      strokeWidth="2"
+                    />
+                    <path d="M24 22 L24 13 L31 19z M56 22 L56 13 L49 19z" fill="#ffb3c6" />
+                    <path
+                      d="M30 38 q4 -4 8 0 M42 38 q4 -4 8 0"
+                      stroke="#222"
+                      strokeWidth="2.4"
+                      fill="none"
+                    />
+                    <path d="M37 46 l3 3 l3 -3" stroke="#222" strokeWidth="1.6" fill="none" />
+                    <path d="M18 58 h44" stroke="#c0392b" strokeWidth="5" />
+                    <circle
+                      cx="40"
+                      cy="64"
+                      r="6"
+                      fill="#ffd166"
+                      stroke="#c9a227"
+                      strokeWidth="1.5"
+                    />
+                    <ellipse
+                      cx="40"
+                      cy="82"
+                      rx="14"
+                      ry="10"
+                      fill="#ffd166"
+                      stroke="#c9a227"
+                      strokeWidth="2"
+                    />
+                    <text
+                      x="40"
+                      y="86"
+                      textAnchor="middle"
+                      fontSize="9"
+                      fontWeight="900"
+                      fill="#8a6a00">
+                      福
+                    </text>
+                    <g className="maneki-arm">
+                      <path
+                        d="M58 56 q12 -10 8 -30"
+                        stroke="#fff"
+                        strokeWidth="11"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                      <path
+                        d="M58 56 q12 -10 8 -30"
+                        stroke="#e0d6c8"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        fill="none"
+                      />
+                    </g>
+                  </svg>
+                </div>
+              )}
+              {decor.tezgah === 'tezgah-cicek' && (
+                <div className="counter-deco2">
+                  <svg viewBox="0 0 80 100">
+                    <path
+                      d="M40 92 L36 40 M40 92 L50 30 M40 92 L26 48"
+                      stroke="#2d6a4f"
+                      strokeWidth="3"
+                      fill="none"
+                    />
+                    {[
+                      [36, 38, '#e2557a'],
+                      [50, 28, '#f4a261'],
+                      [26, 46, '#ffffff'],
+                    ].map(([x, y, col], i) => (
+                      <g key={i} transform={`translate(${x} ${y})`}>
+                        {[0, 72, 144, 216, 288].map((a) => (
+                          <ellipse
+                            key={a}
+                            cx="0"
+                            cy="-7"
+                            rx="5"
+                            ry="8"
+                            fill={col as string}
+                            transform={`rotate(${a})`}
+                          />
+                        ))}
+                        <circle r="3.5" fill="#ffd166" />
+                      </g>
+                    ))}
+                    <path d="M16 78 h48 l-6 20 h-36z" fill="#1f3c88" />
+                    <path d="M16 78 h48" stroke="#d4a017" strokeWidth="3" />
+                  </svg>
+                </div>
+              )}
               {c.phone && (phase === 'walkin' || phase === 'talk' || phase === 'waiting') && (
                 <div className={`phone-stand ${phase === 'walkin' ? 'ringing' : ''}`}>📱</div>
               )}
@@ -738,8 +870,36 @@ export default function Play({
                     </button>
                     <button
                       className={`tool-btn go ${bowl.noodle && bowl.fill >= 0.5 ? 'ready' : ''}`}
-                      onClick={toPot}>
-                      Ocağa koy 🔥
+                      style={{ touchAction: 'none' }}
+                      onPointerDown={(e) => {
+                        (e.target as Element).setPointerCapture?.(e.pointerId);
+                        dragStart.current = { x: e.clientX, y: e.clientY };
+                        setDrag({ x: e.clientX, y: e.clientY, over: false });
+                      }}
+                      onPointerMove={(e) => {
+                        if (!dragStart.current) return;
+                        const z = document.querySelector('.oven-drop')?.getBoundingClientRect();
+                        const over =
+                          !!z &&
+                          e.clientX >= z.left - 30 &&
+                          e.clientY >= z.top - 40 &&
+                          e.clientY <= z.bottom + 40;
+                        setDrag({ x: e.clientX, y: e.clientY, over });
+                      }}
+                      onPointerUp={(e) => {
+                        const st = dragStart.current;
+                        dragStart.current = null;
+                        const moved = st ? Math.hypot(e.clientX - st.x, e.clientY - st.y) : 0;
+                        const wasOver = drag?.over;
+                        setDrag(null);
+                        if (moved < 12 || wasOver) toPot();
+                        else sfx('tap');
+                      }}
+                      onPointerCancel={() => {
+                        dragStart.current = null;
+                        setDrag(null);
+                      }}>
+                      ✋ Fırına taşı 🔥
                     </button>
                   </div>
                 </>
@@ -755,7 +915,7 @@ export default function Play({
             {stage === 'prep' && (
               <div className="pantry2">
                 <div className="tabs">
-                  {(['noodle', 'broth', 'topping'] as Tab[]).map((t) => (
+                  {(['bowl', 'noodle', 'broth', 'topping'] as Tab[]).map((t) => (
                     <button
                       key={t}
                       className={`tab ${tab === t ? 'on' : ''}`}
@@ -763,11 +923,13 @@ export default function Play({
                         setTab(t);
                         sfx('tap');
                       }}>
-                      {t === 'noodle'
-                        ? 'Erişte'
-                        : t === 'broth'
-                          ? 'Su & Sos'
-                          : `Malzemeler (${toppings.length})`}
+                      {t === 'bowl'
+                        ? 'Kase'
+                        : t === 'noodle'
+                          ? 'Erişte'
+                          : t === 'broth'
+                            ? 'Su & Sos'
+                            : `Malzemeler (${toppings.length})`}
                     </button>
                   ))}
                 </div>
@@ -789,8 +951,29 @@ export default function Play({
                   </div>
                 )}
                 <div className={`bins bins-${tab}`}>
+                  {tab === 'bowl' &&
+                    BOWLS.map((bs) => (
+                      <button
+                        key={bs.id}
+                        data-id={bs.id}
+                        className={`bin bowlpick ${kase === bs.id ? 'sel in' : ''}`}
+                        onClick={() => {
+                          setKase(bs.id);
+                          sfx('pop');
+                        }}>
+                        <BowlCanvas bowl={{ fill: 0, pieces: [], style: bs.id }} size={72} />
+                        <span>{bs.name}</span>
+                      </button>
+                    ))}
                   {tab === 'broth' && <div className="bin-group">Çorba (su)</div>}
-                  {(tab === 'noodle' ? noodles : tab === 'broth' ? broths : toppings).map((id) => (
+                  {(tab === 'bowl'
+                    ? []
+                    : tab === 'noodle'
+                      ? noodles
+                      : tab === 'broth'
+                        ? broths
+                        : toppings
+                  ).map((id) => (
                     <BinButton
                       key={id}
                       id={id}
@@ -819,20 +1002,38 @@ export default function Play({
                 </div>
               </div>
             )}
+            {stage === 'prep' && (
+              <div
+                className={`oven-drop ${drag ? 'armed' : ''} ${drag?.over ? 'over' : ''}`}
+                onClick={toPot}>
+                <div className="od-door">
+                  <i />
+                </div>
+                <span>🔥 FIRIN</span>
+              </div>
+            )}
           </section>
 
           {/* STOVE */}
           <section className="station stove2">
             <div className="donabe-wrap">
-              <Stove
-                mode={lifting ? 'lift' : stage === 'pot' ? 'boil' : 'idle'}
-                noodle={stage === 'ready' ? undefined : bowl.noodle}
-                thick={bowl.thick}
-                heat={Math.min(1.3, cookP / 100)}
+              <Oven
+                state={
+                  lifting
+                    ? 'opening'
+                    : stage === 'pot'
+                      ? 'cooking'
+                      : stage === 'ready'
+                        ? 'ready'
+                        : 'empty'
+                }
+                bowl={drawBowl}
+                progress={cookP}
+                bowlWidth={Math.round(Math.min(210, window.innerWidth * 0.36, stageH * 0.24))}
               />
               {stage === 'ready' && (
                 <div className="out-bowl">
-                  <BowlCanvas bowl={drawBowl} size={190} />
+                  <BowlSide bowl={drawBowl} width={Math.min(300, Math.round(stageH * 0.36))} />
                   <div className={`cook-badge cb-${bowl.cook}`}>
                     {COOK_LABEL[bowl.cook ?? 'raw']}
                   </div>
@@ -896,6 +1097,17 @@ export default function Play({
         <div className={`hint2 ${station !== 0 && phase === 'waiting' ? 'k' : ''}`}>{hint}</div>
       )}
       {nudge && <div className="nudge2">{nudge}</div>}
+      {drag &&
+        Math.hypot(
+          drag.x - (dragStart.current?.x ?? drag.x),
+          drag.y - (dragStart.current?.y ?? drag.y)
+        ) > 12 && (
+          <div
+            className={`drag-ghost ${drag.over ? 'over' : ''}`}
+            style={{ left: drag.x, top: drag.y }}>
+            <BowlCanvas bowl={drawBowl} size={150} />
+          </div>
+        )}
 
       {/* NAV */}
       <div className="nav">

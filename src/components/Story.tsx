@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react';
 import { CHARS, type Line } from '../data';
 import { Portrait } from '../avatar';
 import { sfx } from '../audio';
-import { ShopWall } from './Scenery';
+import Restaurant from './Restaurant';
+import { DEFAULT_DECOR, type DecorState } from '../decor';
 
 export default function Story({
   heading,
   title,
   lines,
   onDone,
+  decor,
 }: {
   heading: string;
   title: string;
   lines: Line[];
   onDone: () => void;
+  decor?: DecorState;
 }) {
   const [i, setI] = useState(-1);
   const [shown, setShown] = useState(0);
@@ -55,7 +58,7 @@ export default function Story({
   return (
     <div className="screen story" onClick={advance}>
       <div className="story-bg">
-        <ShopWall />
+        <Restaurant decor={decor ?? DEFAULT_DECOR} menu={['Ramen', 'Udon', 'Soba']} rain={false} />
       </div>
       {i === -1 ? (
         <div className="chapter-card">

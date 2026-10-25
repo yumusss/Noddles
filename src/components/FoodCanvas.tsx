@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { drawBowl, trayImage, type BowlDraw, type Thick } from '../food';
+import { bowlStyle, drawBowl, trayImage, type BowlDraw, type Thick } from '../food';
 
 function useDpr() {
   return Math.min(3, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
@@ -65,7 +65,10 @@ export function BowlSide({
       className={`bowl-side ${bowl.takeaway ? 'kraft' : ''}`}
       style={{ width, height: width * 0.78 }}>
       <div className="bs-shadow" />
-      <div className="bs-body" />
+      <div
+        className="bs-body"
+        style={bowl.takeaway ? undefined : { background: bowlStyle(bowl.style).body }}
+      />
       <div className="bs-top">
         <BowlCanvas bowl={bowl} size={width} />
       </div>

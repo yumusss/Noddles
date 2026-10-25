@@ -8,11 +8,15 @@ import Unlock from './components/Unlock';
 import Play, { type DayResult } from './components/Play';
 import Results from './components/Results';
 import { net } from './money';
+import { DEFAULT_DECOR, DEFAULT_OWNED, type DecorState } from './decor';
+import DecorShop from './components/DecorShop';
 import Ending from './components/Ending';
 
 export interface Save {
   reached: number;
   cash: number;
+  decor?: DecorState;
+  owned?: string[];
   stars: number[];
   best: number[];
   sfx: boolean;
@@ -23,6 +27,8 @@ const KEY = 'noddles-save-v1';
 const fresh: Save = {
   reached: 1,
   cash: 4000,
+  decor: DEFAULT_DECOR,
+  owned: DEFAULT_OWNED,
   stars: Array(10).fill(0),
   best: Array(10).fill(0),
   sfx: true,
@@ -47,7 +53,8 @@ type Screen =
   | { s: 'play'; level: number; key: number }
   | { s: 'results'; level: number; result: DayResult }
   | { s: 'outro'; level: number }
-  | { s: 'ending' };
+  | { s: 'ending' }
+  | { s: 'decor' };
 
 export default function App() {
   const [save, setSave] = useState<Save>(load);
@@ -121,6 +128,14 @@ export default function App() {
           onBack={() => setScreen({ s: 'title' })}
           onToggle={toggle}
           onEnding={() => setScreen({ s: 'ending' })}
+          onDecor={() => setScreen({ s: 'decor' })}
+        />
+      )}
+      {screen.s === 'decor' && (
+        <DecorShop
+          save={save}
+          onChange={(cash, decor, owned) => setSave((s) => ({ ...s, cash, decor, owned }))}
+          onBack={() => setScreen({ s: 'map' })}
         />
       )}
       {screen.s === 'intro' && (
@@ -129,6 +144,7 @@ export default function App() {
           heading={`Bölüm ${screen.level}`}
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].intro}
+          decor={save.decor}
           onDone={() => setScreen({ s: 'unlock', level: screen.level })}
         />
       )}
@@ -164,6 +180,7 @@ export default function App() {
           heading="Gün sonu"
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].outro}
+          decor={save.decor}
           onDone={() => {
             if (screen.level === 10) setScreen({ s: 'ending' });
             else startLevel(screen.level + 1);
