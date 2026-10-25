@@ -3,7 +3,7 @@ import { drawBowl, trayImage, type BowlDraw, type Thick } from '../food';
 import { BOWLS, DEFAULT_BOWL } from '../bowls';
 
 function useDpr() {
-  return Math.min(3, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
+  return Math.min(2, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
 }
 
 /** Top-down bowl drawn on canvas in a 300x300 logical space. */
@@ -34,7 +34,7 @@ export function BowlCanvas({
     const c = cv.getContext('2d')!;
     c.setTransform(px / 300, 0, 0, px / 300, 0, 0);
     drawBowl(c, bowl);
-  });
+  }, [bowl, px, ref]);
   return (
     <canvas
       ref={ref}

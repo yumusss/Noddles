@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
@@ -17,7 +17,14 @@ import {
   tipCents,
   type DayLedger,
 } from '../money';
-import { BOWL_R, THICK_LABEL, THICK_W, type Thick } from '../food';
+import {
+  BOWL_R,
+  THICK_LABEL,
+  THICK_W,
+  drawBowl as drawBowlImg,
+  type BowlDraw,
+  type Thick,
+} from '../food';
 import { BowlCanvas, BowlSide, Tray } from './FoodCanvas';
 import {
   COOK_LABEL,
@@ -51,12 +58,15 @@ export interface DayResult {
 type Phase = 'walkin' | 'talk' | 'waiting' | 'eating' | 'react' | 'pay' | 'leave';
 type Tool = { kind: 'noodle' | 'broth' | 'topping'; id: string } | null;
 type Tab = 'bowl' | 'noodle' | 'broth' | 'topping';
+
 type Stage = 'prep' | 'pot' | 'ready';
 
 const SCATTER = new Set(['yesil', 'susam', 'citir', 'filiz', 'misir', 'aciyag', 'biber']);
 const COOK_SPEED = 100 / 7.5; // progress units per second
-const STATIONS = ['Salon', 'Hazırlık', 'Ocak'];
 const MAX_PIECES = 600;
+const BOWL_THUMB: Record<string, BowlDraw> = Object.fromEntries(
+  Object.keys(BOWLS).map((id) => [id, { fill: 0, pieces: [], style: id }])
+);
 const CAT_SPOTS = [
   { left: '6%', bottom: '44%' },
   { left: '72%', bottom: '21%' },
@@ -92,7 +102,6 @@ export default function Play({
   const [paused, setPaused] = useState(false);
   const [closing, setClosing] = useState(false);
   const [typed, setTyped] = useState(0);
-  const [tab, setTab] = useState<Tab>('bowl');
   const [tool, setTool] = useState<Tool>(null);
   const [thick, setThick] = useState<Thick>('orta');
   const [bowl, setBowl] = useState<Bowl>(emptyBowl);
@@ -129,6 +138,7 @@ export default function Play({
   const [orderAt, setOrderAt] = useState(0);
   const [bowlSize, setBowlSize] = useState(300);
   const [drag, setDrag] = useState<{ x: number; y: number; over: boolean } | null>(null);
+  const ghostImg = useRef<string>('');
   const [catSpot, setCatSpot] = useState(0);
 
   const pouring = useRef(false);
@@ -143,7 +153,9 @@ export default function Play({
 
   const c = custs[idx];
   if (typeof window !== 'undefined' && window.location.search.includes('bot'))
-    (window as unknown as { __order: unknown }).__order = c.order;
+    (window as unknown as { __order: unknown; __dbg: unknown }).__order = c.order;
+  if (typeof window !== 'undefined' && window.location.search.includes('bot'))
+    (window as unknown as { __dbg: unknown }).__dbg = { phase, stage, station, typed };
   const speech = phase === 'talk' || phase === 'waiting' ? `${c.greet} ${c.text}` : '';
   const unlocked = unlockedUpTo(levelId);
   const noodles = unlocked.filter((i) => INGREDIENTS[i].cat === 'noodle');
@@ -177,35 +189,16 @@ export default function Play({
     window.setTimeout(() => setNudge((m) => (m === msg ? null : m)), 1600);
   }, []);
 
-  const stageRef = useRef<HTMLDivElement>(null);
   const go = (s: number) => {
-    const el = stageRef.current;
-    if (!el) return;
-    const cur = Math.round(el.scrollLeft / el.clientWidth);
-    if (cur === s) return;
-    setPanning(true);
-    window.setTimeout(() => setPanning(false), 820);
-    sfx('whoosh');
-    el.scrollTo({ left: s * el.clientWidth, behavior: 'smooth' });
+    const v = s > 0 ? 1 : 0;
+    setStation((cur) => {
+      if (cur === v) return cur;
+      setPanning(true);
+      window.setTimeout(() => setPanning(false), 820);
+      sfx('whoosh');
+      return v;
+    });
   };
-  // keep `station` in sync with the swipe position
-  useEffect(() => {
-    const el = stageRef.current;
-    if (!el) return;
-    let raf = 0;
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const s = Math.round(el.scrollLeft / el.clientWidth);
-        setStation((cur) => (cur === s ? cur : s));
-      });
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
 
   // ---------- customer flow ----------
   useEffect(() => {
@@ -322,7 +315,6 @@ export default function Play({
     setBowl(emptyBowl());
     setStage('prep');
     setCookP(0);
-    setTab('bowl');
     setTool(null);
     sfx('ding');
     window.setTimeout(() => go(1), 350);
@@ -374,7 +366,6 @@ export default function Play({
       sfx('drop');
       buzz(15);
       if (!bowl.broth) {
-        setTab('broth');
         setTool(null);
       }
     } else if (tool.kind === 'broth') {
@@ -397,7 +388,6 @@ export default function Play({
     if (pouring.current) {
       pouring.current = false;
       if (bowl.fill >= 0.7) {
-        setTab('topping');
         setTool(null);
       }
     }
@@ -409,11 +399,20 @@ export default function Play({
     if (!bowl.noodle) return flash('Kasede erişte yok!');
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
     dragRef.current = { sx: e.clientX, sy: e.clientY, on: false };
+    ghostImg.current = snapshotBowl();
     setDrag({ x: e.clientX, y: e.clientY, over: false });
     sfx('tap');
     buzz(10);
   };
-  const edgeTimer = useRef(0);
+  /** one cheap raster of the bowl for the drag ghost (no per-frame redraws) */
+  const snapshotBowl = () => {
+    const cv = document.createElement('canvas');
+    cv.width = 300;
+    cv.height = 300;
+    const ctx = cv.getContext('2d')!;
+    drawBowlImg(ctx, drawBowl);
+    return cv.toDataURL();
+  };
   const moveDrag = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
@@ -430,20 +429,6 @@ export default function Play({
       d.on = over;
       if (over) buzz(12);
     }
-    // carrying the bowl to the edge of the screen pans the kitchen
-    const el = stageRef.current;
-    if (el) {
-      const w = el.clientWidth;
-      const now = performance.now();
-      const cur = Math.round(el.scrollLeft / w);
-      if (e.clientX > window.innerWidth * 0.88 && now > edgeTimer.current && cur < 2) {
-        edgeTimer.current = now + 900;
-        go(cur + 1);
-      } else if (e.clientX < window.innerWidth * 0.12 && now > edgeTimer.current && cur > 0) {
-        edgeTimer.current = now + 900;
-        go(cur - 1);
-      }
-    }
     setDrag({ x: e.clientX, y: e.clientY, over });
   };
   const endDrag = () => {
@@ -458,6 +443,7 @@ export default function Play({
     if (stage !== 'ready') return;
     (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
     dragRef.current = { sx: e.clientX, sy: e.clientY, on: false };
+    ghostImg.current = snapshotBowl();
     setDrag({ x: e.clientX, y: e.clientY, over: false });
     sfx('tap');
     buzz(10);
@@ -471,7 +457,6 @@ export default function Play({
     const wasted = costCents(bowl);
     if (wasted > 0) setLedger((l) => ({ ...l, waste: l.waste + wasted }));
     setBowl(emptyBowl());
-    setTab('bowl');
     setTool(null);
     sfx('trash');
   };
@@ -576,28 +561,28 @@ export default function Play({
         : 'happy';
   const cookNow = cookStateAt(cookP);
   const hint = tutorial();
-  const drawBowl = { ...bowl, liquid: bowl.broth, takeaway: c.phone, style: bowl.style };
+  const drawBowl = useMemo(
+    () => ({ ...bowl, liquid: bowl.broth, takeaway: c.phone, style: bowl.style }),
+    [bowl, c.phone]
+  );
   const closeUp = station === 0 && (phase === 'talk' || phase === 'react');
   const liquidIsSauce = bowl.broth ? INGREDIENTS[bowl.broth].cat === 'sauce' : false;
 
   function tutorial(): string | null {
-    if (levelId > 2 || !started) return null;
+    if (levelId > 1 || !started) return null;
     if (phase === 'talk') return '👂 Müşteriyi dinle, sonra “Siparişi al”a bas.';
     if (phase === 'pay') return '💵 Verilen paradan hesabı çıkar, para üstünü çekmeceden seç.';
     if (phase !== 'waiting') return null;
-    if (station === 0) return '👉 Sağa kaydır: mutfak orada.';
+    if (station === 0) return '👉 “Mutfak” düğmesine bas.';
     if (station === 1) {
-      if (stage !== 'prep') return '👉 Erişte kaynıyor! Ocağa kaydır.';
-      if (!bowl.style) return '🥣 Önce bir kase seç.';
-      if (!bowl.noodle) return '1️⃣ Kalınlığı seç, erişte küvetine dokun, sonra kaseye dokun.';
-      if (!bowl.broth || bowl.fill < 0.72)
-        return '2️⃣ Suyu ya da sosu seç, kaseye BASILI TUT, çizgiye kadar doldur.';
-      if (!bowl.pieces.length)
-        return '3️⃣ Malzeme küvetini seç, kaseye dokun ya da parmağını sürükle.';
-      return '4️⃣ Sipariş tamamsa kaseyi tut, sağa taşı, kaynar suya bırak.';
+      if (stage === 'pot') return 'Kadran “Tam”a gelince Çıkar!';
+      if (stage === 'ready') return 'Kaseyi tut, servis penceresine bırak.';
+      if (!bowl.style) return 'Sağdan bir kase seç.';
+      if (!bowl.noodle) return 'Kalınlığı seç, erişte küvetine dokun, sonra kaseye dokun.';
+      if (!bowl.broth || bowl.fill < 0.72) return 'Suyu seç, kaseye basılı tutarak doldur.';
+      if (!bowl.pieces.length) return 'Malzeme küvetini seç, kaseye serpiştir.';
+      return 'Kaseyi tutup kaynar suya bırak.';
     }
-    if (stage === 'pot') return '🔥 Kadran yeşil “Tam”a gelince Çıkar!';
-    if (stage === 'ready') return '✋ Kaseyi tut, salona taşı, tezgâha bırak.';
     return null;
   }
 
@@ -629,20 +614,11 @@ export default function Play({
         </div>
       </div>
 
-      {/* TICKET */}
-      {phase === 'waiting' && station !== 0 && (
-        <div className="slip">
-          <div className="slip-head">
-            {c.phone ? '📱' : '🪑'} {c.name}
-            {c.special && <span className="slip-vip">ÖZEL MİSAFİR</span>}
-          </div>
-          <div className="slip-text">{c.text}</div>
-        </div>
-      )}
-
       {/* STATIONS */}
-      <div className={`stage-window scroller ${drag ? 'dragging' : ''}`} ref={stageRef}>
-        <div className={`track ${panning ? 'panning' : ''}`}>
+      <div className="stage-window">
+        <div
+          className={`track ${panning ? 'panning' : ''}`}
+          style={{ transform: `translateX(${-station * 100}%)` }}>
           {/* SALON */}
           <section className="station salon2">
             <div className="salon-cam">
@@ -733,7 +709,7 @@ export default function Play({
                 )}
                 {phase === 'waiting' && (
                   <button className="btn ghost talk-btn" onClick={() => go(1)}>
-                    Mutfağa kaydır →
+                    Mutfağa geç →
                   </button>
                 )}
               </div>
@@ -796,188 +772,9 @@ export default function Play({
             )}
           </section>
 
-          {/* PREP */}
-          <section className="station prep">
-            <div className="prep-board" ref={boardRef}>
-              {stage === 'prep' ? (
-                <>
-                  <div className={`bowl-wrap ${tool?.kind === 'broth' ? 'pour' : ''}`}>
-                    <BowlCanvas
-                      bowl={drawBowl}
-                      size={bowlSize}
-                      className="bowl-cv"
-                      canvasRef={cvRef}
-                      onDown={onDown}
-                      onMove={onMove}
-                      onUp={onUp}
-                    />
-                    {tool && (
-                      <div className="tool-chip">
-                        {tool.kind === 'noodle'
-                          ? `${THICK_LABEL[thick]} ${INGREDIENTS[tool.id].name}: kaseye dokun`
-                          : tool.kind === 'broth'
-                            ? `${INGREDIENTS[tool.id].name}: basılı tut`
-                            : `${INGREDIENTS[tool.id].name}: dokun ya da sürükle`}
-                      </div>
-                    )}
-                  </div>
-                  <div className="fill-gauge">
-                    <div className="fg-band" />
-                    <div
-                      className="fg-fill"
-                      style={{
-                        width: `${Math.min(100, (bowl.fill / 1.25) * 100)}%`,
-                        background: bowl.broth ? INGREDIENTS[bowl.broth].color : '#888',
-                      }}
-                    />
-                    <span>
-                      {bowl.broth
-                        ? bowl.fill > 1.03
-                          ? liquidIsSauce
-                            ? 'Sos çok fazla!'
-                            : 'Taşıyor!'
-                          : bowl.fill >= 0.72
-                            ? liquidIsSauce
-                              ? 'Sos tamam'
-                              : 'Su tamam'
-                            : liquidIsSauce
-                              ? 'Sos miktarı'
-                              : 'Su seviyesi'
-                        : 'Su / sos yok'}
-                    </span>
-                  </div>
-                  <div className="prep-tools">
-                    <button className="tool-btn" onClick={undo} disabled={!bowl.pieces.length}>
-                      ↶ Geri al
-                    </button>
-                    <button className="tool-btn" onClick={trash}>
-                      🗑 Boşalt
-                    </button>
-                    <button
-                      className={`tool-btn go ${bowl.noodle && bowl.fill >= 0.5 ? 'ready' : ''}`}
-                      onPointerDown={startDrag}
-                      onPointerMove={moveDrag}
-                      onPointerUp={endDrag}
-                      onPointerCancel={endDrag}>
-                      ✋ Ocağa sürükle
-                    </button>
-                  </div>
-                  {drag &&
-                    createPortal(
-                      <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
-                        <BowlCanvas bowl={drawBowl} size={Math.round(bowlSize * 0.6)} />
-                      </div>,
-                      document.body
-                    )}
-                </>
-              ) : (
-                <div className="prep-empty">
-                  <p>{stage === 'pot' ? 'Erişte kaynar suda!' : 'Kase hazır, servis bekliyor.'}</p>
-                  <button className="btn primary" onClick={() => go(2)}>
-                    Ocağa git →
-                  </button>
-                </div>
-              )}
-            </div>
-            {stage === 'prep' && (
-              <div className="pantry2">
-                <div className="tabs">
-                  {(['bowl', 'noodle', 'broth', 'topping'] as Tab[]).map((t) => (
-                    <button
-                      key={t}
-                      className={`tab ${tab === t ? 'on' : ''}`}
-                      onClick={() => {
-                        setTab(t);
-                        sfx('tap');
-                      }}>
-                      {t === 'bowl'
-                        ? 'Kase'
-                        : t === 'noodle'
-                          ? 'Erişte'
-                          : t === 'broth'
-                            ? 'Su & Sos'
-                            : `Malzemeler (${toppings.length})`}
-                    </button>
-                  ))}
-                </div>
-                {tab === 'noodle' && (
-                  <div className="thick-row">
-                    {(['ince', 'orta', 'kalin'] as Thick[]).map((t) => (
-                      <button
-                        key={t}
-                        className={`thick ${thick === t ? 'on' : ''}`}
-                        onClick={() => {
-                          setThick(t);
-                          sfx('tap');
-                        }}>
-                        <i style={{ height: THICK_W[t] * 1.4 }} />
-                        <i style={{ height: THICK_W[t] * 1.4 }} />
-                        <span>{THICK_LABEL[t]}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {tab === 'bowl' && (
-                  <div className="bowl-picker">
-                    {bowlStyles.map((id) => (
-                      <button
-                        key={id}
-                        className={`bowl-opt ${bowl.style === id ? 'on' : ''}`}
-                        onClick={() => {
-                          setBowl((b) => ({ ...b, style: id }));
-                          setTab('noodle');
-                          sfx('drop');
-                          buzz(10);
-                        }}>
-                        <BowlCanvas bowl={{ fill: 0, pieces: [], style: id }} size={84} />
-                        <span>{BOWLS[id].name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <div className={`bins bins-${tab}`}>
-                  {tab === 'broth' && <div className="bin-group">Çorba (su)</div>}
-                  {(tab === 'noodle'
-                    ? noodles
-                    : tab === 'broth'
-                      ? broths
-                      : tab === 'bowl'
-                        ? []
-                        : toppings
-                  ).map((id) => (
-                    <BinButton
-                      key={id}
-                      id={id}
-                      tab={tab}
-                      bowl={bowl}
-                      tool={tool}
-                      thick={thick}
-                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
-                    />
-                  ))}
-                  {tab === 'broth' && sauces.length > 0 && (
-                    <div className="bin-group">Kuru noodle (sos)</div>
-                  )}
-                  {tab === 'broth' &&
-                    sauces.map((id) => (
-                      <BinButton
-                        key={id}
-                        id={id}
-                        tab={tab}
-                        bowl={bowl}
-                        tool={tool}
-                        thick={thick}
-                        onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
-                      />
-                    ))}
-                </div>
-              </div>
-            )}
-          </section>
-
-          {/* STOVE */}
-          <section className="station stove2">
-            <div className="donabe-wrap">
+          {/* KITCHEN */}
+          <section className="station kitchen">
+            <div className="pot-area">
               <Kamado
                 mode={lifting ? 'lift' : stage === 'pot' ? 'boil' : 'idle'}
                 noodle={stage === 'ready' ? undefined : bowl.noodle}
@@ -990,6 +787,20 @@ export default function Play({
                 <span>♨</span>
                 <b>Kaynar su</b>
               </div>
+              <div
+                ref={serveRef}
+                className={`hatch ${stage === 'ready' ? 'open' : ''} ${drag && stage === 'ready' ? 'show' : ''} ${drag?.over && stage === 'ready' ? 'hot' : ''}`}>
+                <i />
+                <b>{c.phone ? 'Paket' : 'Servis'}</b>
+              </div>
+              {stage === 'pot' && (
+                <div className="cook-ctl">
+                  <div className={`cook-now cb-${cookNow}`}>{COOK_LABEL[cookNow]}</div>
+                  <button className="btn big primary" onClick={takeOut}>
+                    Çıkar!
+                  </button>
+                </div>
+              )}
               {stage === 'ready' && (
                 <div
                   className={`out-bowl carry ${drag ? 'lifted' : ''}`}
@@ -997,68 +808,195 @@ export default function Play({
                   onPointerMove={moveDrag}
                   onPointerUp={endDrag}
                   onPointerCancel={endDrag}>
-                  <BowlCanvas bowl={drawBowl} size={190} />
+                  <BowlCanvas bowl={drawBowl} size={150} />
                   <div className={`cook-badge cb-${bowl.cook}`}>
                     {COOK_LABEL[bowl.cook ?? 'raw']}
                   </div>
                 </div>
               )}
             </div>
-            {stage === 'pot' && (
-              <div className="cook-panel">
-                <div className={`cook-now cb-${cookNow}`}>{COOK_LABEL[cookNow]}</div>
-                <button className="btn big primary" onClick={takeOut}>
-                  Çıkar!
-                </button>
+
+            <div className="prep-area">
+              {phase === 'waiting' && (
+                <div className="slip">
+                  <div className="slip-head">
+                    {c.phone ? '📱' : '🪑'} {c.name}
+                    {c.special && <span className="slip-vip">ÖZEL MİSAFİR</span>}
+                  </div>
+                  <div className="slip-text">{c.text}</div>
+                </div>
+              )}
+              <div className="prep-board" ref={boardRef}>
+                {stage === 'prep' ? (
+                  <>
+                    <div className={`bowl-wrap ${tool?.kind === 'broth' ? 'pour' : ''}`}>
+                      <BowlCanvas
+                        bowl={drawBowl}
+                        size={bowlSize}
+                        className="bowl-cv"
+                        canvasRef={cvRef}
+                        onDown={onDown}
+                        onMove={onMove}
+                        onUp={onUp}
+                      />
+                    </div>
+                    <div className="fill-gauge">
+                      <div className="fg-band" />
+                      <div
+                        className="fg-fill"
+                        style={{
+                          width: `${Math.min(100, (bowl.fill / 1.25) * 100)}%`,
+                          background: bowl.broth ? INGREDIENTS[bowl.broth].color : '#888',
+                        }}
+                      />
+                      <span>
+                        {bowl.broth
+                          ? bowl.fill > 1.03
+                            ? liquidIsSauce
+                              ? 'Sos çok fazla'
+                              : 'Taşıyor'
+                            : bowl.fill >= 0.72
+                              ? liquidIsSauce
+                                ? 'Sos tamam'
+                                : 'Su tamam'
+                              : liquidIsSauce
+                                ? 'Sos'
+                                : 'Su'
+                          : ''}
+                      </span>
+                    </div>
+                    <div className="prep-tools">
+                      <button className="tool-btn" onClick={undo} disabled={!bowl.pieces.length}>
+                        ↶
+                      </button>
+                      <button className="tool-btn" onClick={trash}>
+                        🗑
+                      </button>
+                      <button
+                        className={`tool-btn go ${bowl.noodle && bowl.fill >= 0.5 ? 'ready' : ''}`}
+                        onPointerDown={startDrag}
+                        onPointerMove={moveDrag}
+                        onPointerUp={endDrag}
+                        onPointerCancel={endDrag}>
+                        ✋ Kaseyi tut
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="prep-empty" />
+                )}
               </div>
-            )}
-            {stage === 'ready' && (
-              <div className="cook-panel idle">
-                <p>
-                  {c.phone
-                    ? 'Kaseyi tut, salona taşı ve paketle.'
-                    : 'Kaseyi tut, salona taşı ve tezgâha bırak.'}
-                </p>
+            </div>
+
+            <aside className="rail">
+              <div className="rail-sec">
+                <div className="rail-h">Kase</div>
+                <div className="rail-row">
+                  {bowlStyles.map((id) => (
+                    <button
+                      key={id}
+                      className={`bowl-opt ${bowl.style === id ? 'on' : ''}`}
+                      onClick={() => {
+                        setBowl((b) => ({ ...b, style: id }));
+                        sfx('drop');
+                        buzz(10);
+                      }}
+                      aria-label={BOWLS[id].name}>
+                      <BowlCanvas bowl={BOWL_THUMB[id]} size={44} />
+                    </button>
+                  ))}
+                </div>
               </div>
-            )}
-            {stage === 'prep' && (
-              <div className="cook-panel idle">
-                <p>
-                  {phase === 'waiting'
-                    ? 'Kaseyi hazırlıkta hazırla, sonra kaynar suya sürükle.'
-                    : 'Ocak boşta.'}
-                </p>
+              <div className="rail-sec">
+                <div className="rail-h">Erişte</div>
+                <div className="thick-row">
+                  {(['ince', 'orta', 'kalin'] as Thick[]).map((t) => (
+                    <button
+                      key={t}
+                      className={`thick ${thick === t ? 'on' : ''}`}
+                      onClick={() => {
+                        setThick(t);
+                        sfx('tap');
+                      }}>
+                      <i style={{ height: THICK_W[t] * 1.4 }} />
+                      <span>{THICK_LABEL[t]}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="bins">
+                  {noodles.map((id) => (
+                    <BinButton
+                      key={id}
+                      id={id}
+                      tab="noodle"
+                      bowl={bowl}
+                      tool={tool}
+                      thick={thick}
+                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
+                    />
+                  ))}
+                </div>
               </div>
-            )}
+              <div className="rail-sec">
+                <div className="rail-h">Su & Sos</div>
+                <div className="bins">
+                  {[...broths, ...sauces].map((id) => (
+                    <BinButton
+                      key={id}
+                      id={id}
+                      tab="broth"
+                      bowl={bowl}
+                      tool={tool}
+                      thick={thick}
+                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="rail-sec">
+                <div className="rail-h">Malzemeler</div>
+                <div className="bins">
+                  {toppings.map((id) => (
+                    <BinButton
+                      key={id}
+                      id={id}
+                      tab="topping"
+                      bowl={bowl}
+                      tool={tool}
+                      thick={thick}
+                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
+                    />
+                  ))}
+                </div>
+              </div>
+            </aside>
           </section>
         </div>
         <div className="vignette" />
-        <div className="film-grain" />
       </div>
+      {drag &&
+        createPortal(
+          <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
+            <img src={ghostImg.current} alt="" width={Math.round(bowlSize * 0.55)} />
+          </div>,
+          document.body
+        )}
 
-      {hint && (
-        <div className={`hint2 ${station !== 0 && phase === 'waiting' ? 'k' : ''}`}>{hint}</div>
-      )}
+      {hint && <div className="hint2">{hint}</div>}
       {nudge && <div className="nudge2">{nudge}</div>}
 
-      {/* swipe indicator */}
-      <div className="kdots">
-        {STATIONS.map((s, i) => (
-          <button
-            key={s}
-            className={`kdot ${station === i ? 'on' : ''} ${
-              (i === 0 && phase === 'talk' && station !== 0) ||
-              (i === 2 && stage === 'pot' && station !== 2 && cookP > 70)
-                ? 'alert'
-                : ''
-            }`}
-            aria-label={s}
-            onClick={() => go(i)}>
-            <i />
-            <span>{s}</span>
-          </button>
-        ))}
-      </div>
+      {/* front ⇄ kitchen */}
+      <button
+        className={`flip ${station === 0 ? 'to-kitchen' : 'to-front'} ${
+          (station !== 0 && phase === 'talk') ||
+          (station === 0 && phase === 'waiting' && stage === 'prep')
+            ? 'alert'
+            : ''
+        }`}
+        onClick={() => go(station === 0 ? 1 : 0)}
+        aria-label={station === 0 ? 'Mutfağa geç' : 'Salona geç'}>
+        {station === 0 ? 'Mutfak ›' : '‹ Salon'}
+      </button>
 
       {intro && (
         <Establishing

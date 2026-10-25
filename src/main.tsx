@@ -5,6 +5,7 @@ import './v2.css';
 import './decor.css';
 import './characters.css';
 import './theme.css';
+import './kitchen.css';
 import App from './App.tsx';
 import Gallery from './components/Gallery.tsx';
 
