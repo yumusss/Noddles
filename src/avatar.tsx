@@ -11,21 +11,22 @@ type Opts = Record<string, unknown>;
 const HAIR = ['sideComed', 'undercut', 'spiky', 'bun'] as const;
 const REAR = ['longStraight', 'longWavy', 'shoulderHigh', 'neckHigh'] as const;
 const CLOTHES = ['turtleNeck', 'openJacket', 'dress', 'shirt', 'tShirt'] as const;
+// soft, cohesive "café" palette so every customer looks like they belong in the same picture
 const CLOTH_COL = [
-  '545454',
-  'b11f1f',
-  '0b3286',
-  '147f3c',
-  'eab308',
-  '731ac3',
-  'ec4899',
-  'f97316',
-  '2a9d8f',
-  'e8e9e6',
-  '6d4c41',
+  '9cb89a',
+  'e3a7a1',
+  'f2d58b',
+  'a9c4dc',
+  'b8a9d6',
+  'd98b6c',
+  'f3ead9',
+  '9a7b62',
+  '7fb3ad',
+  'f4c7b5',
+  '6f8fa8',
 ];
-const SKIN = ['f1c3a5', 'c68e7a', 'b98e6a', 'a36b4f', '5c3829', 'f7d7c4'];
-const HAIR_COL = ['2c1b18', 'a55728', 'b58143', 'd6b370', '724133', '111111', 'c0c0c0'];
+const SKIN = ['f6d5c0', 'eec3a5', 'd9a27f', 'b98163', '8a5a44', 'f9e0d0'];
+const HAIR_COL = ['3b2a24', '6b4630', 'a0704a', 'd9b07a', '2a2a2e', '8a5a44', 'c98f6a'];
 const BEARD = ['moustacheTwirl', 'fullBeard', 'chin', 'chinMoustache', 'longBeard'] as const;
 
 function seeded(seed: number) {

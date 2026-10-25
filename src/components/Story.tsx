@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { CHARS, type Line } from '../data';
 import { Portrait } from '../avatar';
 import { sfx } from '../audio';
-import Restaurant from './Restaurant';
-import { DEFAULT_DECOR, type DecorState } from '../decor';
+import Restaurant, { type TimeOfDay } from './Restaurant';
+import { withDefaults, type DecorState } from '../decor';
 
 export default function Story({
   heading,
@@ -11,12 +11,14 @@ export default function Story({
   lines,
   onDone,
   decor,
+  tod,
 }: {
   heading: string;
   title: string;
   lines: Line[];
   onDone: () => void;
-  decor?: DecorState;
+  decor?: Partial<DecorState>;
+  tod?: TimeOfDay;
 }) {
   const [i, setI] = useState(-1);
   const [shown, setShown] = useState(0);
@@ -58,7 +60,7 @@ export default function Story({
   return (
     <div className="screen story" onClick={advance}>
       <div className="story-bg">
-        <Restaurant decor={decor ?? DEFAULT_DECOR} menu={['Ramen', 'Udon', 'Soba']} rain={false} />
+        <Restaurant decor={withDefaults(decor)} menu={['Ramen', 'Udon', 'Soba']} tod={tod} />
       </div>
       {i === -1 ? (
         <div className="chapter-card">

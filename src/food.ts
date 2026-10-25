@@ -892,67 +892,80 @@ function nest(
     col = mixHex(col, '#b9a88a', 0.4);
     w *= 1.35;
   }
-  const radius = dry ? 108 : 86;
-  const count = Math.round(
-    (dry ? 1.35 : 1) * (thick === 'ince' ? 150 : thick === 'orta' ? 100 : 56)
+  // Neat, folded bundles of parallel strands (the classic illustrated ramen look).
+  const radius = dry ? 112 : 92;
+  const crinkle =
+    noodle === 'ramen' ? 1 : noodle === 'soba' ? 0.25 : noodle === 'pirinc' ? 0.15 : 0.35;
+  const spacing = w * 1.18;
+  // each bundle is a set of parallel arcs: noodles folded into a neat swirl
+  const bundles = dry
+    ? [
+        { cx: -18, cy: -10, rr: 62, a0: 2.6, span: 3.6 },
+        { cx: 20, cy: 14, rr: 58, a0: -0.6, span: 3.4 },
+        { cx: 0, cy: 0, rr: 30, a0: 0.8, span: 4.2 },
+        { cx: -6, cy: 26, rr: 74, a0: 3.6, span: 2.2 },
+      ]
+    : [
+        { cx: -14, cy: -8, rr: 52, a0: 2.4, span: 3.4 },
+        { cx: 16, cy: 12, rr: 50, a0: -0.8, span: 3.3 },
+        { cx: 0, cy: 0, rr: 24, a0: 0.6, span: 4 },
+      ];
+  const perBundle = Math.round(
+    (thick === 'ince' ? 15 : thick === 'orta' ? 10 : 6) * (cook === 'burnt' ? 1.2 : 1)
   );
-  const curl = cook === 'raw' ? 0.18 : 0.42;
-  const strands: [number, number][][] = [];
-  for (let i = 0; i < count; i++) {
-    let a = r() * TAU;
-    const d = Math.sqrt(r()) * radius * 0.85;
-    let x = 150 + Math.cos(a) * d;
-    let y = 150 + Math.sin(a) * d;
-    let dir = r() * TAU;
-    const pts: [number, number][] = [[x, y]];
-    const segs = 9 + Math.floor(r() * 6);
-    for (let k = 0; k < segs; k++) {
-      dir += (r() - 0.5) * curl * 2;
-      x += Math.cos(dir) * 12;
-      y += Math.sin(dir) * 12;
-      const dd = Math.hypot(x - 150, y - 150);
-      if (dd > radius) {
-        a = Math.atan2(y - 150, x - 150);
-        dir = a + Math.PI + (r() - 0.5);
-        x = 150 + Math.cos(a) * radius;
-        y = 150 + Math.sin(a) * radius;
-      }
-      pts.push([x, y]);
-    }
-    strands.push(pts);
-  }
-  const path = (pts: [number, number][], ox = 0, oy = 0) => {
-    c.beginPath();
-    c.moveTo(pts[0][0] + ox, pts[0][1] + oy);
-    for (let k = 1; k < pts.length - 1; k++) {
-      const mx = (pts[k][0] + pts[k + 1][0]) / 2;
-      const my = (pts[k][1] + pts[k + 1][1]) / 2;
-      c.quadraticCurveTo(pts[k][0] + ox, pts[k][1] + oy, mx + ox, my + oy);
-    }
-  };
+  c.save();
+  c.beginPath();
+  c.arc(150, 150, radius, 0, TAU);
+  c.clip();
   c.lineCap = 'round';
   c.lineJoin = 'round';
-  for (const s of strands) {
-    path(s, 0.8, 1.6);
-    c.strokeStyle = 'rgba(40,20,0,.28)';
-    c.lineWidth = w + 1.8;
+  const amp = (cook === 'raw' ? 1.2 : 2.1) * crinkle + (noodle === 'udon' ? 0.6 : 0);
+  for (const bd of bundles) {
+    const ox = 150 + bd.cx;
+    const oy = 150 + bd.cy;
+    // soft contact shadow under the bundle
+    c.save();
+    c.globalAlpha = 0.2;
+    c.strokeStyle = '#3a2208';
+    c.lineWidth = perBundle * spacing + 8;
+    c.beginPath();
+    c.arc(ox + 2, oy + 4, bd.rr, bd.a0, bd.a0 + bd.span);
     c.stroke();
-    path(s);
-    c.strokeStyle = tint(col, -0.18);
-    c.lineWidth = w;
-    c.stroke();
-    path(s);
-    c.strokeStyle = col;
-    c.lineWidth = w * 0.7;
-    c.stroke();
-    path(s, -w * 0.18, -w * 0.22);
-    c.strokeStyle = sauce ? 'rgba(255,240,210,.55)' : 'rgba(255,252,240,.6)';
-    c.lineWidth = Math.max(0.7, w * 0.26);
-    c.stroke();
+    c.restore();
+    for (let k = 0; k < perBundle; k++) {
+      const lane = (k - (perBundle - 1) / 2) * spacing;
+      const R0 = Math.max(4, bd.rr + lane);
+      const ph = r() * TAU;
+      const freq = (noodle === 'ramen' ? 22 : 8) + r() * 3;
+      const a0 = bd.a0 + (r() - 0.5) * 0.25;
+      const a1 = bd.a0 + bd.span + (r() - 0.5) * 0.35;
+      const pts: [number, number][] = [];
+      for (let a = a0; a <= a1; a += 0.03) {
+        const rr = R0 + Math.sin(a * freq + ph) * amp;
+        pts.push([ox + Math.cos(a) * rr, oy + Math.sin(a) * rr]);
+      }
+      const stroke = (width: number, style: string, dx = 0, dy = 0) => {
+        c.beginPath();
+        c.moveTo(pts[0][0] + dx, pts[0][1] + dy);
+        for (let q = 1; q < pts.length; q++) c.lineTo(pts[q][0] + dx, pts[q][1] + dy);
+        c.strokeStyle = style;
+        c.lineWidth = width;
+        c.stroke();
+      };
+      stroke(w + 1.2, tint(col, -0.26));
+      stroke(w, col);
+      stroke(
+        Math.max(0.6, w * 0.32),
+        sauce ? 'rgba(255,236,200,.55)' : 'rgba(255,253,244,.72)',
+        -w * 0.16,
+        -w * 0.2
+      );
+    }
   }
+  c.restore();
   if (noodle === 'pirinc') {
     c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = 'rgba(255,255,255,.15)';
+    c.fillStyle = 'rgba(255,255,255,.18)';
     c.fillRect(0, 0, 300, 300);
     c.globalCompositeOperation = 'source-over';
   }
@@ -1157,27 +1170,20 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
     // glossy sauce drizzle over the noodles
     const r = rng(hash(b.liquid! + 'z'));
     c.lineCap = 'round';
-    const lines = Math.round(6 + f * 10);
-    for (let i = 0; i < lines; i++) {
-      let x = cx + (r() - 0.5) * 150;
-      let y = cy + (r() - 0.5) * 150;
-      let dir = r() * TAU;
+    // glossy sauce pooled between the folds
+    for (let i = 0; i < Math.round(4 + f * 6); i++) {
+      const a = r() * TAU;
+      const d = 20 + r() * 80;
+      const x = cx + Math.cos(a) * d;
+      const y = cy + Math.sin(a) * d;
+      const rr = 6 + r() * 10;
+      const g = c.createRadialGradient(x - rr * 0.3, y - rr * 0.3, 1, x, y, rr);
+      g.addColorStop(0, tint(liq.color, 0.35, 0.85));
+      g.addColorStop(1, tint(liq.color, -0.1, 0));
+      c.fillStyle = g;
       c.beginPath();
-      c.moveTo(x, y);
-      for (let k = 0; k < 6; k++) {
-        dir += (r() - 0.5) * 1.6;
-        const nx = x + Math.cos(dir) * 14;
-        const ny = y + Math.sin(dir) * 14;
-        c.quadraticCurveTo(x + Math.cos(dir + 0.8) * 8, y + Math.sin(dir + 0.8) * 8, nx, ny);
-        x = nx;
-        y = ny;
-      }
-      c.strokeStyle = tint(liq.color, 0.05, 0.55);
-      c.lineWidth = 1.8 + r() * 1.4;
-      c.stroke();
-      c.strokeStyle = 'rgba(255,255,255,.4)';
-      c.lineWidth = 0.9;
-      c.stroke();
+      c.ellipse(x, y, rr, rr * 0.7, a, 0, TAU);
+      c.fill();
     }
     gloss(c, cx - 36, cy - 40, 50, 18, -0.6, 0.18);
     c.fillStyle = tint(liq.color, -0.2, 0.55 * f);
@@ -1286,30 +1292,65 @@ export function trayImage(id: string, thick: Thick = 'orta'): HTMLCanvasElement 
     trays.set(key, cv);
     return cv;
   }
-  // steel hotel pan
+  // ceramic dish (toppings) or bamboo zaru basket (noodles), seen from above
+  const basket = ing.cat === 'noodle';
   const pan = new Path2D();
-  pan.roundRect(8, 8, W - 16, H - 16, 18);
+  pan.roundRect(8, 8, W - 16, H - 16, basket ? 60 : 26);
   c.save();
-  c.shadowColor = 'rgba(0,0,0,.55)';
+  c.shadowColor = 'rgba(80,50,30,.35)';
   c.shadowBlur = 10;
   c.shadowOffsetY = 5;
-  c.fillStyle = '#8b949f';
+  c.fillStyle = basket ? '#b08a55' : '#e4d6c2';
   c.fill(pan);
   c.restore();
   const pg = c.createLinearGradient(0, 8, 0, H - 8);
-  pg.addColorStop(0, '#eef2f6');
-  pg.addColorStop(0.5, '#aab3be');
-  pg.addColorStop(1, '#7d8692');
+  if (basket) {
+    pg.addColorStop(0, '#e6c891');
+    pg.addColorStop(1, '#b98f57');
+  } else {
+    pg.addColorStop(0, '#fffdf8');
+    pg.addColorStop(0.6, '#f1e7d8');
+    pg.addColorStop(1, '#dccbb3');
+  }
   c.fillStyle = pg;
   c.fill(pan);
   const well = new Path2D();
-  well.roundRect(20, 20, W - 40, H - 40, 12);
+  well.roundRect(20, 20, W - 40, H - 40, basket ? 50 : 18);
   const wg = c.createLinearGradient(0, 20, 0, H - 20);
-  wg.addColorStop(0, '#59616c');
-  wg.addColorStop(0.25, '#8d96a2');
-  wg.addColorStop(1, '#b8c0ca');
+  if (basket) {
+    wg.addColorStop(0, '#c9a46b');
+    wg.addColorStop(1, '#e2c58f');
+  } else {
+    wg.addColorStop(0, '#e2d5c1');
+    wg.addColorStop(0.3, '#f4ecdf');
+    wg.addColorStop(1, '#fbf6ee');
+  }
   c.fillStyle = wg;
   c.fill(well);
+  if (basket) {
+    c.save();
+    c.clip(well);
+    c.strokeStyle = 'rgba(120,85,40,.35)';
+    c.lineWidth = 2;
+    for (let x = -H; x < W + H; x += 9) {
+      c.beginPath();
+      c.moveTo(x, 20);
+      c.lineTo(x + H, H);
+      c.stroke();
+      c.beginPath();
+      c.moveTo(x + H, 20);
+      c.lineTo(x, H);
+      c.stroke();
+    }
+    c.restore();
+  } else {
+    // a thin indigo line on the rim, like a Japanese dish
+    const rim = new Path2D();
+    rim.roundRect(14, 14, W - 28, H - 28, 22);
+    c.strokeStyle = 'rgba(47,74,107,.55)';
+    c.lineWidth = 2;
+    c.stroke(rim);
+  }
   c.save();
   c.clip(well);
   if (ing.cat === 'noodle') {

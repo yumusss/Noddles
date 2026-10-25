@@ -133,7 +133,7 @@ const BROTH_TEXT: Record<string, string> = {
 
 export function orderText(o: Order): string {
   const parts: string[] = [];
-  const tk = o.thick ? THICK_LABEL[o.thick].toLocaleLowerCase('tr') + ' ' : '';
+  const tk = o.thick ? { ince: 'ince ', orta: 'orta kalınlıkta ', kalin: 'kalın ' }[o.thick] : '';
   const n = o.noodle ? tk + INGREDIENTS[o.noodle].name : null;
   const b = o.broth ? BROTH_TEXT[o.broth] : null;
   if (n && b) parts.push(`${b} bir ${n}`);
@@ -177,7 +177,7 @@ export function randomOrder(levelId: number): Order {
         : sauces.length && Math.random() < 0.3
           ? favour(sauces)
           : favour(broths),
-    thick: levelId >= 2 && Math.random() < 0.35 ? pick<Thick>(['ince', 'kalin']) : null,
+    thick: pick<Thick>(levelId === 1 ? ['orta'] : ['ince', 'orta', 'kalin']),
     reqs: [],
     rules: [],
     cook: 'perfect',
@@ -265,8 +265,9 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'baron',
       name: 'Silindir Şapkalı Bey',
       greet: 'Hmph. Burası mı meşhur dükkân?',
-      text: 'Acılı tantan suyuyla bir ramen. Tam 3 dilim chashu, bol acı yağ ve yeşil soğan. Bakalım bu “efsane” neymiş.',
+      text: 'Acılı tantan suyuyla bir ince ramen. Tam 3 dilim chashu, bol acı yağ ve yeşil soğan. Bakalım bu “efsane” neymiş.',
       order: {
+        thick: 'ince',
         noodle: 'ramen',
         broth: 'acili',
         reqs: [
@@ -291,8 +292,9 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'lezzetova',
       name: 'Madam Lezzetova',
       greet: 'Not defterim hazır, şekerim.',
-      text: 'Miso suyuyla bir soba. Tam 4 parça tofu, 3 shiitake ve biraz yeşil soğan. Erişte diri kalsın. Kusursuz olsun.',
+      text: 'Miso suyuyla bir ince soba. Tam 4 parça tofu, 3 shiitake ve biraz yeşil soğan. Erişte diri kalsın. Kusursuz olsun.',
       order: {
+        thick: 'ince',
         noodle: 'soba',
         broth: 'miso',
         reqs: [
@@ -317,8 +319,9 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'hana',
       name: 'Hana Nine',
       greet: 'Bu sefer müşteri benim evladım.',
-      text: 'Kemik suyuyla bir ramen. 2 dilim chashu, 2 yumurta, bambu filizi ve bol yeşil soğan. Tam kıvamında. Sınav gibi düşün!',
+      text: 'Kemik suyuyla bir orta kalınlıkta ramen. 2 dilim chashu, 2 yumurta, bambu filizi ve bol yeşil soğan. Tam kıvamında. Sınav gibi düşün!',
       order: {
+        thick: 'orta',
         noodle: 'ramen',
         broth: 'tonkotsu',
         reqs: [
@@ -344,8 +347,9 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'lezzetova',
       name: 'Madam Lezzetova',
       greet: 'Jüri başkanı olarak buradayım.',
-      text: 'Kemik suyuyla bir udon. Tam 2 tempura karides, 3 dilim naruto ve 2 yaprak nori. Şaşırt beni.',
+      text: 'Kemik suyuyla bir kalın udon. Tam 2 tempura karides, 3 dilim naruto ve 2 yaprak nori. Şaşırt beni.',
       order: {
+        thick: 'kalin',
         noodle: 'udon',
         broth: 'tonkotsu',
         reqs: [
@@ -368,8 +372,9 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'baron',
       name: 'Baron Kraker',
       greet: '…Merhaba. Bu sefer kılık yok.',
-      text: 'Soya suyuyla bir pirinç eriştesi. 1 yumurta, bol susam, biraz yeşil soğan ve 2 shiitake. Annemin yaptığı gibi. Sade. Lütfen.',
+      text: 'Soya suyuyla bir ince pirinç eriştesi. 1 yumurta, bol susam, biraz yeşil soğan ve 2 shiitake. Annemin yaptığı gibi. Sade. Lütfen.',
       order: {
+        thick: 'ince',
         noodle: 'pirinc',
         broth: 'shoyu',
         reqs: [

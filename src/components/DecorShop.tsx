@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   DECOR,
-  DEFAULT_DECOR,
+  withDefaults,
   DEFAULT_OWNED,
   SLOTS,
   tipBonus,
@@ -22,8 +22,8 @@ export default function DecorShop({
   onChange: (cash: number, decor: DecorState, owned: string[]) => void;
   onBack: () => void;
 }) {
-  const decor = save.decor ?? DEFAULT_DECOR;
-  const owned = save.owned ?? DEFAULT_OWNED;
+  const decor = withDefaults(save.decor);
+  const owned = [...new Set([...(save.owned ?? []), ...DEFAULT_OWNED])];
   const [slot, setSlot] = useState<Slot>('duvar');
   const [preview, setPreview] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);

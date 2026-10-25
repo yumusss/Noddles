@@ -145,6 +145,7 @@ export default function App() {
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].intro}
           decor={save.decor}
+          tod={LEVELS[screen.level - 1].time}
           onDone={() => setScreen({ s: 'unlock', level: screen.level })}
         />
       )}
@@ -181,6 +182,7 @@ export default function App() {
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].outro}
           decor={save.decor}
+          tod="gunbatimi"
           onDone={() => {
             if (screen.level === 10) setScreen({ s: 'ending' });
             else startLevel(screen.level + 1);

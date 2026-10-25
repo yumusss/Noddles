@@ -1280,57 +1280,92 @@ export function CustomerArt({ look, mood, size = 96 }: { look: Look; mood: Mood;
 }
 
 export function CatArt({ size = 70, sleepy = false }: { size?: number; sleepy?: boolean }) {
+  // Mochi: a brown tabby with a white bib, socks and muzzle.
+  const fur = '#8a6a50';
+  const dark = '#4f3a2b';
+  const white = '#fbf6ee';
   return (
     <svg viewBox="0 0 100 90" width={size} height={size * 0.9} aria-hidden="true">
+      <ellipse cx="54" cy="86" rx="34" ry="4" fill="#000" opacity=".18" />
+      <g className="cat-tail" style={{ transformOrigin: '78px 74px' }}>
+        <path
+          d="M76 76 q24 -2 20 -26 q-2 -8 -9 -7"
+          stroke={fur}
+          strokeWidth="9"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M90 62 l6 -2 M93 54 l6 0 M88 47 l6 2"
+          stroke={dark}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </g>
+      {/* body */}
+      <ellipse cx="54" cy="68" rx="28" ry="18" fill={fur} />
       <path
-        className="cat-tail"
-        d="M76 74 q22 -4 18 -26 q-2 -8 -8 -6"
-        stroke="#e8892f"
-        strokeWidth="9"
+        d="M40 54 q4 6 0 12 M52 51 q4 7 0 14 M64 52 q4 7 0 13 M74 57 q3 6 0 11"
+        stroke={dark}
+        strokeWidth="3.2"
         fill="none"
         strokeLinecap="round"
-        style={{ transformOrigin: '76px 74px' }}
       />
-      <ellipse cx="54" cy="66" rx="28" ry="20" fill="#ffa94d" />
-      <ellipse cx="54" cy="72" rx="16" ry="12" fill="#fff1dc" />
-      <path d="M30 62 q6 4 10 0 M68 56 q6 4 10 0" stroke="#e8892f" strokeWidth="3" fill="none" />
-      <circle cx="44" cy="38" r="22" fill="#ffa94d" />
-      <path d="M26 30 L22 8 L40 20z" fill="#ffa94d" />
-      <path d="M62 30 L66 8 L48 20z" fill="#ffa94d" />
-      <path d="M27 26 L25 14 L35 21z" fill="#ffc9d6" />
-      <path d="M61 26 L63 14 L53 21z" fill="#ffc9d6" />
+      <ellipse cx="44" cy="74" rx="15" ry="12" fill={white} />
+      {/* paws */}
+      <ellipse cx="38" cy="84" rx="7" ry="4.5" fill={white} />
+      <ellipse cx="52" cy="85" rx="7" ry="4.5" fill={white} />
+      {/* head */}
+      <path d="M24 30 L22 9 Q24 6 27 8 L40 19z" fill={fur} />
+      <path d="M62 30 L66 9 Q64 6 61 8 L48 19z" fill={fur} />
+      <path d="M26 27 L25 14 L35 21z" fill="#e9b7a8" />
+      <path d="M61 27 L63 14 L53 21z" fill="#e9b7a8" />
+      <ellipse cx="44" cy="38" rx="23" ry="20" fill={fur} />
+      {/* tabby forehead "M" and cheek stripes */}
       <path
-        d="M36 20 l2 8 M44 18 v9 M52 20 l-2 8"
-        stroke="#e8892f"
-        strokeWidth="2.5"
+        d="M36 20 l2 9 M44 18 v10 M52 20 l-2 9"
+        stroke={dark}
+        strokeWidth="2.6"
         strokeLinecap="round"
       />
+      <path
+        d="M22 38 h7 M22 43 l7 -1 M66 38 h-7 M66 43 l-7 -1"
+        stroke={dark}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+      {/* white muzzle blaze */}
+      <path d="M44 30 q-5 8 -12 14 q4 10 12 10 q8 0 12 -10 q-7 -6 -12 -14z" fill={white} />
       {sleepy ? (
-        <g stroke="#2b1d14" strokeWidth="2.4" fill="none" strokeLinecap="round">
-          <path d="M32 40 q4 3 8 0" />
-          <path d="M48 40 q4 3 8 0" />
+        <g stroke={dark} strokeWidth="2.2" fill="none" strokeLinecap="round">
+          <path d="M31 37 q4 3 8 0" />
+          <path d="M49 37 q4 3 8 0" />
         </g>
       ) : (
         <g className="cat-eyes">
-          <ellipse cx="36" cy="39" rx="3.6" ry="5" fill="#2b1d14" />
-          <ellipse cx="52" cy="39" rx="3.6" ry="5" fill="#2b1d14" />
-          <circle cx="37" cy="37" r="1.3" fill="#fff" />
-          <circle cx="53" cy="37" r="1.3" fill="#fff" />
+          <ellipse cx="35" cy="37" rx="4" ry="4.6" fill="#c9a227" />
+          <ellipse cx="53" cy="37" rx="4" ry="4.6" fill="#c9a227" />
+          <ellipse cx="35" cy="37.4" rx="1.6" ry="3.8" fill="#2b1d14" />
+          <ellipse cx="53" cy="37.4" rx="1.6" ry="3.8" fill="#2b1d14" />
+          <circle cx="36.2" cy="35.4" r="1.1" fill="#fff" />
+          <circle cx="54.2" cy="35.4" r="1.1" fill="#fff" />
         </g>
       )}
-      <path d="M41 46 l3 3 l3 -3z" fill="#ff7aa2" />
+      <path d="M41.5 44 l2.5 2.6 l2.5 -2.6z" fill="#e48a95" />
       <path
-        d="M44 49 q-3 4 -6 2 M44 49 q3 4 6 2"
-        stroke="#2b1d14"
-        strokeWidth="1.6"
+        d="M44 46.6 q-2.6 3.4 -5.4 1.8 M44 46.6 q2.6 3.4 5.4 1.8"
+        stroke={dark}
+        strokeWidth="1.4"
         fill="none"
         strokeLinecap="round"
       />
+      <circle cx="29" cy="45" r="3" fill="#f0a7a0" opacity=".45" />
+      <circle cx="59" cy="45" r="3" fill="#f0a7a0" opacity=".45" />
       <path
-        d="M22 46 h-12 M22 50 l-11 3 M66 46 h12 M66 50 l11 3"
+        d="M24 45 h-11 M24 48 l-10 3 M64 45 h11 M64 48 l10 3"
         stroke="#fff"
-        strokeWidth="1.4"
-        opacity=".8"
+        strokeWidth="1.1"
+        opacity=".85"
       />
     </svg>
   );

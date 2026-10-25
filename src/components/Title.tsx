@@ -1,27 +1,14 @@
 import { CatArt } from '../art';
 import FullscreenButton, { enterFullscreen } from './Fullscreen';
 import { BowlSide } from './FoodCanvas';
-import { Rain, Lanterns } from './Scenery';
+import Facade from './Facade';
 
 export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: () => void }) {
   return (
     <div className="screen title-screen">
-      <div className="sky">
-        {Array.from({ length: 28 }, (_, i) => (
-          <span
-            key={i}
-            className="twinkle"
-            style={{
-              left: `${(i * 37) % 100}%`,
-              top: `${(i * 23) % 45}%`,
-              animationDelay: `${(i % 7) * 0.4}s`,
-            }}
-          />
-        ))}
+      <div className="title-bg">
+        <Facade tod="gunbatimi" />
       </div>
-      <Rain count={40} />
-      <div className="skyline" />
-      <Lanterns count={5} />
       <div className="title-wrap">
         <div className="logo">
           {'Noddles'.split('').map((ch, i) => (

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { sfx } from '../audio';
 import { Rain } from './Scenery';
+import Facade from './Facade';
+import type { TimeOfDay } from './Restaurant';
 
 /** Opening shot of each day: the shop from the street, then the camera pushes in through the door. */
 export default function Establishing({
@@ -9,6 +11,7 @@ export default function Establishing({
   subtitle,
   meta,
   rain,
+  tod = 'ogle',
   onDone,
 }: {
   day: number;
@@ -16,40 +19,14 @@ export default function Establishing({
   subtitle: string;
   meta: string;
   rain: boolean;
+  tod?: TimeOfDay;
   onDone: () => void;
 }) {
   const [push, setPush] = useState(false);
   return (
-    <div className={`establish ${push ? 'push' : ''}`}>
+    <div className={`establish est-${tod} ${push ? 'push' : ''}`}>
       <div className="est-scene">
-        <div className="est-sky" />
-        <div className="est-moon" />
-        <div className="est-buildings" />
-        <div className="est-shop">
-          <div className="est-roof" />
-          <div className="est-sign">
-            <span>NODDLES</span>
-          </div>
-          <div className="est-front">
-            <div className="est-window">
-              <div className="est-silhouette s1" />
-              <div className="est-silhouette s2" />
-              <div className="est-steam" />
-            </div>
-            <div className="est-door">
-              <div className="est-noren">
-                <i>麺</i>
-                <i>屋</i>
-              </div>
-            </div>
-            <div className="est-window">
-              <div className="est-silhouette s3" />
-            </div>
-          </div>
-          <div className="est-lantern l" />
-          <div className="est-lantern r" />
-        </div>
-        <div className="est-street" />
+        <Facade tod={tod} rain={rain} />
         {rain && <Rain count={50} />}
       </div>
       <div className="est-bars top" />

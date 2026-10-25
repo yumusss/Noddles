@@ -62,7 +62,7 @@ export interface Character {
 export const CHARS: Record<CharId, Character> = {
   hana: { id: 'hana', name: 'Hana Nine', color: '#e94f37' },
   sef: { id: 'sef', name: 'Sen', color: '#3ba7ff' },
-  miso: { id: 'miso', name: 'Miso (kedi)', color: '#ffb347' },
+  miso: { id: 'miso', name: 'Mochi (kedi)', color: '#8b6a4f' },
   ruzgar: { id: 'ruzgar', name: 'Rüzgar', color: '#2ec4b6' },
   baron: { id: 'baron', name: 'Baron Kraker', color: '#8e44ad' },
   lezzetova: { id: 'lezzetova', name: 'Madam Lezzetova', color: '#d4a017' },
@@ -87,11 +87,14 @@ export interface Level {
   intro: Line[];
   outro: Line[];
   tip?: string;
+  time?: 'sabah' | 'ogle' | 'gunbatimi' | 'aksam';
+  rain?: boolean;
 }
 
 export const LEVELS: Level[] = [
   {
     id: 1,
+    time: 'sabah',
     customers: 5,
     phone: 0,
     complexity: 1,
@@ -106,7 +109,7 @@ export const LEVELS: Level[] = [
         text: 'Kırk yıl bu tezgâhın arkasında durdum. Artık dizlerim eskisi gibi değil.',
       },
       { who: 'sef', text: 'Nine… Noddles’ı gerçekten bana mı bırakıyorsun?' },
-      { who: 'hana', text: 'Sana ve Miso’ya. O kedi bu dükkânın asıl patronudur, unutma.' },
+      { who: 'hana', text: 'Sana ve Mochi’ye. O kedi bu dükkânın asıl patronudur, unutma.' },
       { who: 'miso', text: 'Miyav. (Tezgâhın üstüne kurulur ve seni süzer.)' },
       {
         who: 'hana',
@@ -125,6 +128,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 2,
+    time: 'ogle',
     customers: 6,
     phone: 0,
     complexity: 1,
@@ -147,6 +151,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 3,
+    time: 'ogle',
     customers: 7,
     phone: 2,
     complexity: 2,
@@ -181,6 +186,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 4,
+    time: 'gunbatimi',
     customers: 7,
     phone: 2,
     complexity: 2,
@@ -192,7 +198,7 @@ export const LEVELS: Level[] = [
       { who: 'hana', text: 'Belediye meydanı kimin alacağına festivalde karar verecekmiş.' },
       { who: 'hana', text: 'Mahalle hangi mutfağı severse, meydan onun olacak. Bize oy lazım!' },
       { who: 'sef', text: 'O zaman menüyü büyütelim. Defterin dördüncü sayfası: Udon ve miso!' },
-      { who: 'miso', text: 'Miyav? (Adının çorbaya verildiğini öğrenince gururlanır.)' },
+      { who: 'miso', text: 'Miyav? (Miso kokusunu alınca kuyruğu dikleşir.)' },
     ],
     outro: [
       { who: 'hana', text: 'Kalın udon, kadife gibi miso… Mahalle bu akşam huzurla uyuyacak.' },
@@ -204,6 +210,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 5,
+    time: 'ogle',
+    rain: true,
     customers: 8,
     phone: 2,
     complexity: 3,
@@ -214,7 +222,7 @@ export const LEVELS: Level[] = [
       { who: 'ruzgar', text: 'Gökyüzü delindi! Bu yağmurda herkes sıcak çorba isteyecek.' },
       {
         who: 'hana',
-        text: 'Yağmurlu akşamların kraliçesi: mısırlı, mantarlı miso. Beşinci sayfa!',
+        text: 'Yağmurlu günlerin kraliçesi: mısırlı, mantarlı miso. Beşinci sayfa!',
       },
       { who: 'hana', text: 'Ocaklara üçüncü tencereyi de koydum. Hızlı ol!' },
     ],
@@ -228,6 +236,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 6,
+    time: 'aksam',
     customers: 8,
     phone: 2,
     complexity: 3,
@@ -256,6 +265,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 7,
+    time: 'ogle',
     customers: 8,
     phone: 2,
     complexity: 3,
@@ -281,6 +291,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 8,
+    time: 'sabah',
     customers: 9,
     phone: 3,
     complexity: 4,
@@ -305,6 +316,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 9,
+    time: 'gunbatimi',
     customers: 9,
     phone: 3,
     complexity: 4,
@@ -314,7 +326,7 @@ export const LEVELS: Level[] = [
     intro: [
       { who: 'miso', text: 'Miyav! Miyav! (Tavan arasındaki eski bir sandığı tırmalıyor.)' },
       { who: 'sef', text: 'Sandığın içinde… Son sayfa! “Kemik suyu: 18 saat, sabır ve sevgi.”' },
-      { who: 'hana', text: 'Miso bulmuş! Tonkotsu, bu dükkânın kalbidir. Yanına bambu filizi.' },
+      { who: 'hana', text: 'Mochi bulmuş! Tonkotsu, bu dükkânın kalbidir. Yanına bambu filizi.' },
       { who: 'hana', text: 'Bugün ben de bir kase isteyeceğim. Sınav gibi düşün.' },
     ],
     outro: [
@@ -331,6 +343,7 @@ export const LEVELS: Level[] = [
   },
   {
     id: 10,
+    time: 'aksam',
     customers: 10,
     phone: 3,
     complexity: 4,
@@ -363,7 +376,7 @@ export const LEVELS: Level[] = [
         who: 'hana',
         text: 'Kırk yıl önce bu dükkânı tek bir kaseyle açmıştım. Sen onu bir mahalleye çevirdin.',
       },
-      { who: 'miso', text: 'Mrrrr. (Kucağına kıvrılır. Bu, Miso’nun en büyük ödülüdür.)' },
+      { who: 'miso', text: 'Mrrrr. (Kucağına kıvrılır. Bu, Mochi’nin en büyük ödülüdür.)' },
     ],
   },
 ];

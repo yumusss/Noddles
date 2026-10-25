@@ -1,314 +1,349 @@
 import { useMemo } from 'react';
-import type { DecorState } from '../decor';
+import { withDefaults, type DecorState } from '../decor';
 import { avatarUri } from '../avatar';
 import type { Look } from '../art';
 
-// The dining room behind the counter, drawn as one wide SVG (1600x900) that is cropped
-// to fit: phones see the middle, tablets see the whole room. Every decor slot swaps a group.
+// The dining room behind the counter, drawn as one wide SVG (1600x900) cropped to fit:
+// phones see the middle, tablets the whole room. A calm, daylight Japanese noodle shop:
+// light hinoki wood, a big window with a sakura branch, paper lamps, a few tables.
+
+export type TimeOfDay = 'sabah' | 'ogle' | 'gunbatimi' | 'aksam';
 
 const W = 1600;
-const FLOOR = 600;
+const FLOOR = 610;
 
-function Defs() {
+const SKY: Record<TimeOfDay, [string, string, string]> = {
+  sabah: ['#ffe8d2', '#fbd9c2', '#cfe6f0'],
+  ogle: ['#d4ecf7', '#e8f5fb', '#f7fbfc'],
+  gunbatimi: ['#f7b38f', '#f6c9a0', '#f9e2c2'],
+  aksam: ['#2c3a66', '#4b4a78', '#7b5e86'],
+};
+const SUN: Record<TimeOfDay, [number, number, string]> = {
+  sabah: [1380, 330, '#fff1d6'],
+  ogle: [1500, 170, '#fffbe8'],
+  gunbatimi: [1420, 380, '#ffc58a'],
+  aksam: [1470, 190, '#f3f0e2'],
+};
+
+function Defs({ tod }: { tod: TimeOfDay }) {
+  const [a, b, c] = SKY[tod];
   return (
     <defs>
-      <linearGradient id="r-warm" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0" stopColor="#000" stopOpacity=".35" />
-        <stop offset=".4" stopColor="#000" stopOpacity="0" />
-        <stop offset="1" stopColor="#000" stopOpacity=".25" />
+      <linearGradient id="r-sky" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stopColor={a} />
+        <stop offset=".55" stopColor={b} />
+        <stop offset="1" stopColor={c} />
       </linearGradient>
-      <radialGradient id="r-glow" cx=".5" cy=".5" r=".5">
-        <stop offset="0" stopColor="#ffcf86" stopOpacity=".55" />
-        <stop offset="1" stopColor="#ffcf86" stopOpacity="0" />
+      <linearGradient id="r-shade" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0" stopColor="#3a2414" stopOpacity=".22" />
+        <stop offset=".3" stopColor="#3a2414" stopOpacity="0" />
+        <stop offset="1" stopColor="#3a2414" stopOpacity=".12" />
+      </linearGradient>
+      <linearGradient id="r-ray" x1="1" x2="0" y1="0" y2="1">
+        <stop offset="0" stopColor="#fff7e6" stopOpacity={tod === 'aksam' ? 0 : 0.5} />
+        <stop offset="1" stopColor="#fff7e6" stopOpacity="0" />
+      </linearGradient>
+      <radialGradient id="r-lamp" cx=".5" cy=".5" r=".5">
+        <stop offset="0" stopColor="#ffd9a0" stopOpacity={tod === 'aksam' ? 0.7 : 0.35} />
+        <stop offset="1" stopColor="#ffd9a0" stopOpacity="0" />
       </radialGradient>
-      <pattern id="p-ahsap" width="70" height="600" patternUnits="userSpaceOnUse">
-        <rect width="70" height="600" fill="#7a4428" />
-        <rect x="68" width="2" height="600" fill="#4a2414" />
-        <path
-          d="M14 0 q6 150 -2 300 t4 300 M40 0 q-6 200 4 360 t-3 240"
-          stroke="#6a3820"
-          strokeWidth="2"
-          fill="none"
-        />
-        <rect width="70" height="600" fill="#ffffff" opacity=".03" />
+      <pattern id="p-hinoki" width="56" height="610" patternUnits="userSpaceOnUse">
+        <rect width="56" height="610" fill="#e3c9a2" />
+        <rect x="54" width="2" height="610" fill="#c9a97c" />
+        <path d="M16 0 q5 160 -2 310 t3 300" stroke="#d8bb90" strokeWidth="1.4" fill="none" />
+        <path d="M36 0 q-5 220 3 380 t-2 230" stroke="#dcc199" strokeWidth="1.2" fill="none" />
       </pattern>
-      <pattern id="p-washi" width="60" height="104" patternUnits="userSpaceOnUse">
-        <rect width="60" height="104" fill="#efe3c8" />
-        <path
-          d="M0 0 L30 52 L60 0 M0 104 L30 52 L60 104 M30 0 V104 M0 52 H60"
-          stroke="#c9b48a"
-          strokeWidth="1.4"
-          fill="none"
-        />
+      <pattern id="p-shoji" width="120" height="150" patternUnits="userSpaceOnUse">
+        <rect width="120" height="150" fill="#f6efe2" />
+        <rect width="120" height="150" fill="none" stroke="#b9946a" strokeWidth="5" />
+        <path d="M40 0 V150 M80 0 V150 M0 50 H120 M0 100 H120" stroke="#c8a77d" strokeWidth="2.4" />
       </pattern>
-      <pattern id="p-tugla" width="80" height="40" patternUnits="userSpaceOnUse">
-        <rect width="80" height="40" fill="#5a3a2e" />
-        <rect x="2" y="2" width="76" height="16" rx="2" fill="#9a5a40" />
-        <rect x="-38" y="22" width="76" height="16" rx="2" fill="#8d4f38" />
-        <rect x="42" y="22" width="76" height="16" rx="2" fill="#a2634a" />
+      <pattern id="p-sage" width="300" height="300" patternUnits="userSpaceOnUse">
+        <rect width="300" height="300" fill="#b9c6ad" />
+        <circle cx="60" cy="80" r="70" fill="#c3cfb7" opacity=".5" />
+        <circle cx="220" cy="210" r="90" fill="#aebd9f" opacity=".45" />
       </pattern>
-      <pattern id="p-lake" width="200" height="600" patternUnits="userSpaceOnUse">
-        <rect width="200" height="600" fill="#8e1f17" />
-        <rect x="14" y="80" width="172" height="440" fill="none" stroke="#d4a017" strokeWidth="3" />
-        <rect x="24" y="90" width="152" height="420" fill="#a3281d" />
+      <pattern id="p-terra" width="300" height="300" patternUnits="userSpaceOnUse">
+        <rect width="300" height="300" fill="#d9a385" />
+        <circle cx="80" cy="60" r="80" fill="#e2b195" opacity=".5" />
+        <circle cx="230" cy="230" r="90" fill="#cf957a" opacity=".45" />
       </pattern>
-      <pattern id="p-sakura" width="140" height="140" patternUnits="userSpaceOnUse">
-        <rect width="140" height="140" fill="#f6dbe2" />
+      <pattern id="p-sakura" width="150" height="150" patternUnits="userSpaceOnUse">
+        <rect width="150" height="150" fill="#f7e6e4" />
         {[
-          [30, 30],
-          [100, 90],
-          [60, 120],
+          [30, 34],
+          [104, 92],
+          [64, 128],
+        ].map(([x, y], i) => (
+          <g key={i} transform={`translate(${x} ${y})`} opacity=".8">
+            {[0, 72, 144, 216, 288].map((a) => (
+              <ellipse
+                key={a}
+                cx="0"
+                cy="-7"
+                rx="4.4"
+                ry="7"
+                fill="#efb8c3"
+                transform={`rotate(${a})`}
+              />
+            ))}
+            <circle r="2.4" fill="#d9788f" />
+          </g>
+        ))}
+      </pattern>
+      <pattern id="p-oak" width="240" height="44" patternUnits="userSpaceOnUse">
+        <rect width="240" height="44" fill="#d7b48a" />
+        <rect y="0" width="118" height="21" fill="#dcbb93" />
+        <rect x="120" y="22" width="118" height="21" fill="#d2ad80" />
+        <rect x="120" y="0" width="118" height="21" fill="#e0c19b" />
+        <rect y="22" width="118" height="21" fill="#d5b186" />
+      </pattern>
+      <pattern id="p-tatami" width="220" height="110" patternUnits="userSpaceOnUse">
+        <rect width="220" height="110" fill="#d8cf9e" />
+        {Array.from({ length: 22 }, (_, i) => (
+          <rect key={i} y={i * 5} width="220" height="2" fill="#cbc18c" />
+        ))}
+        <rect width="220" height="6" fill="#5a6b4b" />
+        <rect width="6" height="110" fill="#5a6b4b" />
+      </pattern>
+      <pattern id="p-terrazzo" width="140" height="140" patternUnits="userSpaceOnUse">
+        <rect width="140" height="140" fill="#efe9df" />
+        {[
+          [20, 30, '#d9a385'],
+          [80, 20, '#b9c6ad'],
+          [110, 90, '#c9b8a0'],
+          [40, 100, '#e7c4b0'],
+          [70, 64, '#a9b6c4'],
+        ].map(([x, y, c], i) => (
+          <ellipse
+            key={i}
+            cx={x}
+            cy={y}
+            rx="8"
+            ry="5"
+            fill={c as string}
+            transform={`rotate(${i * 40} ${x} ${y})`}
+          />
+        ))}
+      </pattern>
+      <pattern id="p-stone" width="170" height="96" patternUnits="userSpaceOnUse">
+        <rect width="170" height="96" fill="#b8b2a8" />
+        <path
+          d="M4 4 h76 v40 h-76z M86 4 h80 v54 h-80z M4 50 h52 v42 h-52z M62 50 h20 v42 h-20z M88 64 h78 v28 h-78z"
+          fill="#ccc7bd"
+        />
+      </pattern>
+      <filter id="r-soft" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="6" />
+      </filter>
+      <filter id="r-neon" x="-30%" y="-80%" width="160%" height="260%">
+        <feGaussianBlur stdDeviation="4" result="b" />
+        <feMerge>
+          <feMergeNode in="b" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </defs>
+  );
+}
+
+const WALL_FILL: Record<string, string> = {
+  'duvar-ahsap': 'p-hinoki',
+  'duvar-washi': 'p-shoji',
+  'duvar-tugla': 'p-sage',
+  'duvar-lake': 'p-terra',
+  'duvar-sakura': 'p-sakura',
+};
+const FLOOR_FILL: Record<string, string> = {
+  'zemin-parke': 'p-oak',
+  'zemin-tatami': 'p-tatami',
+  'zemin-dama': 'p-terrazzo',
+  'zemin-tas': 'p-stone',
+};
+
+function Room({ decor }: { decor: DecorState }) {
+  return (
+    <g>
+      <rect width={W} height={FLOOR} fill={`url(#${WALL_FILL[decor.duvar] ?? 'p-hinoki'})`} />
+      <rect y={FLOOR - 120} width={W} height="120" fill="#b98d63" />
+      <rect y={FLOOR - 126} width={W} height="8" fill="#8f6542" />
+      {Array.from({ length: 20 }, (_, i) => (
+        <rect
+          key={i}
+          x={i * 80 + 2}
+          y={FLOOR - 112}
+          width="76"
+          height="104"
+          rx="3"
+          fill="#c39a70"
+        />
+      ))}
+      <rect
+        y={FLOOR}
+        width={W}
+        height={900 - FLOOR}
+        fill={`url(#${FLOOR_FILL[decor.zemin] ?? 'p-oak'})`}
+      />
+      <rect y={FLOOR} width={W} height="12" fill="#6e4a2e" opacity=".35" />
+      <rect width={W} height="30" fill="#a77b52" />
+      {Array.from({ length: 9 }, (_, i) => (
+        <rect key={i} x={i * 200 - 8} width="16" height="30" fill="#8f6542" />
+      ))}
+      <rect width={W} height={FLOOR} fill="url(#r-shade)" />
+    </g>
+  );
+}
+
+function BigWindow({ tod, rain }: { tod: TimeOfDay; rain: boolean }) {
+  const [sx, sy, sc] = SUN[tod];
+  return (
+    <g>
+      <rect x="1290" y="100" width="280" height="380" rx="6" fill="#8f6542" />
+      <svg x="1302" y="112" width="256" height="356" viewBox="1302 112 256 356">
+        <rect x="1302" y="112" width="256" height="356" fill="url(#r-sky)" />
+        <circle cx={sx} cy={sy} r={tod === 'aksam' ? 22 : 36} fill={sc} opacity=".95" />
+        {tod === 'aksam' &&
+          [
+            [1330, 150],
+            [1400, 200],
+            [1520, 140],
+            [1360, 260],
+          ].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="1.6" fill="#fff" opacity=".8" />)}
+        <path
+          d="M1302 400 Q1380 350 1460 380 T1560 360 V470 H1302z"
+          fill={tod === 'aksam' ? '#3b3d5e' : '#b8cfb0'}
+        />
+        <path
+          d="M1302 430 h90 l20 -26 h70 l20 26 h58 V470 H1302z"
+          fill={tod === 'aksam' ? '#2a2b45' : '#8f9d8a'}
+        />
+        <path
+          d="M1560 150 Q1500 170 1450 220 T1360 260"
+          stroke="#6b4a36"
+          strokeWidth="6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M1470 205 q-10 -30 4 -50"
+          stroke="#6b4a36"
+          strokeWidth="3.4"
+          fill="none"
+          strokeLinecap="round"
+        />
+        {[
+          [1540, 156],
+          [1500, 176],
+          [1470, 206],
+          [1474, 158],
+          [1430, 236],
+          [1390, 252],
+          [1366, 262],
+          [1520, 186],
+          [1450, 222],
         ].map(([x, y], i) => (
           <g key={i} transform={`translate(${x} ${y})`}>
             {[0, 72, 144, 216, 288].map((a) => (
               <ellipse
                 key={a}
                 cx="0"
-                cy="-8"
-                rx="5"
-                ry="8"
-                fill="#f2a7bd"
-                transform={`rotate(${a})`}
+                cy="-6"
+                rx="4.2"
+                ry="6.4"
+                fill="#f6c2cf"
+                transform={`rotate(${a + i * 17})`}
               />
             ))}
-            <circle r="3" fill="#e2557a" />
+            <circle r="2" fill="#e27f98" />
           </g>
         ))}
-      </pattern>
-      <pattern id="p-parke" width="120" height="40" patternUnits="userSpaceOnUse">
-        <rect width="120" height="40" fill="#9a6338" />
-        <rect y="0" width="58" height="19" fill="#a8703f" />
-        <rect x="60" y="20" width="58" height="19" fill="#8e5a31" />
-        <rect x="60" y="0" width="58" height="19" fill="#b37a47" />
-        <rect y="20" width="58" height="19" fill="#9c6537" />
-      </pattern>
-      <pattern id="p-tatami" width="200" height="100" patternUnits="userSpaceOnUse">
-        <rect width="200" height="100" fill="#cfc18a" />
-        {Array.from({ length: 20 }, (_, i) => (
-          <rect key={i} y={i * 5} width="200" height="2" fill="#b9aa72" />
-        ))}
-        <rect width="200" height="6" fill="#2b2d24" />
-        <rect width="6" height="100" fill="#2b2d24" />
-      </pattern>
-      <pattern id="p-dama" width="80" height="80" patternUnits="userSpaceOnUse">
-        <rect width="80" height="80" fill="#f1ece2" />
-        <rect width="40" height="40" fill="#2b2d33" />
-        <rect x="40" y="40" width="40" height="40" fill="#2b2d33" />
-      </pattern>
-      <pattern id="p-tas" width="160" height="90" patternUnits="userSpaceOnUse">
-        <rect width="160" height="90" fill="#6d6a64" />
-        <path
-          d="M4 4 h70 v38 h-70z M80 4 h76 v52 h-76z M4 48 h50 v38 h-50z M60 48 h20 v38 h-20z M86 62 h70 v24 h-70z"
-          fill="#8a867e"
-        />
-      </pattern>
-      <filter id="neon" x="-30%" y="-80%" width="160%" height="260%">
-        <feGaussianBlur stdDeviation="5" result="b" />
-        <feMerge>
-          <feMergeNode in="b" />
-          <feMergeNode in="b" />
-          <feMergeNode in="SourceGraphic" />
-        </feMerge>
-      </filter>
-      <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="3" />
-      </filter>
-    </defs>
-  );
-}
-
-function Wall({ id }: { id: string }) {
-  const fill =
-    id === 'duvar-washi'
-      ? 'p-washi'
-      : id === 'duvar-tugla'
-        ? 'p-tugla'
-        : id === 'duvar-lake'
-          ? 'p-lake'
-          : id === 'duvar-sakura'
-            ? 'p-sakura'
-            : 'p-ahsap';
-  return (
-    <g>
-      <rect width={W} height={FLOOR} fill={`url(#${fill})`} />
-      {/* wainscot */}
-      <rect y={FLOOR - 120} width={W} height="120" fill="#4a2818" />
-      <rect y={FLOOR - 124} width={W} height="8" fill="#2e170c" />
-      {Array.from({ length: 16 }, (_, i) => (
-        <rect
-          key={i}
-          x={i * 100 + 10}
-          y={FLOOR - 104}
-          width="80"
-          height="88"
-          rx="4"
-          fill="#5a3220"
-        />
+        {rain &&
+          Array.from({ length: 26 }, (_, i) => (
+            <line
+              key={i}
+              x1={1310 + ((i * 47) % 240)}
+              y1={120 + ((i * 83) % 330)}
+              x2={1306 + ((i * 47) % 240)}
+              y2={140 + ((i * 83) % 330)}
+              stroke="#8fb3c9"
+              strokeOpacity=".7"
+              strokeWidth="1.5"
+              className="rain-svg"
+              style={{ animationDelay: `${(i % 7) * 0.12}s` }}
+            />
+          ))}
+      </svg>
+      <rect
+        x="1302"
+        y="112"
+        width="256"
+        height="356"
+        fill="none"
+        stroke="#a77b52"
+        strokeWidth="6"
+      />
+      <path d="M1430 112 V468 M1302 290 H1558" stroke="#a77b52" strokeWidth="6" />
+      <path d="M1310 118 L1380 118 L1318 230z" fill="#fff" opacity=".18" />
+      <rect x="1296" y="104" width="268" height="60" fill="#d8bf8f" />
+      {Array.from({ length: 10 }, (_, i) => (
+        <rect key={i} x="1296" y={106 + i * 6} width="268" height="1.5" fill="#bfa06c" />
       ))}
-      <rect width={W} height={FLOOR} fill="url(#r-warm)" />
+      <rect x="1292" y="476" width="288" height="14" rx="3" fill="#8f6542" />
+      <path d="M1300 130 L1300 470 L900 900 L1180 900z" fill="url(#r-ray)" className="ray" />
     </g>
   );
 }
 
-function Floor({ id }: { id: string }) {
-  const fill =
-    id === 'zemin-tatami'
-      ? 'p-tatami'
-      : id === 'zemin-dama'
-        ? 'p-dama'
-        : id === 'zemin-tas'
-          ? 'p-tas'
-          : 'p-parke';
+function KitchenPass({ tod }: { tod: TimeOfDay }) {
   return (
     <g>
-      <rect y={FLOOR} width={W} height={900 - FLOOR} fill={`url(#${fill})`} />
-      <rect y={FLOOR} width={W} height={900 - FLOOR} fill="#000" opacity=".28" />
-      <rect y={FLOOR} width={W} height="10" fill="#000" opacity=".35" />
-    </g>
-  );
-}
-
-function Beams() {
-  return (
-    <g>
-      <rect width={W} height="46" fill="#2a160c" />
-      <rect y="42" width={W} height="6" fill="#1a0d06" />
-      {Array.from({ length: 9 }, (_, i) => (
-        <rect key={i} x={i * 200 - 10} y="0" width="22" height="46" fill="#3a2010" />
-      ))}
-    </g>
-  );
-}
-
-const LAMP_X = [210, 470, 1130, 1390];
-
-function Lamps({ id }: { id: string }) {
-  return (
-    <g>
-      {LAMP_X.map((x, i) => (
-        <g
-          key={x}
-          className="sway-g"
-          style={{ transformOrigin: `${x}px 46px`, animationDelay: `${i * 0.7}s` }}>
-          <line x1={x} y1="46" x2={x} y2="80" stroke="#1a0d06" strokeWidth="2" />
-          <circle cx={x} cy="130" r="80" fill="url(#r-glow)" />
-          {id === 'lamba-kure' ? (
-            <g>
-              <circle cx={x} cy="120" r="36" fill="#fff6e2" />
-              <circle cx={x} cy="120" r="36" fill="none" stroke="#e8d6b0" strokeWidth="1.5" />
-              {[-24, -12, 0, 12, 24].map((d) => (
-                <ellipse
-                  key={d}
-                  cx={x}
-                  cy={120 + d}
-                  rx={Math.sqrt(36 * 36 - d * d)}
-                  ry="2"
-                  fill="none"
-                  stroke="#e8d6b0"
-                  strokeWidth="1"
-                />
-              ))}
-            </g>
-          ) : id === 'lamba-ampul' ? (
-            <g>
-              <rect x={x - 6} y="80" width="12" height="14" fill="#5a4a2a" />
-              <path
-                d={`M${x - 16} 110 a16 18 0 1 1 32 0 q0 14 -10 22 h-12 q-10 -8 -10 -22z`}
-                fill="#ffd27a"
-                opacity=".85"
-              />
-              <path d={`M${x - 6} 118 q6 -12 12 0`} stroke="#fff3c4" strokeWidth="2" fill="none" />
-            </g>
-          ) : (
-            <g>
-              <rect x={x - 22} y="78" width="44" height="8" rx="2" fill="#151515" />
-              <ellipse
-                cx={x}
-                cy="124"
-                rx="34"
-                ry="42"
-                fill={
-                  id === 'lamba-renkli'
-                    ? ['#e94f37', '#2a9d8f', '#f4a261', '#8e44ad'][i % 4]
-                    : '#d8352a'
-                }
-              />
-              {[-30, -18, -6, 6, 18, 30].map((d) => (
-                <ellipse
-                  key={d}
-                  cx={x}
-                  cy={124 + d}
-                  rx={Math.sqrt(1 - (d / 42) ** 2) * 34}
-                  ry="1.6"
-                  fill="#00000030"
-                />
-              ))}
-              <ellipse cx={x - 10} cy="108" rx="8" ry="16" fill="#ffffff30" />
-              <rect x={x - 22} y="162" width="44" height="8" rx="2" fill="#151515" />
-              <text x={x} y="134" textAnchor="middle" fontSize="28" fill="#1a0d06" fontWeight="700">
-                {['麺', '福', '味', '湯'][i]}
-              </text>
-              <line x1={x} y1="170" x2={x} y2="190" stroke="#d4a017" strokeWidth="2" />
-            </g>
-          )}
-        </g>
-      ))}
-    </g>
-  );
-}
-
-function KitchenPass() {
-  return (
-    <g>
-      <rect x="110" y="160" width="330" height="290" fill="#2a160c" />
-      <rect x="122" y="172" width="306" height="266" fill="#1b120c" />
-      <rect x="122" y="172" width="306" height="266" fill="url(#r-glow)" opacity=".7" />
-      {/* shelf with bowls & pots inside */}
-      <rect x="130" y="300" width="290" height="8" fill="#5a3220" />
-      {[150, 196, 242].map((x) => (
+      <rect x="90" y="140" width="360" height="300" rx="4" fill="#8f6542" />
+      <rect x="102" y="152" width="336" height="276" fill="#f3e6cf" />
+      <rect
+        x="102"
+        y="152"
+        width="336"
+        height="276"
+        fill={tod === 'aksam' ? '#ffcf86' : '#fff2da'}
+        opacity=".55"
+      />
+      <rect x="110" y="292" width="320" height="8" fill="#b98d63" />
+      {[130, 176, 222].map((x, i) => (
         <path
           key={x}
-          d={`M${x} 300 q0 -26 20 -26 q20 0 20 26z`}
-          fill="#f4ede2"
-          stroke="#c0392b"
-          strokeWidth="2"
+          d={`M${x} 292 q0 -24 20 -24 q20 0 20 24z`}
+          fill={['#f4f1ea', '#2f4a6d', '#c96a4a'][i]}
         />
       ))}
-      <rect x="300" y="250" width="60" height="50" rx="6" fill="#9aa3ae" />
-      <ellipse cx="330" cy="250" rx="30" ry="6" fill="#c9ced6" />
+      <rect x="300" y="240" width="64" height="52" rx="8" fill="#c9ced3" />
+      <ellipse cx="332" cy="240" rx="32" ry="6" fill="#e3e6ea" />
       <path
-        d="M318 240 q-6 -16 4 -30 M340 240 q-6 -16 4 -30"
+        d="M318 230 q-6 -16 4 -30 M344 230 q-6 -16 4 -30"
         stroke="#fff"
-        strokeOpacity=".4"
-        strokeWidth="4"
+        strokeOpacity=".7"
+        strokeWidth="5"
         fill="none"
         className="steam-svg"
       />
-      {/* cook silhouette */}
-      <ellipse cx="240" cy="400" rx="44" ry="38" fill="#0d0805" />
-      <circle cx="240" cy="352" r="22" fill="#0d0805" />
-      <path d="M220 334 q20 -22 40 0z" fill="#e8e1d4" opacity=".7" />
-      {/* pass counter */}
-      <rect x="100" y="438" width="350" height="14" fill="#7a4428" />
-      {/* noren */}
+      <rect x="380" y="200" width="6" height="70" fill="#8f6542" />
+      <ellipse cx="383" cy="276" rx="14" ry="6" fill="#c9ced3" />
+      <ellipse cx="240" cy="402" rx="46" ry="36" fill="#cbb49a" />
+      <circle cx="240" cy="352" r="22" fill="#cbb49a" />
+      <path d="M220 336 q20 -24 40 0z" fill="#fff" />
+      <rect x="84" y="430" width="372" height="16" rx="3" fill="#a77b52" />
       {[0, 1, 2, 3].map((i) => (
         <g
           key={i}
           className="noren-g"
-          style={{ transformOrigin: `${132 + i * 76}px 160px`, animationDelay: `${i * 0.4}s` }}>
-          <rect x={124 + i * 76} y="160" width="72" height="92" fill="#1f3c88" />
-          <text
-            x={160 + i * 76}
-            y="218"
-            textAnchor="middle"
-            fontSize="34"
-            fill="#fff"
-            fontWeight="700">
-            {['ら', 'ー', 'め', 'ん'][i]}
-          </text>
+          style={{ transformOrigin: `${130 + i * 82}px 140px`, animationDelay: `${i * 0.4}s` }}>
+          <rect x={108 + i * 82} y="140" width="78" height="96" fill="#2f4a6d" />
         </g>
       ))}
-      <rect x="114" y="152" width="322" height="10" fill="#3a2010" />
+      <circle cx="270" cy="186" r="26" fill="none" stroke="#f6efe2" strokeWidth="4" />
+      <text x="270" y="196" textAnchor="middle" fontSize="26" fill="#f6efe2" fontWeight="700">
+        麺
+      </text>
+      <rect x="98" y="132" width="344" height="10" rx="3" fill="#8f6542" />
     </g>
   );
 }
@@ -329,17 +364,16 @@ function Frame({
   return (
     <g>
       <rect
-        x={x - 4}
-        y={y + 8}
-        width={w + 8}
-        height={h + 8}
-        fill="#000"
-        opacity=".35"
-        filter="url(#soft)"
+        x={x - 2}
+        y={y + 10}
+        width={w + 4}
+        height={h + 4}
+        fill="#3a2414"
+        opacity=".18"
+        filter="url(#r-soft)"
       />
-      <rect x={x - 10} y={y - 10} width={w + 20} height={h + 20} fill="#2a160c" />
-      <rect x={x - 6} y={y - 6} width={w + 12} height={h + 12} fill="#c9a227" />
-      <rect x={x} y={y} width={w} height={h} fill="#f3ead6" />
+      <rect x={x - 9} y={y - 9} width={w + 18} height={h + 18} rx="2" fill="#8f6542" />
+      <rect x={x - 4} y={y - 4} width={w + 8} height={h + 8} fill="#f6efe2" />
       <svg
         x={x}
         y={y}
@@ -355,104 +389,77 @@ function Frame({
 
 function BigPainting({ id }: { id: string }) {
   if (id === 'tablo1-yok') return null;
-  const x = 620;
-  const y = 74;
   return (
-    <Frame x={x} y={y} w={360} h={200}>
+    <Frame x={630} y={84} w={340} h={190}>
       {id === 'tablo1-fuji' && (
         <g>
-          <rect width="300" height="180" fill="#f6e2c4" />
-          <circle cx="220" cy="54" r="26" fill="#e94f37" />
-          <path d="M40 150 L140 44 Q150 36 160 44 L260 150z" fill="#3d5a80" />
+          <rect width="300" height="180" fill="#f6e7d2" />
+          <circle cx="226" cy="54" r="24" fill="#e58f73" />
+          <path d="M40 150 L140 48 Q150 40 160 48 L260 150z" fill="#7d93ad" />
           <path
-            d="M116 70 L140 44 Q150 36 160 44 L184 70 L172 66 L160 76 L148 64 L136 76 L126 66z"
-            fill="#fff"
+            d="M118 72 L140 48 Q150 40 160 48 L182 72 L170 68 L160 78 L148 66 L136 78 L126 68z"
+            fill="#fbf7ef"
           />
-          <path d="M0 150 q30 -14 60 0 t60 0 t60 0 t60 0 t60 0 V180 H0z" fill="#98c1d9" />
-          <path
-            d="M0 162 q30 -12 60 0 t60 0 t60 0 t60 0 t60 0"
-            stroke="#fff"
-            strokeWidth="3"
-            fill="none"
-          />
+          <path d="M0 150 q30 -12 60 0 t60 0 t60 0 t60 0 t60 0 V180 H0z" fill="#a9c4cf" />
         </g>
       )}
       {id === 'tablo1-dalga' && (
         <g>
-          <rect width="300" height="180" fill="#efe2c2" />
-          <path d="M210 150 L240 118 L270 150z" fill="#3d5a80" />
-          <path d="M236 122 L240 118 L244 122z" fill="#fff" />
+          <rect width="300" height="180" fill="#f1e6cf" />
+          <path d="M212 150 L240 120 L268 150z" fill="#7d93ad" />
           <path
-            d="M0 180 V120 Q40 40 120 40 Q190 40 196 96 Q170 64 140 80 Q170 96 150 130 Q120 110 96 140 Q70 160 40 160 Q20 170 0 180z"
-            fill="#1d3557"
+            d="M0 180 V122 Q40 44 120 44 Q186 44 194 98 Q170 68 142 82 Q170 98 150 130 Q120 112 96 140 Q70 160 40 160 Q20 170 0 180z"
+            fill="#3e5f80"
           />
-          <path
-            d="M120 40 Q190 40 196 96 Q178 72 154 74 Q168 56 150 50 Q140 44 120 40z"
-            fill="#457b9d"
-          />
-          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-            <path key={i} d={`M${140 + i * 8} ${46 + i * 6} q6 -8 10 2 q-4 -2 -6 4`} fill="#fff" />
+          <path d="M120 44 Q186 44 194 98 Q178 74 156 76 Q168 58 150 52z" fill="#6f8fae" />
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <path
+              key={i}
+              d={`M${140 + i * 8} ${50 + i * 6} q6 -8 10 2 q-4 -2 -6 4`}
+              fill="#fbf7ef"
+            />
           ))}
           <path
-            d="M0 160 Q60 120 120 150 Q170 170 220 150 Q260 140 300 156 V180 H0z"
-            fill="#457b9d"
-          />
-          <path
-            d="M0 168 Q60 136 120 160 Q170 178 220 160 Q260 150 300 166"
-            stroke="#fff"
-            strokeWidth="2.4"
-            fill="none"
+            d="M0 160 Q60 124 120 150 Q170 170 220 150 Q260 140 300 156 V180 H0z"
+            fill="#6f8fae"
           />
         </g>
       )}
       {id === 'tablo1-koi' && (
         <g>
-          <rect width="300" height="180" fill="#2a6f97" />
+          <rect width="300" height="180" fill="#bcd3d6" />
           {[
-            [70, 50],
-            [230, 130],
-            [60, 150],
+            [64, 46],
+            [236, 134],
+            [54, 148],
           ].map(([cx, cy], i) => (
-            <g key={i}>
-              <circle cx={cx} cy={cy} r="20" fill="#52b788" />
-              <path
-                d={`M${cx} ${cy} L${cx + 20} ${cy - 6} L${cx + 18} ${cy + 6}z`}
-                fill="#2a6f97"
-              />
-            </g>
+            <circle key={i} cx={cx} cy={cy} r="20" fill="#8fb3a0" />
           ))}
           <g transform="translate(150 90) rotate(-20)">
-            <path d="M-60 0 Q-20 -22 30 -6 Q50 0 30 6 Q-20 22 -60 0z" fill="#f4a261" />
-            <path d="M30 0 L56 -16 L50 0 L56 16z" fill="#f4a261" />
-            <circle cx="-10" cy="-4" r="8" fill="#fff" />
-            <circle cx="-48" cy="-2" r="2" fill="#111" />
+            <path d="M-60 0 Q-20 -22 30 -6 Q50 0 30 6 Q-20 22 -60 0z" fill="#e8a27a" />
+            <path d="M30 0 L56 -16 L50 0 L56 16z" fill="#e8a27a" />
+            <circle cx="-10" cy="-4" r="8" fill="#fbf7ef" />
           </g>
           <g transform="translate(150 90) rotate(160)">
-            <path d="M-56 0 Q-18 -20 28 -6 Q46 0 28 6 Q-18 20 -56 0z" fill="#fff" />
-            <path d="M28 0 L52 -14 L46 0 L52 14z" fill="#fff" />
-            <circle cx="-14" cy="0" r="9" fill="#e63946" />
-            <circle cx="-44" cy="-2" r="2" fill="#111" />
+            <path d="M-56 0 Q-18 -20 28 -6 Q46 0 28 6 Q-18 20 -56 0z" fill="#fbf7ef" />
+            <path d="M28 0 L52 -14 L46 0 L52 14z" fill="#fbf7ef" />
+            <circle cx="-14" cy="0" r="9" fill="#d97a6a" />
           </g>
         </g>
       )}
       {id === 'tablo1-vinc' && (
         <g>
-          <rect width="300" height="180" fill="#d4a017" />
-          <rect width="300" height="180" fill="#fff" opacity=".18" />
-          <circle cx="240" cy="40" r="22" fill="#e94f37" />
+          <rect width="300" height="180" fill="#e9d6a8" />
+          <circle cx="240" cy="40" r="20" fill="#d97a6a" />
           {[
             [90, 100, 1],
             [190, 80, -1],
-          ].map(([x, y, s], i) => (
-            <g key={i} transform={`translate(${x} ${y}) scale(${s} 1)`}>
-              <path d="M0 0 Q-50 -50 -90 -30 Q-50 -20 -20 10z" fill="#fff" />
-              <path d="M0 0 Q50 -60 90 -40 Q50 -20 20 10z" fill="#fff" />
-              <path d="M-10 6 Q0 -6 14 6 Q4 14 -10 6z" fill="#fff" />
-              <path d="M10 4 L34 -16" stroke="#111" strokeWidth="5" strokeLinecap="round" />
-              <circle cx="36" cy="-18" r="5" fill="#111" />
-              <circle cx="36" cy="-22" r="3" fill="#e63946" />
-              <path d="M-80 -30 l-8 -4 M-84 -28 l-8 0" stroke="#111" strokeWidth="3" />
-              <path d="M-14 10 L-30 40 M-6 10 L-18 42" stroke="#111" strokeWidth="2" />
+          ].map(([x, y, sc], i) => (
+            <g key={i} transform={`translate(${x} ${y}) scale(${sc} 1)`}>
+              <path d="M0 0 Q-50 -50 -90 -30 Q-50 -20 -20 10z" fill="#fbf7ef" />
+              <path d="M0 0 Q50 -60 90 -40 Q50 -20 20 10z" fill="#fbf7ef" />
+              <path d="M10 4 L34 -16" stroke="#3a3a3a" strokeWidth="4" strokeLinecap="round" />
+              <circle cx="36" cy="-20" r="3" fill="#d97a6a" />
             </g>
           ))}
         </g>
@@ -468,49 +475,58 @@ function SmallArt({ id }: { id: string }) {
   if (id === 'tablo2-kaligrafi')
     return (
       <g>
-        <rect x={x - 6} y={y - 10} width="112" height="10" rx="4" fill="#5a3220" />
-        <rect x={x} y={y} width="100" height="220" fill="#f6ecd6" />
-        <rect x={x} y={y} width="100" height="220" fill="none" stroke="#b9a37a" strokeWidth="6" />
+        <rect x={x - 6} y={y - 10} width="112" height="10" rx="4" fill="#8f6542" />
+        <rect x={x} y={y} width="100" height="220" fill="#f6efe2" />
+        <rect
+          x={x + 6}
+          y={y + 6}
+          width="88"
+          height="208"
+          fill="none"
+          stroke="#d8c29c"
+          strokeWidth="2"
+        />
         <text
           x={x + 50}
           y={y + 130}
           textAnchor="middle"
-          fontSize="92"
-          fill="#1a1a1a"
+          fontSize="90"
+          fill="#2b2b2b"
           fontFamily="serif">
           味
         </text>
-        <rect x={x + 38} y={y + 180} width="24" height="24" fill="#c0392b" />
-        <rect x={x - 6} y={y + 220} width="112" height="12" rx="5" fill="#5a3220" />
+        <rect x={x + 40} y={y + 178} width="20" height="20" fill="#c96a5a" />
+        <rect x={x - 6} y={y + 220} width="112" height="12" rx="5" fill="#8f6542" />
       </g>
     );
   return (
-    <Frame x={x} y={y} w={100} h={140}>
+    <Frame x={x} y={y} w={100} h={130}>
       {id === 'tablo2-kedi' ? (
         <g>
-          <rect width="300" height="180" fill="#ffd166" />
-          <g transform="translate(150 96) scale(1.6)">
-            <circle r="34" fill="#ffa94d" />
-            <path d="M-30 -14 L-26 -46 L-6 -30z M30 -14 L26 -46 L6 -30z" fill="#ffa94d" />
-            <circle cx="-12" cy="-4" r="5" fill="#2b1d14" />
-            <circle cx="12" cy="-4" r="5" fill="#2b1d14" />
-            <path d="M-4 8 l4 4 l4 -4z" fill="#ff7aa2" />
+          <rect width="300" height="180" fill="#f3d9b0" />
+          <g transform="translate(150 100) scale(1.6)">
+            <circle r="32" fill="#8a6a50" />
+            <path d="M-28 -12 L-24 -44 L-6 -28z M28 -12 L24 -44 L6 -28z" fill="#8a6a50" />
+            <path
+              d="M0 -10 q-8 14 -18 22 q8 14 18 14 q10 0 18 -14 q-10 -8 -18 -22z"
+              fill="#fbf6ee"
+            />
+            <circle cx="-11" cy="-4" r="4" fill="#2b1d14" />
+            <circle cx="11" cy="-4" r="4" fill="#2b1d14" />
           </g>
-          <text x="150" y="30" textAnchor="middle" fontSize="28" fontWeight="900" fill="#c0392b">
-            MISO
+          <text x="150" y="32" textAnchor="middle" fontSize="26" fontWeight="900" fill="#8f6542">
+            MOCHI
           </text>
         </g>
       ) : (
         <g>
-          <rect width="300" height="180" fill="#f6ecd6" />
-          <path d="M0 160 Q90 120 160 90 T300 20" stroke="#3a2010" strokeWidth="10" fill="none" />
-          <path d="M120 106 Q150 130 170 150" stroke="#3a2010" strokeWidth="6" fill="none" />
+          <rect width="300" height="180" fill="#f6efe2" />
+          <path d="M0 160 Q90 120 160 90 T300 20" stroke="#6b4a36" strokeWidth="9" fill="none" />
           {[
             [80, 128],
             [140, 96],
             [200, 64],
             [250, 40],
-            [168, 148],
             [108, 112],
           ].map(([cx, cy], i) => (
             <g key={i} transform={`translate(${cx} ${cy})`}>
@@ -521,11 +537,11 @@ function SmallArt({ id }: { id: string }) {
                   cy="-10"
                   rx="7"
                   ry="11"
-                  fill="#f2a7bd"
+                  fill="#f2b8c6"
                   transform={`rotate(${a})`}
                 />
               ))}
-              <circle r="4" fill="#e2557a" />
+              <circle r="4" fill="#d9788f" />
             </g>
           ))}
         </g>
@@ -534,95 +550,47 @@ function SmallArt({ id }: { id: string }) {
   );
 }
 
-function MenuBoard({ items }: { items: string[] }) {
+function MenuTags({ items }: { items: string[] }) {
+  const tags = items.slice(0, 5);
   return (
     <g>
-      <rect x="1020" y="150" width="250" height="260" rx="8" fill="#3a2010" />
-      <rect x="1032" y="162" width="226" height="236" rx="4" fill="#1f2a22" />
-      <text
-        x="1145"
-        y="206"
-        textAnchor="middle"
-        fontSize="34"
-        fontWeight="800"
-        fill="#f8f1d8"
-        fontFamily="Baloo 2, sans-serif">
-        MENÜ
-      </text>
-      {items.slice(0, 6).map((t, i) => (
-        <g key={t}>
+      <rect x="1010" y="118" width="260" height="10" rx="4" fill="#8f6542" />
+      {tags.map((t, i) => (
+        <g
+          key={t}
+          className="tag-g"
+          style={{ transformOrigin: `${1036 + i * 52}px 128px`, animationDelay: `${i * 0.3}s` }}>
+          <line
+            x1={1036 + i * 52}
+            y1="128"
+            x2={1036 + i * 52}
+            y2="140"
+            stroke="#6b4a36"
+            strokeWidth="2"
+          />
+          <rect
+            x={1016 + i * 52}
+            y="140"
+            width="40"
+            height="190"
+            rx="3"
+            fill={i % 2 ? '#f6efe2' : '#efe2c8'}
+            stroke="#c8a77d"
+            strokeWidth="2"
+          />
           <text
-            x="1050"
-            y={248 + i * 26}
-            fontSize="19"
-            fill="#f8f1d8"
+            x={1036 + i * 52}
+            y="156"
+            fontSize="17"
+            fontWeight="800"
+            fill="#3a2414"
             fontFamily="Nunito, sans-serif"
-            fontWeight="700">
+            style={{ writingMode: 'vertical-rl' }}>
             {t}
           </text>
-          <text
-            x="1240"
-            y={248 + i * 26}
-            fontSize="17"
-            textAnchor="end"
-            fill="#ffd166"
-            fontFamily="Nunito, sans-serif"
-            fontWeight="800">
-            ${(4.5 + i * 0.5).toFixed(2)}
-          </text>
+          <circle cx={1036 + i * 52} cy="314" r="9" fill="#c96a5a" />
         </g>
       ))}
-      <path
-        d="M1052 228 h186"
-        stroke="#f8f1d8"
-        strokeOpacity=".3"
-        strokeWidth="2"
-        strokeDasharray="6 5"
-      />
-    </g>
-  );
-}
-
-function StreetWindow({ rain }: { rain: boolean }) {
-  return (
-    <g>
-      <rect x="1310" y="130" width="250" height="320" fill="#2a160c" />
-      <rect x="1322" y="142" width="226" height="296" fill="#161034" />
-      <rect x="1322" y="300" width="226" height="138" fill="#0e0a20" />
-      {[1335, 1380, 1440, 1500].map((x, i) => (
-        <rect key={x} x={x} y={250 - i * 20} width="40" height={200 + i * 20} fill="#22183f" />
-      ))}
-      {[
-        [1350, 280],
-        [1395, 300],
-        [1455, 260],
-        [1515, 320],
-        [1460, 340],
-      ].map(([x, y], i) => (
-        <rect key={i} x={x} y={y} width="8" height="10" fill="#ffd166" opacity=".8" />
-      ))}
-      <text x="1470" y="200" fontSize="22" fill="#ff5fa2" filter="url(#neon)" fontWeight="800">
-        BAR
-      </text>
-      {rain &&
-        Array.from({ length: 22 }, (_, i) => (
-          <line
-            key={i}
-            x1={1330 + ((i * 47) % 210)}
-            y1={150 + ((i * 83) % 260)}
-            x2={1326 + ((i * 47) % 210)}
-            y2={170 + ((i * 83) % 260)}
-            stroke="#9fd3ff"
-            strokeOpacity=".7"
-            strokeWidth="1.5"
-            className="rain-svg"
-            style={{ animationDelay: `${(i % 7) * 0.12}s` }}
-          />
-        ))}
-      <rect x="1430" y="142" width="8" height="296" fill="#2a160c" />
-      <rect x="1322" y="286" width="226" height="8" fill="#2a160c" />
-      <path d="M1330 150 L1400 150 L1340 260z" fill="#fff" opacity=".07" />
-      <rect x="1300" y="446" width="270" height="14" fill="#5a3220" />
     </g>
   );
 }
@@ -630,67 +598,139 @@ function StreetWindow({ rain }: { rain: boolean }) {
 function Shelf() {
   return (
     <g>
-      <rect x="1010" y="440" width="270" height="10" fill="#5a3220" />
-      {[1024, 1052, 1080].map((x, i) => (
+      <rect x="1004" y="402" width="276" height="10" rx="3" fill="#a77b52" />
+      {[1024, 1050].map((x, i) => (
         <g key={x}>
-          <rect x={x + 6} y={386} width="8" height="12" fill={i === 1 ? '#3a1a08' : '#0a1f13'} />
-          <path
-            d={`M${x} 404 q0 -8 10 -8 q10 0 10 8 v34 h-20z`}
-            fill={i === 1 ? '#8a4a1c' : '#2f6b47'}
-          />
-          <rect x={x + 3} y="414" width="14" height="12" fill="#f3e6c8" />
+          <rect x={x + 6} y="350" width="8" height="12" fill={i ? '#6b4a36' : '#5a7a5e'} />
+          <path d={`M${x} 368 q0 -8 10 -8 q10 0 10 8 v34 h-20z`} fill={i ? '#b9835a' : '#7d9a80'} />
         </g>
       ))}
-      {[1120, 1170, 1220].map((x) => (
-        <path
+      {[1090, 1136].map((x, i) => (
+        <path key={x} d={`M${x} 402 q0 -22 22 -22 q22 0 22 22z`} fill={i ? '#2f4a6d' : '#f4f1ea'} />
+      ))}
+      <rect x="1196" y="378" width="56" height="24" rx="5" fill="#c96a5a" />
+      <path
+        d="M1224 378 q-6 -26 -20 -34 M1224 378 q4 -26 18 -32"
+        stroke="#6b4a36"
+        strokeWidth="4"
+        fill="none"
+      />
+      <ellipse cx="1202" cy="340" rx="20" ry="11" fill="#7d9a80" />
+      <ellipse cx="1244" cy="344" rx="18" ry="10" fill="#6a8a6e" />
+      <ellipse cx="1224" cy="330" rx="16" ry="9" fill="#93b195" />
+    </g>
+  );
+}
+
+const LAMP_X = [230, 520, 1080, 1360];
+
+function Lamps({ id, tod }: { id: string; tod: TimeOfDay }) {
+  return (
+    <g>
+      {LAMP_X.map((x, i) => (
+        <g
           key={x}
-          d={`M${x} 440 q0 -22 22 -22 q22 0 22 22z`}
-          fill="#f4ede2"
-          stroke="#1f3c88"
-          strokeWidth="2"
-        />
+          className="sway-g"
+          style={{ transformOrigin: `${x}px 30px`, animationDelay: `${i * 0.7}s` }}>
+          <line x1={x} y1="30" x2={x} y2="70" stroke="#6b4a36" strokeWidth="2" />
+          <circle cx={x} cy="110" r="90" fill="url(#r-lamp)" />
+          {id === 'lamba-kure' ? (
+            <g>
+              <circle cx={x} cy="104" r="34" fill="#fbf4e4" />
+              {[-22, -11, 0, 11, 22].map((d) => (
+                <ellipse
+                  key={d}
+                  cx={x}
+                  cy={104 + d}
+                  rx={Math.sqrt(34 * 34 - d * d)}
+                  ry="1.6"
+                  fill="none"
+                  stroke="#e5d4b2"
+                  strokeWidth="1"
+                />
+              ))}
+            </g>
+          ) : id === 'lamba-ampul' ? (
+            <g>
+              <path d={`M${x - 40} 112 Q${x} 50 ${x + 40} 112z`} fill="#c9a06a" />
+              {Array.from({ length: 7 }, (_, k) => (
+                <path
+                  key={k}
+                  d={`M${x - 36 + k * 12} 110 Q${x} 56 ${x} 62`}
+                  stroke="#a77b52"
+                  strokeWidth="1"
+                  fill="none"
+                />
+              ))}
+              <circle cx={x} cy="116" r="9" fill="#ffe7b0" />
+            </g>
+          ) : (
+            <g>
+              <rect x={x - 18} y="68" width="36" height="7" rx="2" fill="#3a2a22" />
+              <ellipse
+                cx={x}
+                cy="108"
+                rx="28"
+                ry="36"
+                fill={
+                  id === 'lamba-renkli'
+                    ? ['#e7a38f', '#9fc1b5', '#f2c38b', '#b9a7c9'][i % 4]
+                    : '#f6ead4'
+                }
+              />
+              {[-24, -12, 0, 12, 24].map((d) => (
+                <ellipse
+                  key={d}
+                  cx={x}
+                  cy={108 + d}
+                  rx={Math.sqrt(1 - (d / 36) ** 2) * 28}
+                  ry="1.4"
+                  fill="#00000018"
+                />
+              ))}
+              <rect x={x - 18} y="141" width="36" height="7" rx="2" fill="#3a2a22" />
+              {tod === 'aksam' && (
+                <ellipse cx={x} cy="108" rx="20" ry="26" fill="#ffd58a" opacity=".45" />
+              )}
+            </g>
+          )}
+        </g>
       ))}
     </g>
   );
 }
 
-function Neon({ id }: { id: string }) {
+function Neon({ id, tod }: { id: string; tod: TimeOfDay }) {
   if (id === 'neon-yok') return null;
+  const op = tod === 'aksam' ? 1 : 0.75;
   if (id === 'neon-ramen')
     return (
-      <g className="neon-g">
-        <rect x="660" y="300" width="280" height="70" rx="10" fill="#0a0612" opacity=".6" />
+      <g className="neon-g" opacity={op}>
         <text
           x="800"
           y="352"
           textAnchor="middle"
-          fontSize="48"
-          fill="#ff7ab8"
-          filter="url(#neon)"
+          fontSize="44"
+          fill="#f28fb0"
+          filter="url(#r-neon)"
           fontWeight="800">
           ラーメン
         </text>
       </g>
     );
   return (
-    <g className="neon-g" filter="url(#neon)">
+    <g className="neon-g" filter="url(#r-neon)" opacity={op}>
       <path
-        d="M720 330 h160 q-8 40 -80 44 q-72 -4 -80 -44z"
+        d="M730 330 h140 q-8 36 -70 40 q-62 -4 -70 -40z"
         fill="none"
-        stroke="#5ff0ff"
+        stroke="#8fd9e6"
         strokeWidth="5"
       />
       <path
-        d="M760 326 q10 -20 0 -40 M800 326 q10 -20 0 -40 M840 326 q10 -20 0 -40"
+        d="M770 326 q8 -18 0 -36 M800 326 q8 -18 0 -36 M830 326 q8 -18 0 -36"
         fill="none"
         stroke="#fff"
         strokeWidth="4"
-      />
-      <path
-        d="M850 300 L900 270 M856 308 L906 278"
-        stroke="#ffd166"
-        strokeWidth="5"
-        strokeLinecap="round"
       />
     </g>
   );
@@ -698,75 +738,69 @@ function Neon({ id }: { id: string }) {
 
 function Plants({ id }: { id: string }) {
   if (id === 'bitki-yok') return null;
+  const fiddle = (x: number) => (
+    <g key={'f' + x}>
+      <ellipse cx={x} cy={FLOOR + 98} rx="44" ry="8" fill="#3a2414" opacity=".15" />
+      <path d={`M${x - 32} ${FLOOR + 30} h64 l-8 66 h-48z`} fill="#efe5d6" />
+      <path d={`M${x - 32} ${FLOOR + 30} h64`} stroke="#d8c8b0" strokeWidth="4" />
+      <path d={`M${x} ${FLOOR + 30} V${FLOOR - 160}`} stroke="#6b4a36" strokeWidth="5" />
+      {[
+        [-30, -150, -30],
+        [30, -120, 30],
+        [-26, -90, -40],
+        [28, -60, 40],
+        [-20, -30, -30],
+        [0, -180, 0],
+      ].map(([dx, dy, a], i) => (
+        <ellipse
+          key={i}
+          cx={x + dx}
+          cy={FLOOR + dy}
+          rx="20"
+          ry="30"
+          fill={i % 2 ? '#6f9a72' : '#7fae80'}
+          transform={`rotate(${a} ${x + dx} ${FLOOR + dy})`}
+        />
+      ))}
+    </g>
+  );
   const bamboo = (x: number) => (
     <g key={'b' + x}>
-      <path d={`M${x - 30} ${FLOOR + 40} h60 l-8 50 h-44z`} fill="#3a3a3a" />
-      {[-14, 0, 14].map((d, i) => (
+      <path d={`M${x - 28} ${FLOOR + 40} h56 l-6 50 h-44z`} fill="#5a6b4b" />
+      {[-12, 0, 12].map((d, i) => (
         <g key={d}>
           <rect
-            x={x + d - 4}
-            y={FLOOR - 230 + i * 30}
-            width="8"
-            height={270 - i * 30}
-            fill="#6a994e"
+            x={x + d - 3}
+            y={FLOOR - 220 + i * 30}
+            width="6"
+            height={260 - i * 30}
+            fill="#93ae78"
           />
-          {[0, 1, 2, 3, 4].map((k) => (
+          {[0, 1, 2, 3].map((k) => (
             <rect
               key={k}
-              x={x + d - 5}
-              y={FLOOR - 200 + i * 30 + k * 50}
-              width="10"
+              x={x + d - 4}
+              y={FLOOR - 190 + i * 30 + k * 56}
+              width="8"
               height="3"
-              fill="#386641"
+              fill="#6f8a58"
             />
           ))}
           <path
-            d={`M${x + d} ${FLOOR - 220 + i * 30} q30 -10 50 6 q-30 2 -50 -6z`}
-            fill="#a7c957"
+            d={`M${x + d} ${FLOOR - 210 + i * 30} q28 -10 46 6 q-28 2 -46 -6z`}
+            fill="#a9c48a"
           />
           <path
-            d={`M${x + d} ${FLOOR - 160 + i * 30} q-30 -10 -50 6 q30 2 50 -6z`}
-            fill="#a7c957"
+            d={`M${x + d} ${FLOOR - 150 + i * 30} q-28 -10 -46 6 q28 2 46 -6z`}
+            fill="#a9c48a"
           />
         </g>
       ))}
     </g>
   );
-  const monstera = (x: number) => (
-    <g key={'m' + x}>
-      <path d={`M${x - 36} ${FLOOR + 30} h72 l-10 60 h-52z`} fill="#c0392b" />
-      {[-60, -20, 20, 60].map((a, i) => (
-        <g key={a} transform={`translate(${x} ${FLOOR + 30}) rotate(${a})`}>
-          <path d={`M0 0 L0 ${-120 - i * 10}`} stroke="#386641" strokeWidth="4" />
-          <path
-            d={`M0 ${-120 - i * 10} q-46 -20 -40 -70 q30 10 40 40 q10 -30 40 -40 q6 50 -40 70z`}
-            fill="#2d6a4f"
-          />
-          <path d={`M0 ${-125 - i * 10} v-50`} stroke="#52b788" strokeWidth="2" />
-        </g>
-      ))}
-    </g>
-  );
-  if (id === 'bitki-bambu') return <g>{[60, 1540].map(bamboo)}</g>;
-  if (id === 'bitki-bonsai')
-    return (
-      <g>
-        {monstera(70)}
-        <g>
-          <rect x="1180" y="418" width="60" height="22" rx="4" fill="#1f3c88" />
-          <path
-            d="M1210 418 q-4 -30 -20 -40 M1210 418 q6 -26 22 -36"
-            stroke="#5a3220"
-            strokeWidth="6"
-            fill="none"
-          />
-          <ellipse cx="1186" cy="372" rx="26" ry="14" fill="#386641" />
-          <ellipse cx="1234" cy="378" rx="24" ry="12" fill="#2d6a4f" />
-          <ellipse cx="1210" cy="360" rx="20" ry="11" fill="#52b788" />
-        </g>
-      </g>
-    );
-  return <g>{[monstera(60), bamboo(1545), monstera(1480)]}</g>;
+  if (id === 'bitki-bambu') return <g>{[56, 1548].map(bamboo)}</g>;
+  if (id === 'bitki-bonsai') return <g>{fiddle(60)}</g>;
+  return <g>{[fiddle(60), bamboo(1548)]}</g>;
 }
 
 function Special({ id }: { id: string }) {
@@ -774,50 +808,49 @@ function Special({ id }: { id: string }) {
   if (id === 'ozel-akvaryum')
     return (
       <g>
-        <rect x="470" y="420" width="140" height="60" fill="#3a2010" />
-        <rect x="476" y="330" width="128" height="92" fill="#4ea8de" opacity=".65" />
-        <rect x="476" y="330" width="128" height="10" fill="#cfe8ff" opacity=".7" />
-        <rect x="476" y="400" width="128" height="22" fill="#c9a66b" />
+        <rect x="470" y="420" width="140" height="70" rx="4" fill="#a77b52" />
+        <rect x="476" y="334" width="128" height="88" rx="4" fill="#bfe1e6" opacity=".85" />
+        <rect x="476" y="398" width="128" height="24" fill="#e6d2ae" />
         <path
-          d="M500 400 q-4 -30 4 -50 M512 400 q6 -24 -2 -44 M580 400 q-6 -26 2 -40"
-          stroke="#2d6a4f"
+          d="M500 398 q-4 -26 4 -44 M512 398 q6 -22 -2 -40 M580 398 q-6 -24 2 -36"
+          stroke="#6f9a72"
           strokeWidth="4"
           fill="none"
         />
         <g className="fish-a">
-          <path d="M520 370 q14 -10 26 0 q-12 10 -26 0z M546 370 l8 -6 v12z" fill="#f4a261" />
+          <path d="M520 370 q14 -10 26 0 q-12 10 -26 0z M546 370 l8 -6 v12z" fill="#e8a27a" />
         </g>
         <g className="fish-b">
-          <path d="M560 386 q-12 -8 -22 0 q10 8 22 0z M538 386 l-7 -5 v10z" fill="#ffd166" />
+          <path d="M560 384 q-12 -8 -22 0 q10 8 22 0z M538 384 l-7 -5 v10z" fill="#f2c38b" />
         </g>
         <rect
           x="476"
-          y="330"
+          y="334"
           width="128"
-          height="92"
+          height="88"
+          rx="4"
           fill="none"
-          stroke="#2a160c"
-          strokeWidth="5"
+          stroke="#8f6542"
+          strokeWidth="4"
         />
-        <path d="M486 336 L520 336 L490 380z" fill="#fff" opacity=".18" />
       </g>
     );
   return (
     <g>
-      <rect x="470" y="420" width="140" height="60" fill="#3a2010" />
-      <rect x="480" y="396" width="120" height="26" rx="4" fill="#5a3220" />
-      <g className="spin-g" style={{ transformOrigin: '530px 396px' }}>
-        <ellipse cx="530" cy="396" rx="40" ry="10" fill="#111" />
-        <ellipse cx="530" cy="396" rx="12" ry="3" fill="#e94f37" />
+      <rect x="470" y="420" width="140" height="70" rx="4" fill="#a77b52" />
+      <rect x="482" y="398" width="116" height="24" rx="4" fill="#c39a70" />
+      <g className="spin-g" style={{ transformOrigin: '530px 398px' }}>
+        <ellipse cx="530" cy="398" rx="38" ry="9" fill="#2b2b2b" />
+        <ellipse cx="530" cy="398" rx="10" ry="2.6" fill="#c96a5a" />
       </g>
-      <path d="M582 384 L566 398" stroke="#c9ced6" strokeWidth="3" />
+      <path d="M580 386 L566 398" stroke="#c9ced3" strokeWidth="3" />
       {[0, 1, 2].map((i) => (
         <text
           key={i}
           x={560 + i * 14}
-          y={360 - i * 12}
+          y={364 - i * 12}
           fontSize="20"
-          fill="#ffd166"
+          fill="#8f6542"
           className="note-svg"
           style={{ animationDelay: `${i * 0.6}s` }}>
           ♪
@@ -827,9 +860,68 @@ function Special({ id }: { id: string }) {
   );
 }
 
+const TABLE: Record<string, [string, string, string]> = {
+  'masaStil-mese': ['#d9b48a', '#c39a70', '#a77b52'],
+  'masaStil-ceviz': ['#8a5e3e', '#6e4a2e', '#4f3420'],
+  'masaStil-mermer': ['#f4f1ec', '#dcd6cc', '#b9b2a6'],
+  'masaStil-lake': ['#c0503c', '#9e3a2a', '#6e2418'],
+};
+
 const DINER_SEEDS = [301, 517, 733, 919, 1103, 1291, 1447, 1601];
 
-function Tables({ id }: { id: string }) {
+function Centerpiece({ id, x, y }: { id: string; x: number; y: number }) {
+  if (id === 'masaSus-vazo')
+    return (
+      <g>
+        <path
+          d={`M${x - 8} ${y} q-4 -16 4 -26 h8 q8 10 4 26z`}
+          fill="#f4f1ea"
+          stroke="#d8cfc0"
+          strokeWidth="1.5"
+        />
+        <path
+          d={`M${x} ${y - 26} q-10 -20 -22 -24 M${x} ${y - 26} q8 -24 22 -26`}
+          stroke="#6b4a36"
+          strokeWidth="2"
+          fill="none"
+        />
+        {[
+          [x - 22, y - 50],
+          [x + 22, y - 52],
+          [x - 8, y - 44],
+          [x + 10, y - 40],
+        ].map(([cx, cy], i) => (
+          <circle key={i} cx={cx} cy={cy} r="5" fill="#f2b8c6" />
+        ))}
+      </g>
+    );
+  if (id === 'masaSus-mum')
+    return (
+      <g>
+        <rect x={x - 26} y={y - 22} width="12" height="22" rx="2" fill="#fbf4e4" />
+        <path d={`M${x - 20} ${y - 30} q4 6 0 8 q-4 -2 0 -8z`} fill="#ffbf5a" />
+        <path d={`M${x} ${y} q0 -18 16 -18 q16 0 16 18z`} fill="#5a7a5e" />
+        <rect x={x + 30} y={y - 12} width="8" height="12" rx="2" fill="#f4f1ea" />
+      </g>
+    );
+  if (id === 'masaSus-bonsai')
+    return (
+      <g>
+        <rect x={x - 16} y={y - 12} width="32" height="12" rx="3" fill="#2f4a6d" />
+        <path
+          d={`M${x} ${y - 12} q-4 -14 -12 -20 M${x} ${y - 12} q4 -14 12 -18`}
+          stroke="#6b4a36"
+          strokeWidth="3"
+          fill="none"
+        />
+        <ellipse cx={x - 12} cy={y - 34} rx="12" ry="7" fill="#7d9a80" />
+        <ellipse cx={x + 12} cy={y - 32} rx="11" ry="6" fill="#6a8a6e" />
+      </g>
+    );
+  return null;
+}
+
+function Tables({ decor }: { decor: DecorState }) {
   const diners = useMemo(
     () =>
       DINER_SEEDS.map((s, i) =>
@@ -837,57 +929,51 @@ function Tables({ id }: { id: string }) {
       ),
     []
   );
-  if (id === 'masa-yok') return null;
-  const spots = id === 'masa-dort' ? [180, 470, 1130, 1420] : [200, 1400];
+  if (decor.masa === 'masa-yok') return null;
+  const spots = decor.masa === 'masa-dort' ? [190, 470, 1130, 1410] : [230, 1370];
+  const [top, mid, leg] = TABLE[decor.masaStil] ?? TABLE['masaStil-mese'];
   return (
     <g>
       {spots.map((x, i) => (
         <g key={x}>
-          {/* diners behind the table */}
           <image
             href={diners[i * 2]}
-            x={x - 120}
-            y={FLOOR - 170}
-            width="130"
-            height="130"
+            x={x - 118}
+            y={FLOOR - 176}
+            width="128"
+            height="128"
             className="diner"
             style={{ animationDelay: `${i * 0.3}s` }}
           />
           <image
             href={diners[i * 2 + 1]}
-            x={x - 10}
-            y={FLOOR - 170}
-            width="130"
-            height="130"
+            x={x - 8}
+            y={FLOOR - 176}
+            width="128"
+            height="128"
             className="diner"
             style={{ animationDelay: `${i * 0.3 + 0.5}s` }}
           />
-          {/* table */}
-          <ellipse cx={x} cy={FLOOR + 70} rx="120" ry="14" fill="#000" opacity=".3" />
-          <rect x={x - 10} y={FLOOR - 40} width="20" height="110" fill="#3a2010" />
-          <rect x={x - 120} y={FLOOR - 64} width="240" height="26" rx="6" fill="#8a5530" />
-          <rect x={x - 120} y={FLOOR - 64} width="240" height="8" rx="4" fill="#b57a48" />
-          {/* bowls + chopsticks on table */}
-          <path d={`M${x - 80} ${FLOOR - 64} q0 -24 30 -24 q30 0 30 24z`} fill="#c0392b" />
-          <path d={`M${x + 20} ${FLOOR - 64} q0 -24 30 -24 q30 0 30 24z`} fill="#1f3c88" />
+          <ellipse cx={x} cy={FLOOR + 80} rx="130" ry="14" fill="#3a2414" opacity=".14" />
+          <rect x={x - 8} y={FLOOR - 40} width="16" height="118" fill={leg} />
+          <rect x={x - 124} y={FLOOR - 66} width="248" height="22" rx="8" fill={mid} />
+          <rect x={x - 124} y={FLOOR - 66} width="248" height="9" rx="5" fill={top} />
+          <path d={`M${x - 84} ${FLOOR - 66} q0 -22 28 -22 q28 0 28 22z`} fill="#f4f1ea" />
+          <path d={`M${x + 30} ${FLOOR - 66} q0 -22 28 -22 q28 0 28 22z`} fill="#2f4a6d" />
           <path
-            d={`M${x - 74} ${FLOOR - 78} q4 -24 -2 -40 M${x + 30} ${FLOOR - 78} q4 -24 -2 -40`}
+            d={`M${x - 70} ${FLOOR - 82} q4 -22 -2 -36 M${x + 44} ${FLOOR - 82} q4 -22 -2 -36`}
             stroke="#fff"
-            strokeOpacity=".35"
+            strokeOpacity=".6"
             strokeWidth="5"
             fill="none"
             className="steam-svg"
           />
-          <path
-            d={`M${x - 10} ${FLOOR - 70} L${x + 10} ${FLOOR - 108}`}
-            stroke="#d9b38c"
-            strokeWidth="3"
-          />
-          {/* stools */}
-          {[-90, 90].map((d) => (
+          <Centerpiece id={decor.masaSus} x={x} y={FLOOR - 66} />
+          {[-92, 92].map((d) => (
             <g key={d}>
-              <rect x={x + d - 6} y={FLOOR - 4} width="12" height="74" fill="#2a160c" />
-              <ellipse cx={x + d} cy={FLOOR - 4} rx="30" ry="9" fill="#c0392b" />
+              <rect x={x + d - 5} y={FLOOR - 4} width="10" height="80" fill={leg} />
+              <ellipse cx={x + d} cy={FLOOR - 4} rx="30" ry="9" fill="#e8d6b8" />
+              <ellipse cx={x + d} cy={FLOOR - 7} rx="26" ry="6" fill="#f3e6cf" />
             </g>
           ))}
         </g>
@@ -897,35 +983,38 @@ function Tables({ id }: { id: string }) {
 }
 
 export default function Restaurant({
-  decor,
+  decor: raw,
   menu,
-  rain,
+  rain = false,
+  tod = 'ogle',
 }: {
-  decor: DecorState;
+  decor?: Partial<DecorState>;
   menu: string[];
-  rain: boolean;
+  rain?: boolean;
+  tod?: TimeOfDay;
 }) {
+  const decor = withDefaults(raw);
   return (
     <svg
-      className="restaurant"
+      className={`restaurant tod-${tod}`}
       viewBox="0 0 1600 900"
       preserveAspectRatio="xMidYMax slice"
       aria-hidden="true">
-      <Defs />
-      <Wall id={decor.duvar} />
-      <Floor id={decor.zemin} />
-      <KitchenPass />
+      <Defs tod={tod} />
+      <Room decor={decor} />
+      <KitchenPass tod={tod} />
       <SmallArt id={decor.tablo2} />
       <BigPainting id={decor.tablo1} />
-      <MenuBoard items={menu} />
+      <MenuTags items={menu} />
       <Shelf />
-      <StreetWindow rain={rain} />
+      <BigWindow tod={tod} rain={rain} />
       <Special id={decor.ozel} />
-      <Neon id={decor.neon} />
-      <Beams />
-      <Lamps id={decor.lamba} />
+      <Neon id={decor.neon} tod={tod} />
+      <Lamps id={decor.lamba} tod={tod} />
       <Plants id={decor.bitki} />
-      <Tables id={decor.masa} />
+      <Tables decor={decor} />
+      {tod === 'aksam' && <rect width={W} height="900" fill="#1a1838" opacity=".18" />}
+      {tod === 'gunbatimi' && <rect width={W} height="900" fill="#f39a5e" opacity=".08" />}
     </svg>
   );
 }
