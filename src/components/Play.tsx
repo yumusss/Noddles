@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
@@ -38,7 +38,8 @@ import {
   type Verdict,
 } from '../orders';
 import { buzz, sfx } from '../audio';
-import { Restaurant } from './Scenery';
+import { Restaurant as RestaurantRaw } from './Scenery';
+const Restaurant = memo(RestaurantRaw);
 import { decorTipBonus } from '../decor';
 import Establishing from './Establishing';
 import type { Save } from '../App';
@@ -267,6 +268,8 @@ export default function Play({
     let raf = 0;
     let last = performance.now();
     let acc = 0;
+    let frame = 0;
+    let cookAcc = 0;
     const loop = (now: number) => {
       const dt = Math.min(0.1, (now - last) / 1000);
       last = now;
@@ -278,9 +281,13 @@ export default function Play({
           sfx('bubble');
         }
       }
-      if (cooking) {
+      frame++;
+      cookAcc += dt;
+      if (cooking && frame % 2 === 0) {
+        const step = cookAcc;
+        cookAcc = 0;
         setCookP((p) => {
-          const n = p + dt * COOK_SPEED;
+          const n = p + step * COOK_SPEED;
           if (p < 58 && n >= 58) sfx('ding');
           if (p < 100 && n >= 100) sfx('fail');
           return Math.min(130, n);
