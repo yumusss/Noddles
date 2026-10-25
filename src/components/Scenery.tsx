@@ -314,9 +314,11 @@ export function SmallArt({ kind }: { kind: string }) {
     );
   if (kind === 'smallart_miso')
     return (
-      <div className="sart poster">
+      <div
+        className="sart poster"
+        style={{ background: 'linear-gradient(#f8f1e6, #dfc9ac)', color: '#5c4332' }}>
         <CatArt size={46} />
-        <b>MISO</b>
+        <b style={{ color: '#5c4332' }}>MOCHI</b>
       </div>
     );
   if (kind === 'smallart_sakura')

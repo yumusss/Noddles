@@ -1,6 +1,37 @@
 import { INGREDIENTS } from '../data';
 import { BowlCanvas, BowlSide, Tray } from './FoodCanvas';
 import type { BowlDraw } from '../food';
+import { ChangePanel, RegisterDecor, TipJar } from './Cash';
+
+/** `?gallery&cash` — counter props and the change panel in a salon-like frame. */
+function CashGallery() {
+  const frame = (w: number, h: number, open: boolean, pay: boolean) => (
+    <div
+      className="station salon2"
+      style={{ position: 'relative', width: w, height: h, flex: 'none' }}>
+      <div className="salon-cam">
+        <div className="counter2">
+          <div className="counter2-top" />
+          <div className="counter2-front">
+            <span>NODDLES</span>
+          </div>
+        </div>
+        <RegisterDecor open={open} display={open ? '$12.75' : '$0.00'} />
+        <TipJar amount={open ? 1850 : 450} bump={open ? 1 : 0} />
+      </div>
+      {pay && (
+        <ChangePanel name="Ada" due={1275} given={2000} showAnswer onDone={() => undefined} />
+      )}
+    </div>
+  );
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, padding: 12, background: '#1c1612' }}>
+      {frame(420, 560, false, false)}
+      {frame(420, 560, true, true)}
+      {frame(760, 560, true, false)}
+    </div>
+  );
+}
 
 const P = (id: string, x: number, y: number, k: number, s = 0.85) => ({
   id,
@@ -12,6 +43,7 @@ const P = (id: string, x: number, y: number, k: number, s = 0.85) => ({
 });
 
 export default function Gallery() {
+  if (window.location.search.includes('cash')) return <CashGallery />;
   const ramen: BowlDraw = {
     noodle: 'ramen',
     thick: 'orta',
