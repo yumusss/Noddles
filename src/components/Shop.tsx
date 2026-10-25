@@ -53,9 +53,12 @@ function ItemPreview({ item }: { item: DecorItem }) {
       <div className="prev tables">
         {Array.from({ length: id === 'tables_4' ? 4 : 2 }, (_, i) => (
           <svg key={i} viewBox="0 0 40 30">
-            <ellipse cx="20" cy="10" rx="18" ry="6" fill="#c98f5a" />
-            <rect x="18" y="12" width="4" height="14" fill="#3a1f12" />
-            <ellipse cx="20" cy="9" rx="6" ry="2.6" fill="#f7e0b0" />
+            <ellipse cx="20" cy="11" rx="18" ry="6" fill="#b6834f" />
+            <ellipse cx="20" cy="10" rx="18" ry="6" fill="#d4ab78" />
+            <rect x="18" y="14" width="4" height="12" fill="#7b4f2e" />
+            <ellipse cx="20" cy="26" rx="7" ry="2" fill="#7b4f2e" />
+            <ellipse cx="16" cy="9" rx="5" ry="2.2" fill="#f6efe4" />
+            <circle cx="27" cy="9" r="2" fill="#7c9a6e" />
           </svg>
         ))}
       </div>
@@ -137,18 +140,18 @@ export default function Shop({
           ‹
         </button>
         <div className="map-title">Dekorasyon</div>
-        <div className="map-stars cash">💵 {fmt(save.cash)}</div>
+        <div className="map-stars cash">{fmt(save.cash)}</div>
       </div>
 
       <div className="shop-preview">
-        <Restaurant decor={save.decor} cat={<CatArt size={40} sleepy />} />
+        <Restaurant decor={save.decor} cat={<CatArt size={40} sleepy />} time="noon" />
         <div className="pv-counter" />
         <div className="shop-bonus">
           <b>Bahşiş bonusu</b>
           <span>+{pct(bonus)}</span>
         </div>
         {tableCount(save.decor) === 0 && (
-          <div className="shop-hint">Masa alırsan misafirler oturur 🍜</div>
+          <div className="shop-hint">Masa alırsan misafirler oturur</div>
         )}
       </div>
 
@@ -182,7 +185,7 @@ export default function Shop({
               <div className="sc-desc">{it.desc}</div>
               <div className="sc-meta">
                 {it.tipBonus > 0 ? (
-                  <span className="sc-bonus">💝 +{pct(it.tipBonus)}</span>
+                  <span className="sc-bonus">bahşiş +{pct(it.tipBonus)}</span>
                 ) : (
                   <span />
                 )}
@@ -190,7 +193,7 @@ export default function Shop({
                 {owned && !equipped && <span className="sc-owned">Senin</span>}
               </div>
               {equipped ? (
-                <div className="btn small sc-btn is-eq">✓ Takılı</div>
+                <div className="btn small sc-btn is-eq">Takılı ✓</div>
               ) : owned ? (
                 <button className="btn small ghost sc-btn" onClick={() => equip(it)}>
                   Kullan
@@ -199,7 +202,7 @@ export default function Shop({
                 <button
                   className={`btn small sc-btn ${locked ? 'ghost' : 'primary'}`}
                   onClick={() => buy(it)}>
-                  {locked ? '🔒 Para yetmiyor' : 'Satın al'}
+                  {locked ? 'Para yetmiyor' : 'Satın al'}
                 </button>
               )}
             </div>

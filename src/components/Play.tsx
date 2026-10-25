@@ -602,7 +602,8 @@ export default function Play({
             <div className="salon-cam">
               <Restaurant
                 decor={save.decor}
-                rain={L.id === 5}
+                time={L.time}
+                weather={L.weather}
                 menu={noodles.map((n) => INGREDIENTS[n].name).join(' • ')}
               />
               <div className="miso-roam" style={CAT_SPOTS[catSpot]}>
