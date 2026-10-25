@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CHARS, type Line } from '../data';
-import { Portrait } from '../art';
+import { Portrait } from '../avatar';
 import { sfx } from '../audio';
 import { ShopWall } from './Scenery';
 

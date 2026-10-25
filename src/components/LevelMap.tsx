@@ -1,5 +1,6 @@
 import { LEVELS, INGREDIENTS } from '../data';
-import { CatArt, IngredientIcon, Star } from '../art';
+import { CatArt, Star } from '../art';
+import { Tray } from './FoodCanvas';
 import { sfx } from '../audio';
 import type { Save } from '../App';
 import { Rain } from './Scenery';
@@ -73,7 +74,7 @@ export default function LevelMap({
                 <div className="node-unlocks">
                   {l.unlock.map((u) => (
                     <span key={u} title={INGREDIENTS[u].name}>
-                      <IngredientIcon id={u} size={20} />
+                      <Tray id={u} width={34} />
                     </span>
                   ))}
                 </div>

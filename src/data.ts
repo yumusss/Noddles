@@ -1,6 +1,6 @@
 // ---------- Ingredients ----------
 
-export type Category = 'noodle' | 'broth' | 'topping';
+export type Category = 'noodle' | 'broth' | 'sauce' | 'topping';
 
 export interface Ingredient {
   id: string;
@@ -21,6 +21,13 @@ export const INGREDIENTS: Record<string, Ingredient> = {
   miso: { id: 'miso', name: 'Miso', cat: 'broth', color: '#d39a4c', price: 4 },
   acili: { id: 'acili', name: 'Acılı Tantan', cat: 'broth', color: '#d8401f', price: 5 },
   tonkotsu: { id: 'tonkotsu', name: 'Kemik Suyu', cat: 'broth', color: '#efdcbc', price: 6 },
+  tavuk: { id: 'tavuk', name: 'Tavuk Suyu', cat: 'broth', color: '#e2b04f', price: 4 },
+  kori: { id: 'kori', name: 'Köri Suyu', cat: 'broth', color: '#c9861c', price: 5 },
+  // sauces (dry noodles)
+  teriyaki: { id: 'teriyaki', name: 'Teriyaki Sos', cat: 'sauce', color: '#5a2a10', price: 4 },
+  fistik: { id: 'fistik', name: 'Fıstık Sosu', cat: 'sauce', color: '#b9814a', price: 4 },
+  tatliaci: { id: 'tatliaci', name: 'Tatlı Acı Sos', cat: 'sauce', color: '#d6401c', price: 4 },
+  yakisoba: { id: 'yakisoba', name: 'Yakisoba Sosu', cat: 'sauce', color: '#3b1d0e', price: 5 },
   // toppings
   yesil: { id: 'yesil', name: 'Yeşil Soğan', cat: 'topping', color: '#5cb85c', price: 1 },
   yumurta: { id: 'yumurta', name: 'Marine Yumurta', cat: 'topping', color: '#f9a825', price: 2 },
@@ -123,7 +130,7 @@ export const LEVELS: Level[] = [
     complexity: 1,
     title: 'Mahallenin Tadı',
     subtitle: 'Defterin ikinci sayfası: chashu',
-    unlock: ['chashu', 'pakchoi'],
+    unlock: ['chashu', 'pakchoi', 'teriyaki'],
     intro: [
       { who: 'sef', text: 'Tezgâhın altında bir sayfa buldum! Yağ lekeleriyle dolu ama okunuyor.' },
       { who: 'hana', text: 'Aaa, chashu tarifim! Bütün gece kısık ateşte… Mahalle buna bayılır.' },
@@ -145,7 +152,7 @@ export const LEVELS: Level[] = [
     complexity: 2,
     title: 'Rüzgar Geliyor',
     subtitle: 'Online siparişler başlıyor',
-    unlock: ['nori'],
+    unlock: ['nori', 'tavuk'],
     tip: 'Artık telefon da çalıyor! Telefondan gelen siparişi Rüzgar kapıp götürür.',
     intro: [
       {
@@ -202,7 +209,7 @@ export const LEVELS: Level[] = [
     complexity: 3,
     title: 'Yağmur Akşamı',
     subtitle: 'Sağanak yağmur, dolup taşan dükkân',
-    unlock: ['misir', 'mantar'],
+    unlock: ['misir', 'mantar', 'fistik'],
     intro: [
       { who: 'ruzgar', text: 'Gökyüzü delindi! Bu yağmurda herkes sıcak çorba isteyecek.' },
       {
@@ -254,7 +261,7 @@ export const LEVELS: Level[] = [
     complexity: 3,
     title: 'Eleştirmen',
     subtitle: 'Madam Lezzetova masada',
-    unlock: ['soba', 'tofu', 'kimchi'],
+    unlock: ['soba', 'tofu', 'kimchi', 'tatliaci'],
     intro: [
       {
         who: 'ruzgar',
@@ -303,7 +310,7 @@ export const LEVELS: Level[] = [
     complexity: 4,
     title: 'Kemik Suyu Sırrı',
     subtitle: 'Kayıp son sayfa',
-    unlock: ['tonkotsu', 'bambu', 'citir'],
+    unlock: ['tonkotsu', 'bambu', 'citir', 'kori'],
     intro: [
       { who: 'miso', text: 'Miyav! Miyav! (Tavan arasındaki eski bir sandığı tırmalıyor.)' },
       { who: 'sef', text: 'Sandığın içinde… Son sayfa! “Kemik suyu: 18 saat, sabır ve sevgi.”' },
@@ -329,7 +336,7 @@ export const LEVELS: Level[] = [
     complexity: 4,
     title: 'Büyük Festival',
     subtitle: 'Meydan kimin olacak?',
-    unlock: ['pirinc', 'susam'],
+    unlock: ['pirinc', 'susam', 'yakisoba'],
     intro: [
       {
         who: 'mahalle',

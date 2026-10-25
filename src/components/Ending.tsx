@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
-import { BowlArt, CatArt, Portrait, Star } from '../art';
+import { CatArt, Star } from '../art';
+import { BowlSide } from './FoodCanvas';
+import { Portrait } from '../avatar';
 import { sfx } from '../audio';
 import type { Save } from '../App';
 import { Lanterns } from './Scenery';
@@ -31,11 +33,20 @@ export default function Ending({ save, onMap }: { save: Save; onMap: () => void 
         <Portrait who="baron" mood="happy" size={92} />
       </div>
       <div className="ending-bowl">
-        <BowlArt
+        <BowlSide
           bowl={{
             noodle: 'ramen',
-            broth: 'tonkotsu',
-            toppings: ['chashu', 'yumurta', 'karides', 'naruto', 'nori', 'yesil'],
+            thick: 'orta',
+            liquid: 'tonkotsu',
+            fill: 0.9,
+            pieces: [
+              { id: 'chashu', x: 112, y: 112, r: 20, s: 0.95, k: 1 },
+              { id: 'yumurta', x: 192, y: 138, r: 10, s: 0.95, k: 3 },
+              { id: 'karides', x: 150, y: 190, r: 160, s: 0.9, k: 4 },
+              { id: 'naruto', x: 112, y: 176, r: 0, s: 0.95, k: 6 },
+              { id: 'nori', x: 205, y: 95, r: 30, s: 1, k: 5 },
+              { id: 'yesil', x: 150, y: 140, r: 0, s: 0.9, k: 7 },
+            ],
           }}
           width={250}
         />

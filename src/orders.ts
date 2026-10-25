@@ -1,6 +1,49 @@
-import { FIRST_NAMES, INGREDIENTS, LEVELS, ONLINE_NAMES, unlockedUpTo } from './data';
+import { INGREDIENTS, LEVELS, ONLINE_NAMES, unlockedUpTo } from './data';
 import { randomLook, type Look } from './art';
+import { isFeminine } from './avatar';
+
+const FEMALE = [
+  'Ayşe',
+  'Elif',
+  'Zeynep',
+  'Ece',
+  'Selin',
+  'Defne',
+  'Melis',
+  'Nil',
+  'İpek',
+  'Lale',
+  'Asya',
+  'Nehir',
+  'Ada',
+  'Duru',
+  'Yuki',
+  'Mia',
+  'Sara',
+  'Deniz',
+];
+const MALE = [
+  'Mehmet',
+  'Can',
+  'Burak',
+  'Kaan',
+  'Emre',
+  'Ozan',
+  'Yusuf',
+  'Arda',
+  'Kerem',
+  'Tolga',
+  'Barış',
+  'Cem',
+  'Mert',
+  'Efe',
+  'Kenji',
+  'Leo',
+  'Omar',
+  'Deniz',
+];
 import type { CookState, Piece } from './bowl';
+import { THICK_LABEL, type Thick } from './food';
 
 // ---------- order model ----------
 
@@ -20,7 +63,8 @@ export type CookPref = 'dente' | 'perfect' | 'soft';
 
 export interface Order {
   noodle: string | null;
-  broth: string | null;
+  broth: string | null; // a broth (soup) or a sauce (dry noodles)
+  thick?: Thick | null;
   reqs: Req[];
   rules: Rule[];
   cook: CookPref;
@@ -78,11 +122,18 @@ const BROTH_TEXT: Record<string, string> = {
   miso: 'miso suyuyla',
   acili: 'acılı tantan suyuyla',
   tonkotsu: 'kemik suyuyla',
+  tavuk: 'tavuk suyuyla',
+  kori: 'köri suyuyla',
+  teriyaki: 'teriyaki soslu, kuru',
+  fistik: 'fıstık soslu, kuru',
+  tatliaci: 'tatlı acı soslu, kuru',
+  yakisoba: 'yakisoba soslu, kuru',
 };
 
 export function orderText(o: Order): string {
   const parts: string[] = [];
-  const n = o.noodle ? INGREDIENTS[o.noodle].name : null;
+  const tk = o.thick ? THICK_LABEL[o.thick].toLocaleLowerCase('tr') + ' ' : '';
+  const n = o.noodle ? tk + INGREDIENTS[o.noodle].name : null;
   const b = o.broth ? BROTH_TEXT[o.broth] : null;
   if (n && b) parts.push(`${b} bir ${n}`);
   else if (n) parts.push(`bir ${n}, su fark etmez`);
@@ -110,6 +161,7 @@ export function randomOrder(levelId: number): Order {
   const fresh = L.unlock;
   const noodles = un.filter((i) => INGREDIENTS[i].cat === 'noodle');
   const broths = un.filter((i) => INGREDIENTS[i].cat === 'broth');
+  const sauces = un.filter((i) => INGREDIENTS[i].cat === 'sauce');
   const tops = un.filter((i) => INGREDIENTS[i].cat === 'topping');
   const favour = (list: string[]) => {
     const f = list.filter((x) => fresh.includes(x));
@@ -117,7 +169,13 @@ export function randomOrder(levelId: number): Order {
   };
   const o: Order = {
     noodle: cx >= 3 && Math.random() < 0.12 ? null : favour(noodles),
-    broth: cx >= 3 && Math.random() < 0.12 ? null : favour(broths),
+    broth:
+      cx >= 3 && Math.random() < 0.1
+        ? null
+        : sauces.length && Math.random() < 0.3
+          ? favour(sauces)
+          : favour(broths),
+    thick: levelId >= 2 && Math.random() < 0.35 ? pick<Thick>(['ince', 'kalin']) : null,
     reqs: [],
     rules: [],
     cook: 'perfect',
@@ -358,10 +416,11 @@ export function dayCustomers(levelId: number): Customer[] {
     }
     const order = randomOrder(levelId);
     const phone = phoneSlots.has(i);
+    const look = randomLook();
     out.push({
       id: i,
-      name: phone ? pick(ONLINE_NAMES) : pick(FIRST_NAMES),
-      look: randomLook(),
+      name: phone ? pick(ONLINE_NAMES) : pick(isFeminine(look) ? FEMALE : MALE),
+      look,
       phone,
       greet: phone ? pick(PHONE_GREETS) : pick(GREETS),
       text: orderText(order),
@@ -376,6 +435,7 @@ export function dayCustomers(levelId: number): Customer[] {
 
 export interface Bowl {
   noodle?: string;
+  thick?: Thick;
   broth?: string;
   fill: number;
   pieces: Piece[];
@@ -422,8 +482,13 @@ export function judge(o: Order, b: Bowl, waitSec: number, bonus: number): Verdic
   else if (o.noodle && b.noodle !== o.noodle)
     notes.push(`${INGREDIENTS[o.noodle].name} istemiştim`);
   else score += 20;
+  if (b.noodle && o.thick && b.thick !== o.thick) {
+    score -= 8;
+    notes.push(`${THICK_LABEL[o.thick]} erişte istemiştim`);
+  }
   // broth 15 + fill 10
-  if (!b.broth || b.fill < 0.15) notes.push('Su yok!');
+  const wantCat = o.broth ? INGREDIENTS[o.broth].cat : 'broth';
+  if (!b.broth || b.fill < 0.15) notes.push(wantCat === 'sauce' ? 'Sos yok!' : 'Su yok!');
   else if (o.broth && b.broth !== o.broth) notes.push(`${INGREDIENTS[o.broth].name} istemiştim`);
   else score += 15;
   if (b.broth) {
@@ -431,10 +496,10 @@ export function judge(o: Order, b: Bowl, waitSec: number, bonus: number): Verdic
       score += 10;
     } else if (b.fill > 1.03) {
       score += 3;
-      notes.push('Su taşmış');
+      notes.push(INGREDIENTS[b.broth].cat === 'sauce' ? 'Sos çok fazla' : 'Su taşmış');
     } else if (b.fill >= 0.45) {
       score += 5;
-      notes.push('Su az kalmış');
+      notes.push(INGREDIENTS[b.broth].cat === 'sauce' ? 'Sos az kalmış' : 'Su az kalmış');
     } else notes.push('Neredeyse su yok');
   }
   // toppings 35

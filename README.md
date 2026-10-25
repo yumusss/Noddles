@@ -16,7 +16,10 @@ Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devra
 - Memnuniyet puanı ve ona göre bahşiş; 3. bölümden itibaren telefon siparişleri ve kurye Rüzgar
 - Özel misafirler: Baron Kraker, eleştirmen Madam Lezzetova, Hana Nine
 - Seri (combo) bahşişleri, 3 yıldızlı hedefler, kayıtlı ilerleme
-- Kod içinde üretilen SVG grafikler ve Web Audio sesler; hiçbir görsel/ses dosyası yok
+- Canvas ile çizilen gerçekçi yemekler (tel tel erişte, yağ damlalı su, dokulu malzemeler), içi dolu malzeme küvetleri
+- İnce / orta / kalın erişte, 6 çeşit su ve kuru noodle için 4 sos
+- Gün açılış planı, kamera geçişleri, yakın plan diyaloglar, sinema bantları ve film greni
+- Karakterler: [Avataaars](https://avataaars.com/) (Pablo Stanley, kişisel ve ticari kullanıma serbest) ile [DiceBear](https://www.dicebear.com/) üzerinden
 
 ## Geliştirme
 

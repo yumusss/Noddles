@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { INGREDIENTS, type Level } from '../data';
-import { IngredientIcon, Star } from '../art';
+import { Star } from '../art';
+import { Tray } from './FoodCanvas';
 import { sfx } from '../audio';
 
 export default function Unlock({ level, onDone }: { level: Level; onDone: () => void }) {
@@ -17,7 +18,7 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
           {level.unlock.map((id, i) => (
             <div key={id} className="unlock-item" style={{ animationDelay: `${0.2 + i * 0.15}s` }}>
               <div className="unlock-icon">
-                <IngredientIcon id={id} size={62} />
+                <Tray id={id} width={84} />
               </div>
               <div className="unlock-name">{INGREDIENTS[id].name}</div>
               <div className="unlock-cat">
@@ -25,7 +26,9 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
                   ? 'Erişte'
                   : INGREDIENTS[id].cat === 'broth'
                     ? 'Su'
-                    : 'Malzeme'}
+                    : INGREDIENTS[id].cat === 'sauce'
+                      ? 'Sos'
+                      : 'Malzeme'}
               </div>
             </div>
           ))}

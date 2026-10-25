@@ -865,6 +865,7 @@ export function PotArt({
 export type Mood = 'happy' | 'neutral' | 'worried' | 'angry' | 'love';
 
 export interface Look {
+  seed?: number;
   skin: string;
   hair: number;
   hairColor: string;
@@ -903,6 +904,7 @@ const SHIRTS = [
 export function randomLook(): Look {
   const p = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
   return {
+    seed: Math.floor(Math.random() * 1e9),
     skin: p(SKINS),
     hair: Math.floor(Math.random() * 7),
     hairColor: p(HAIRS),
@@ -1332,61 +1334,6 @@ export function CatArt({ size = 70, sleepy = false }: { size?: number; sleepy?: 
       />
     </svg>
   );
-}
-
-export function Portrait({
-  who,
-  mood = 'happy',
-  size = 120,
-}: {
-  who: string;
-  mood?: Mood;
-  size?: number;
-}) {
-  if (who === 'miso') return <CatArt size={size} />;
-  if (who === 'mahalle')
-    return (
-      <div className="crowd" style={{ width: size, height: size }}>
-        <CustomerArt look={{ ...randomLookSeed(1) }} mood="happy" size={size * 0.6} />
-        <CustomerArt look={{ ...randomLookSeed(2) }} mood="neutral" size={size * 0.6} />
-      </div>
-    );
-  const special = (who === 'sef' ? 'sef' : who) as Look['special'];
-  return (
-    <CustomerArt
-      look={{
-        skin: '#f1c27d',
-        hair: 0,
-        hairColor: '#222',
-        shirt: '#fff',
-        acc: 0,
-        accColor: '#fff',
-        special,
-      }}
-      mood={mood}
-      size={size}
-    />
-  );
-}
-
-function randomLookSeed(s: number): Look {
-  return s === 1
-    ? {
-        skin: '#e0ac69',
-        hair: 3,
-        hairColor: '#2b1d14',
-        shirt: '#2ec4b6',
-        acc: 3,
-        accColor: '#ffb347',
-      }
-    : {
-        skin: '#ffdbb5',
-        hair: 1,
-        hairColor: '#a0522d',
-        shirt: '#ff7aa2',
-        acc: 1,
-        accColor: '#333',
-      };
 }
 
 // ---------- Small icons ----------

@@ -1,4 +1,5 @@
-import { BowlArt, CatArt } from '../art';
+import { CatArt } from '../art';
+import { BowlSide } from './FoodCanvas';
 import { Rain, Lanterns } from './Scenery';
 
 export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: () => void }) {
@@ -32,14 +33,26 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
       </div>
       <div className="title-bowl">
         <div className="bowl-glow" />
-        <BowlArt
+        <BowlSide
           bowl={{
             noodle: 'ramen',
-            broth: 'tonkotsu',
-            toppings: ['chashu', 'yumurta', 'nori', 'naruto', 'yesil'],
-            quality: 'perfect',
+            thick: 'orta',
+            liquid: 'tonkotsu',
+            fill: 0.9,
+            cook: 'perfect',
+            pieces: [
+              { id: 'chashu', x: 112, y: 112, r: 20, s: 0.95, k: 1 },
+              { id: 'chashu', x: 140, y: 98, r: 80, s: 0.95, k: 2 },
+              { id: 'yumurta', x: 192, y: 138, r: 10, s: 0.95, k: 3 },
+              { id: 'yumurta', x: 178, y: 178, r: 150, s: 0.95, k: 4 },
+              { id: 'nori', x: 210, y: 92, r: 30, s: 1, k: 5 },
+              { id: 'naruto', x: 112, y: 182, r: 0, s: 0.95, k: 6 },
+              { id: 'yesil', x: 150, y: 150, r: 0, s: 0.9, k: 7 },
+              { id: 'yesil', x: 128, y: 146, r: 90, s: 0.8, k: 8 },
+              { id: 'bambu', x: 86, y: 146, r: 70, s: 0.9, k: 9 },
+            ],
           }}
-          width={300}
+          width={290}
         />
         <div className="title-cat">
           <CatArt size={86} />
