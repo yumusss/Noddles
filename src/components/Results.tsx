@@ -61,10 +61,14 @@ export default function Results({
       )}
       <div className="card results-card">
         <div className="chapter-heading">
-          Bölüm {level.id} • {level.title}
+          Gün {level.id} • {level.title}
         </div>
         <h2>
-          {pass ? (result.stars === 3 ? 'Efsane bir gün!' : 'Gün tamam!') : 'Hedefe ulaşamadın'}
+          {pass
+            ? result.stars === 3
+              ? 'Efsane bir gün!'
+              : 'Gün tamam!'
+            : 'Mahalle pek memnun kalmadı'}
         </h2>
         <div className="big-stars">
           {[1, 2, 3].map((i) => (
@@ -77,13 +81,15 @@ export default function Results({
           <Coin size={28} /> {coins}
         </div>
         <div className="res-targets">
-          {level.targets.map((t, i) => (
-            <span key={i} className={result.coins >= t ? 'hit' : ''}>
-              {'★'.repeat(i + 1)} {t}
-            </span>
-          ))}
+          <span className={result.avg >= 55 ? 'hit' : ''}>★ %55</span>
+          <span className={result.avg >= 75 ? 'hit' : ''}>★★ %75</span>
+          <span className={result.avg >= 90 ? 'hit' : ''}>★★★ %90</span>
         </div>
         <div className="res-stats">
+          <div>
+            <b>%{result.avg}</b>
+            <span>ort. memnuniyet</span>
+          </div>
           <div>
             <b>{result.served}</b>
             <span>servis</span>
@@ -93,12 +99,8 @@ export default function Results({
             <span>mükemmel</span>
           </div>
           <div>
-            <b>{result.bestCombo}</b>
-            <span>en iyi seri</span>
-          </div>
-          <div>
-            <b>{result.lost}</b>
-            <span>kaçan</span>
+            <b>{result.unhappy}</b>
+            <span>mutsuz</span>
           </div>
         </div>
         {pass ? (
@@ -113,8 +115,8 @@ export default function Results({
         ) : (
           <>
             <p className="res-tip">
-              İpucu: Erişteyi yeşil bölgede çıkar, fazla malzeme koyma, sabırsız müşterilere öncelik
-              ver.
+              İpucu: Siparişi dikkatle oku. Adetleri tam tut, istenmeyen malzeme koyma, suyu çizgiye
+              kadar doldur ve erişteyi tam kıvamında çıkar.
             </p>
             <button className="btn big primary" onClick={onRetry}>
               Tekrar dene

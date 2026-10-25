@@ -2,17 +2,18 @@
 
 Hikayeli, mobil öncelikli bir noodle dükkânı oyunu.
 
-Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devralıyorsun. Müşteriler tezgâha gelip sipariş veriyor, sen mutfağa geçip erişteyi haşlıyor, suyu döküyor, malzemeleri kendin koyuyorsun. Bir yandan da telefona düşen online siparişleri yetiştirmeye çalışıyorsun. Amaç: festivalde mahallenin oyunu kazanıp meydanı Baron Kraker’in MegaNoodle fabrikasından kurtarmak.
+Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devralıyorsun. Müşteriler tek tek gelip siparişlerini anlatıyor; sen hazırlıkta erişteyi koyuyor, suyu döküyor, malzemeleri parmağınla kaseye tek tek serpiştiriyorsun. Sonra kaseyi ocağa koyup tam kıvamında çıkarıyor ve servis ediyorsun. Müşteri memnuniyetine göre bahşiş bırakıp gidiyor. Amaç: festivalde mahallenin oyunu kazanıp meydanı Baron Kraker’in MegaNoodle fabrikasından kurtarmak.
 
 **Oyna:** https://yumusss.github.io/Noddles/
 
 ## Özellikler
 
 - 10 bölümlük hikaye: her bölümde giriş ve kapanış diyalogları, tarif defterinden yeni bir sayfa
-- 20 malzeme: 4 erişte, 4 su, 12 garnitür (level ilerledikçe açılıyor)
-- Salon ve mutfak arası geçiş, sabır çubuğuyla bekleyen her biri farklı görünümlü müşteriler
-- Pişirme zamanlaması: erişteyi yeşil bölgede çıkar, çiğ ya da lapa olursa puan düşer
-- 3. bölümden itibaren online siparişler ve kurye Rüzgar
+- Kamera geçişli üç istasyon: Salon, Hazırlık, Ocak
+- Konuşarak sipariş veren müşteriler: adet (“3 dilim chashu”), bol/biraz, “olmasın”, acılı, vejetaryen, pişirme tercihi
+- 26 malzeme: 4 erişte, 4 su, 18 garnitür; her parça kaseye tek tek yerleşir
+- Ocakta pişirme göstergesi: çiğ, diri, tam kıvam, yumuşak, lapa
+- Memnuniyet puanı ve ona göre bahşiş; 3. bölümden itibaren telefon siparişleri ve kurye Rüzgar
 - Özel misafirler: Baron Kraker, eleştirmen Madam Lezzetova, Hana Nine
 - Seri (combo) bahşişleri, 3 yıldızlı hedefler, kayıtlı ilerleme
 - Kod içinde üretilen SVG grafikler ve Web Audio sesler; hiçbir görsel/ses dosyası yok

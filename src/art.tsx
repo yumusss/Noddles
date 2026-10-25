@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { INGREDIENTS } from './data';
 
 // ---------- color helpers ----------
-function shade(hex: string, amt: number): string {
+export function shade(hex: string, amt: number): string {
   const n = parseInt(hex.slice(1), 16);
   let r = (n >> 16) & 255;
   let g = (n >> 8) & 255;
@@ -354,6 +354,150 @@ function Sesame() {
   );
 }
 
+function PakChoi() {
+  return (
+    <g>
+      <path
+        d="M32 58 C 18 50 8 30 18 12 C 26 4 38 4 46 12 C 56 30 46 50 32 58z"
+        fill="#3f9a3f"
+        stroke="#2a6b2a"
+        strokeWidth="2"
+      />
+      <path
+        d="M32 58 C 26 44 26 26 32 10 C 38 26 38 44 32 58z"
+        fill="#e9f5d8"
+        stroke="#b9d9a0"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M32 50 L20 30 M32 40 L44 24 M32 30 L22 18"
+        stroke="#6cc46c"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </g>
+  );
+}
+
+function Sprouts() {
+  return (
+    <g>
+      {[
+        [10, 40, 30, 14],
+        [16, 50, 44, 20],
+        [24, 54, 50, 34],
+        [12, 26, 40, 42],
+        [30, 12, 52, 48],
+      ].map(([x1, y1, x2, y2], i) => (
+        <g key={i}>
+          <path
+            d={`M${x1} ${y1} Q ${(x1 + x2) / 2 + 6} ${(y1 + y2) / 2 - 8} ${x2} ${y2}`}
+            stroke="#d8d2b0"
+            strokeWidth="5"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <path
+            d={`M${x1} ${y1} Q ${(x1 + x2) / 2 + 6} ${(y1 + y2) / 2 - 8} ${x2} ${y2}`}
+            stroke="#fbf8ea"
+            strokeWidth="3"
+            fill="none"
+            strokeLinecap="round"
+          />
+          <ellipse cx={x2} cy={y2} rx="4" ry="3" fill="#e8d35a" />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function ChiliSlices() {
+  return (
+    <g>
+      {[
+        [20, 22],
+        [42, 20],
+        [30, 40],
+        [48, 42],
+        [16, 44],
+      ].map(([x, y], i) => (
+        <g key={i} transform={`translate(${x} ${y})`}>
+          <circle r="8" fill="#b51d1d" />
+          <circle r="5.2" fill="#f4e7c9" />
+          <circle cx="-1.5" cy="-1" r="1.2" fill="#e8c76a" />
+          <circle cx="1.8" cy="1.2" r="1.2" fill="#e8c76a" />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function Kimchi() {
+  return (
+    <g>
+      <path
+        d="M10 30 Q14 12 32 14 Q50 10 54 28 Q58 44 42 50 Q26 58 14 46 Q6 40 10 30z"
+        fill="#e2552a"
+        stroke="#a8341a"
+        strokeWidth="2"
+      />
+      <path
+        d="M18 24 Q30 30 46 22 M16 36 Q30 42 50 34 M22 46 Q32 48 40 44"
+        stroke="#ffb38a"
+        strokeWidth="2.6"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <circle cx="26" cy="30" r="1.6" fill="#7a1f0e" />
+      <circle cx="40" cy="38" r="1.6" fill="#7a1f0e" />
+    </g>
+  );
+}
+
+function Lime() {
+  return (
+    <g>
+      <path d="M8 36 A 24 24 0 0 1 56 36 Z" fill="#5c9e2e" />
+      <path d="M12 36 A 20 20 0 0 1 52 36 Z" fill="#d8f0a0" />
+      <path
+        d="M32 36 L16 26 M32 36 L24 18 M32 36 L32 16 M32 36 L40 18 M32 36 L48 26"
+        stroke="#f4ffd8"
+        strokeWidth="2"
+      />
+      <path d="M8 36 h48" stroke="#4a8424" strokeWidth="3" />
+    </g>
+  );
+}
+
+function CrispyShallot() {
+  const bits: [number, number, number][] = [
+    [18, 20, 10],
+    [32, 16, 60],
+    [46, 22, 120],
+    [22, 34, 200],
+    [38, 32, 30],
+    [50, 38, 150],
+    [26, 48, 80],
+    [42, 48, 250],
+    [14, 42, 300],
+  ];
+  return (
+    <g>
+      {bits.map(([x, y, r], i) => (
+        <path
+          key={i}
+          d="M-6 0 q3 -6 6 0 q3 6 6 0"
+          transform={`translate(${x} ${y}) rotate(${r})`}
+          stroke={i % 2 ? '#a55f1f' : '#c98a3c'}
+          strokeWidth="3.6"
+          fill="none"
+          strokeLinecap="round"
+        />
+      ))}
+    </g>
+  );
+}
+
 export function IngredientShape({ id }: { id: string }) {
   const ing = INGREDIENTS[id];
   switch (id) {
@@ -394,6 +538,18 @@ export function IngredientShape({ id }: { id: string }) {
       return <Bamboo />;
     case 'susam':
       return <Sesame />;
+    case 'pakchoi':
+      return <PakChoi />;
+    case 'filiz':
+      return <Sprouts />;
+    case 'biber':
+      return <ChiliSlices />;
+    case 'kimchi':
+      return <Kimchi />;
+    case 'lime':
+      return <Lime />;
+    case 'citir':
+      return <CrispyShallot />;
     default:
       return <circle cx="32" cy="32" r="20" fill="#ccc" />;
   }

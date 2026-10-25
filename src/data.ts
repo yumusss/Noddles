@@ -34,6 +34,12 @@ export const INGREDIENTS: Record<string, Ingredient> = {
   naruto: { id: 'naruto', name: 'Naruto', cat: 'topping', color: '#ffffff', price: 2 },
   bambu: { id: 'bambu', name: 'Bambu Filizi', cat: 'topping', color: '#c9a55a', price: 2 },
   susam: { id: 'susam', name: 'Susam', cat: 'topping', color: '#f5ead0', price: 1 },
+  pakchoi: { id: 'pakchoi', name: 'Pak Choi', cat: 'topping', color: '#4caf50', price: 2 },
+  filiz: { id: 'filiz', name: 'Fasulye Filizi', cat: 'topping', color: '#f3f0dc', price: 1 },
+  biber: { id: 'biber', name: 'Kırmızı Biber', cat: 'topping', color: '#d62828', price: 1 },
+  kimchi: { id: 'kimchi', name: 'Kimchi', cat: 'topping', color: '#e85d2a', price: 2 },
+  lime: { id: 'lime', name: 'Misket Limonu', cat: 'topping', color: '#8bc34a', price: 1 },
+  citir: { id: 'citir', name: 'Çıtır Soğan', cat: 'topping', color: '#b5732c', price: 1 },
 };
 
 // ---------- Characters ----------
@@ -61,54 +67,31 @@ export interface Line {
   text: string;
 }
 
-// ---------- Special customers ----------
-
-export interface SpecialCustomer {
-  at: number; // seconds into the day
-  look: 'hana' | 'baron' | 'lezzetova' | 'ruzgar';
-  name: string;
-  order: { noodle: string; broth: string; toppings: string[] };
-  greet: string;
-  patience?: number;
-  bonus: number; // extra coins for a perfect bowl
-}
-
 // ---------- Levels ----------
 
 export interface Level {
   id: number;
   title: string;
   subtitle: string;
-  duration: number; // seconds
-  spawnEvery: [number, number];
-  seats: number;
-  pots: number;
-  patience: number; // base seconds
-  maxToppings: [number, number];
-  online: number; // 0 = none, otherwise seconds between online orders
+  customers: number; // customers in the day
+  phone: number; // how many of them order by phone
+  complexity: number; // 1..4, how tricky orders get
   unlock: string[]; // ingredients unlocked this level
-  targets: [number, number, number];
   intro: Line[];
   outro: Line[];
-  specials?: SpecialCustomer[];
   tip?: string;
 }
 
 export const LEVELS: Level[] = [
   {
     id: 1,
+    customers: 5,
+    phone: 0,
+    complexity: 1,
     title: 'Açılış Günü',
     subtitle: 'Kırk yıllık kepenk yeniden açılıyor',
-    duration: 100,
-    spawnEvery: [9, 13],
-    seats: 2,
-    pots: 2,
-    patience: 55,
-    maxToppings: [1, 2],
-    online: 0,
     unlock: ['ramen', 'shoyu', 'yesil', 'yumurta'],
-    targets: [50, 90, 130],
-    tip: 'Müşteriye dokun, siparişi al. Mutfakta: erişteyi tencereye at, yeşil bölgede çıkar, suyu dök, malzemeleri koy, servis et!',
+    tip: 'Müşteriyi dinle, siparişi al. Hazırlıkta erişteyi koy, suyu basılı tutarak dök, malzemeleri parmağınla kaseye serpiştir. Sonra ocakta tam kıvamında çıkar ve servis et!',
     intro: [
       { who: 'hana', text: 'Sonunda geldin evladım! Fener Sokağı seni özledi.' },
       {
@@ -135,17 +118,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 2,
+    customers: 6,
+    phone: 0,
+    complexity: 1,
     title: 'Mahallenin Tadı',
     subtitle: 'Defterin ikinci sayfası: chashu',
-    duration: 110,
-    spawnEvery: [8, 11],
-    seats: 3,
-    pots: 2,
-    patience: 52,
-    maxToppings: [1, 2],
-    online: 0,
-    unlock: ['chashu'],
-    targets: [65, 115, 170],
+    unlock: ['chashu', 'pakchoi'],
     intro: [
       { who: 'sef', text: 'Tezgâhın altında bir sayfa buldum! Yağ lekeleriyle dolu ama okunuyor.' },
       { who: 'hana', text: 'Aaa, chashu tarifim! Bütün gece kısık ateşte… Mahalle buna bayılır.' },
@@ -162,18 +140,13 @@ export const LEVELS: Level[] = [
   },
   {
     id: 3,
+    customers: 7,
+    phone: 2,
+    complexity: 2,
     title: 'Rüzgar Geliyor',
     subtitle: 'Online siparişler başlıyor',
-    duration: 120,
-    spawnEvery: [9, 12],
-    seats: 3,
-    pots: 2,
-    patience: 50,
-    maxToppings: [1, 2],
-    online: 22,
     unlock: ['nori'],
-    targets: [85, 150, 220],
-    tip: 'Mutfaktaki telefona dikkat! Online siparişi zamanında kabul et, hazırla ve Rüzgar’a teslim et.',
+    tip: 'Artık telefon da çalıyor! Telefondan gelen siparişi Rüzgar kapıp götürür.',
     intro: [
       {
         who: 'ruzgar',
@@ -201,17 +174,13 @@ export const LEVELS: Level[] = [
   },
   {
     id: 4,
+    customers: 7,
+    phone: 2,
+    complexity: 2,
     title: 'Kalın ve Yumuşak',
     subtitle: 'Udon ve miso menüde',
-    duration: 120,
-    spawnEvery: [8, 11],
-    seats: 3,
-    pots: 2,
-    patience: 50,
-    maxToppings: [1, 3],
-    online: 24,
-    unlock: ['udon', 'miso'],
-    targets: [90, 160, 235],
+    unlock: ['udon', 'miso', 'filiz'],
+    tip: 'Bazı müşteriler erişteyi diri ya da iyice yumuşak ister. Siparişi dikkatli oku!',
     intro: [
       { who: 'hana', text: 'Belediye meydanı kimin alacağına festivalde karar verecekmiş.' },
       { who: 'hana', text: 'Mahalle hangi mutfağı severse, meydan onun olacak. Bize oy lazım!' },
@@ -228,18 +197,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 5,
+    customers: 8,
+    phone: 2,
+    complexity: 3,
     title: 'Yağmur Akşamı',
     subtitle: 'Sağanak yağmur, dolup taşan dükkân',
-    duration: 130,
-    spawnEvery: [7, 10],
-    seats: 3,
-    pots: 3,
-    patience: 48,
-    maxToppings: [2, 3],
-    online: 20,
     unlock: ['misir', 'mantar'],
-    targets: [95, 170, 250],
-    tip: 'Üçüncü tencere geldi! Aynı anda birden fazla erişte haşla.',
     intro: [
       { who: 'ruzgar', text: 'Gökyüzü delindi! Bu yağmurda herkes sıcak çorba isteyecek.' },
       {
@@ -258,28 +221,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 6,
+    customers: 8,
+    phone: 2,
+    complexity: 3,
     title: 'Ateşli Gece',
     subtitle: 'Acılı tantan ve gizemli bir misafir',
-    duration: 130,
-    spawnEvery: [7, 10],
-    seats: 3,
-    pots: 3,
-    patience: 46,
-    maxToppings: [2, 3],
-    online: 20,
-    unlock: ['acili', 'aciyag'],
-    targets: [100, 180, 265],
-    specials: [
-      {
-        at: 35,
-        look: 'baron',
-        name: 'Silindir Şapkalı Bey',
-        order: { noodle: 'ramen', broth: 'acili', toppings: ['chashu', 'aciyag', 'yesil'] },
-        greet: 'Hmph. En acı kasenizi getirin. Bakalım bu “efsane” neymiş.',
-        patience: 60,
-        bonus: 25,
-      },
-    ],
+    unlock: ['acili', 'aciyag', 'biber'],
     intro: [
       {
         who: 'hana',
@@ -302,28 +249,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 7,
+    customers: 8,
+    phone: 2,
+    complexity: 3,
     title: 'Eleştirmen',
     subtitle: 'Madam Lezzetova masada',
-    duration: 135,
-    spawnEvery: [7, 9.5],
-    seats: 3,
-    pots: 3,
-    patience: 46,
-    maxToppings: [2, 3],
-    online: 19,
-    unlock: ['soba', 'tofu'],
-    targets: [105, 185, 275],
-    specials: [
-      {
-        at: 45,
-        look: 'lezzetova',
-        name: 'Madam Lezzetova',
-        order: { noodle: 'soba', broth: 'miso', toppings: ['tofu', 'mantar', 'yesil'] },
-        greet: 'Soba. Miso. Tofu, mantar, yeşil soğan. Hepsi kusursuz olsun, şekerim.',
-        patience: 70,
-        bonus: 40,
-      },
-    ],
+    unlock: ['soba', 'tofu', 'kimchi'],
     intro: [
       {
         who: 'ruzgar',
@@ -343,18 +274,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 8,
+    customers: 9,
+    phone: 3,
+    complexity: 4,
     title: 'Deniz Kenarı',
     subtitle: 'Tempura karides ve naruto',
-    duration: 140,
-    spawnEvery: [6.5, 9],
-    seats: 4,
-    pots: 3,
-    patience: 45,
-    maxToppings: [2, 3],
-    online: 18,
-    unlock: ['karides', 'naruto'],
-    targets: [110, 190, 285],
-    tip: 'Tezgâhta dördüncü sandalye var. Salonu ve mutfağı sık sık kontrol et!',
+    unlock: ['karides', 'naruto', 'lime'],
     intro: [
       { who: 'hana', text: 'Sekizinci sayfa dedeninmiş. Balıkçıydı, her sabah karides getirirdi.' },
       { who: 'hana', text: 'Çıtır tempura karides ve pembe sarmal naruto. Liman insanı bayılır.' },
@@ -373,32 +298,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 9,
+    customers: 9,
+    phone: 3,
+    complexity: 4,
     title: 'Kemik Suyu Sırrı',
     subtitle: 'Kayıp son sayfa',
-    duration: 140,
-    spawnEvery: [6.5, 9],
-    seats: 4,
-    pots: 3,
-    patience: 44,
-    maxToppings: [2, 4],
-    online: 17,
-    unlock: ['tonkotsu', 'bambu'],
-    targets: [120, 205, 305],
-    specials: [
-      {
-        at: 30,
-        look: 'hana',
-        name: 'Hana Nine',
-        order: {
-          noodle: 'ramen',
-          broth: 'tonkotsu',
-          toppings: ['chashu', 'yumurta', 'bambu', 'yesil'],
-        },
-        greet: 'Bu sefer müşteri benim. Bakalım öğrencim sırrı çözmüş mü?',
-        patience: 75,
-        bonus: 40,
-      },
-    ],
+    unlock: ['tonkotsu', 'bambu', 'citir'],
     intro: [
       { who: 'miso', text: 'Miyav! Miyav! (Tavan arasındaki eski bir sandığı tırmalıyor.)' },
       { who: 'sef', text: 'Sandığın içinde… Son sayfa! “Kemik suyu: 18 saat, sabır ve sevgi.”' },
@@ -419,41 +324,12 @@ export const LEVELS: Level[] = [
   },
   {
     id: 10,
+    customers: 10,
+    phone: 3,
+    complexity: 4,
     title: 'Büyük Festival',
     subtitle: 'Meydan kimin olacak?',
-    duration: 160,
-    spawnEvery: [5.5, 8],
-    seats: 4,
-    pots: 3,
-    patience: 44,
-    maxToppings: [2, 4],
-    online: 15,
     unlock: ['pirinc', 'susam'],
-    targets: [165, 290, 430],
-    specials: [
-      {
-        at: 40,
-        look: 'lezzetova',
-        name: 'Madam Lezzetova',
-        order: { noodle: 'udon', broth: 'tonkotsu', toppings: ['karides', 'naruto', 'nori'] },
-        greet: 'Jüri başkanı olarak buradayım. Şaşırt beni.',
-        patience: 70,
-        bonus: 40,
-      },
-      {
-        at: 95,
-        look: 'baron',
-        name: 'Baron Kraker',
-        order: {
-          noodle: 'pirinc',
-          broth: 'shoyu',
-          toppings: ['yumurta', 'susam', 'yesil', 'mantar'],
-        },
-        greet: '…Bir kase istiyorum. Annemin yaptığı gibi. Sade. Lütfen.',
-        patience: 75,
-        bonus: 60,
-      },
-    ],
     intro: [
       {
         who: 'mahalle',

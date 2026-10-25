@@ -48,7 +48,7 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
       <button className="btn big primary pulse" onClick={onPlay}>
         {hasSave ? 'Devam Et' : 'Dükkânı Aç'}
       </button>
-      <div className="title-foot">10 bölüm • 20 malzeme • bir mahalleyi kurtar</div>
+      <div className="title-foot">10 bölüm • 26 malzeme • bir mahalleyi kurtar</div>
     </div>
   );
 }

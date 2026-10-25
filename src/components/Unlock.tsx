@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { INGREDIENTS, type Level } from '../data';
-import { Coin, IngredientIcon, Star } from '../art';
+import { IngredientIcon, Star } from '../art';
 import { sfx } from '../audio';
 
 export default function Unlock({ level, onDone }: { level: Level; onDone: () => void }) {
@@ -31,26 +31,20 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
           ))}
         </div>
         <div className="goals">
-          {level.targets.map((t, i) => (
+          {[55, 75, 90].map((t, i) => (
             <div key={i} className="goal">
               <span className="goal-stars">
-                {[0, 1, 2].map((s) => (
-                  <Star key={s} on={s <= i} size={16} />
+                {[0, 1, 2].map((st) => (
+                  <Star key={st} on={st <= i} size={16} />
                 ))}
               </span>
-              <span className="goal-coins">
-                <Coin size={16} /> {t}
-              </span>
+              <span className="goal-coins">%{t} memnun</span>
             </div>
           ))}
         </div>
         <div className="unlock-meta">
-          <span>
-            ⏱ {Math.floor(level.duration / 60)}:{String(level.duration % 60).padStart(2, '0')}
-          </span>
-          <span>🪑 {level.seats} sandalye</span>
-          <span>🍲 {level.pots} tencere</span>
-          {level.online > 0 && <span>📱 Online sipariş</span>}
+          <span>👥 {level.customers} müşteri</span>
+          {level.phone > 0 && <span>📱 {level.phone} telefon siparişi</span>}
         </div>
         {level.tip && <div className="tip">💡 {level.tip}</div>}
         <button
