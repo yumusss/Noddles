@@ -92,18 +92,21 @@ export function BowlSide({
 
 export function Tray({ id, thick, width = 100 }: { id: string; thick?: Thick; width?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const dpr = useDpr();
+  const pw = Math.round(width * dpr);
+  const ph = Math.round(((width * 170) / 240) * dpr);
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
     const c = cv.getContext('2d')!;
     c.clearRect(0, 0, cv.width, cv.height);
     c.drawImage(trayImage(id, thick), 0, 0, cv.width, cv.height);
-  }, [id, thick]);
+  }, [id, thick, pw, ph]);
   return (
     <canvas
       ref={ref}
-      width={240}
-      height={170}
+      width={pw}
+      height={ph}
       style={{ width, height: (width * 170) / 240 }}
       className="tray-cv"
     />

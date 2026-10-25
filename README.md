@@ -25,7 +25,7 @@ Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devra
 - Canvas ile çizilen gerçekçi yemekler (tel tel erişte, yağ damlalı su, dokulu malzemeler), içi dolu malzeme küvetleri
 - İnce / orta / kalın erişte, 6 çeşit su ve kuru noodle için 4 sos
 - Gün açılış planı, kamera geçişleri, yakın plan diyaloglar, sinema bantları ve film greni
-- Karakterler: [Avataaars](https://avataaars.com/) (Pablo Stanley, kişisel ve ticari kullanıma serbest) ile [DiceBear](https://www.dicebear.com/) üzerinden
+- Karakterler: [Lorelei](https://www.figma.com/community/file/1198749693280469639) (Lisa Wischofsky, [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)) ile [DiceBear](https://www.dicebear.com/) üzerinden; kıyafet, şapka ve aksesuar katmanları oyuna özel SVG
 
 ## Geliştirme
 

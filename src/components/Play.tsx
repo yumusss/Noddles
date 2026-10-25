@@ -4,7 +4,7 @@ import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
 import { Avatar } from '../avatar';
 import type { Piece } from '../bowl';
-import Oven from './Oven';
+import Stove from './Stove';
 import { BOWLS, bowlsUpTo } from '../bowls';
 import { ChangePanel, RegisterDecor, TipJar } from './Cash';
 import {
@@ -55,7 +55,7 @@ type Stage = 'prep' | 'pot' | 'ready';
 
 const SCATTER = new Set(['yesil', 'susam', 'citir', 'filiz', 'misir', 'aciyag', 'biber']);
 const COOK_SPEED = 100 / 7.5; // progress units per second
-const STATIONS = ['Salon', 'Hazırlık', 'Fırın'];
+const STATIONS = ['Salon', 'Hazırlık', 'Ocak'];
 const MAX_PIECES = 600;
 const CAT_SPOTS = [
   { left: '6%', bottom: '44%' },
@@ -539,14 +539,14 @@ export default function Play({
     if (phase !== 'waiting') return null;
     if (station === 0) return '➡ Hazırlık istasyonuna geç.';
     if (station === 1) {
-      if (stage !== 'prep') return '➡ Kase fırında! Fırın istasyonuna geç.';
+      if (stage !== 'prep') return '➡ Erişte kaynıyor! Ocak istasyonuna geç.';
       if (!bowl.style) return '🥣 Önce bir kase seç.';
       if (!bowl.noodle) return '1️⃣ Kalınlığı seç, erişte küvetine dokun, sonra kaseye dokun.';
       if (!bowl.broth || bowl.fill < 0.72)
         return '2️⃣ Suyu ya da sosu seç, kaseye BASILI TUT, çizgiye kadar doldur.';
       if (!bowl.pieces.length)
         return '3️⃣ Malzeme küvetini seç, kaseye dokun ya da parmağını sürükle.';
-      return '4️⃣ Sipariş tamamsa kaseyi tutup 🔥 fırına sürükle.';
+      return '4️⃣ Sipariş tamamsa kaseyi tutup 🔥 kaynar suya sürükle.';
     }
     if (stage === 'pot') return '🔥 Kadran yeşil “Tam”a gelince Çıkar!';
     if (stage === 'ready') return '🛎 Servis et!';
@@ -806,14 +806,14 @@ export default function Play({
                       onPointerMove={moveDrag}
                       onPointerUp={endDrag}
                       onPointerCancel={endDrag}>
-                      ✋ Fırına sürükle
+                      ✋ Ocağa sürükle
                     </button>
                   </div>
                   <div
                     ref={dropRef}
                     className={`oven-drop ${drag ? 'show' : ''} ${drag?.over ? 'hot' : ''}`}>
-                    <span>🔥</span>
-                    <b>Fırın</b>
+                    <span>🍜</span>
+                    <b>Ocak</b>
                   </div>
                   {drag &&
                     createPortal(
@@ -825,11 +825,9 @@ export default function Play({
                 </>
               ) : (
                 <div className="prep-empty">
-                  <p>
-                    {stage === 'pot' ? 'Kase fırında pişiyor!' : 'Kase hazır, servis bekliyor.'}
-                  </p>
+                  <p>{stage === 'pot' ? 'Erişte kaynar suda!' : 'Kase hazır, servis bekliyor.'}</p>
                   <button className="btn primary" onClick={() => go(2)}>
-                    Fırına git →
+                    Ocağa git →
                   </button>
                 </div>
               )}
@@ -933,9 +931,10 @@ export default function Play({
           {/* STOVE */}
           <section className="station stove2">
             <div className="donabe-wrap">
-              <Oven
-                mode={lifting ? 'lift' : stage === 'pot' ? 'cook' : 'idle'}
-                bowl={stage === 'pot' || lifting ? drawBowl : null}
+              <Stove
+                mode={lifting ? 'lift' : stage === 'pot' ? 'boil' : 'idle'}
+                noodle={stage === 'ready' ? undefined : bowl.noodle}
+                thick={bowl.thick}
                 heat={Math.min(1.3, cookP / 100)}
               />
               {stage === 'ready' && (
@@ -984,8 +983,8 @@ export default function Play({
               <div className="cook-panel idle">
                 <p>
                   {phase === 'waiting'
-                    ? 'Kaseyi hazırlıkta hazırla, sonra fırına sürükle.'
-                    : 'Fırın boşta.'}
+                    ? 'Kaseyi hazırlıkta hazırla, sonra kaynar suya sürükle.'
+                    : 'Ocak boşta.'}
                 </p>
                 {phase === 'waiting' && (
                   <button className="btn ghost" onClick={() => go(1)}>

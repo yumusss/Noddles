@@ -412,7 +412,7 @@ export function dayCustomers(levelId: number): Customer[] {
       out.push({
         id: i,
         name: sp.name,
-        look: { ...randomLook(), special: sp.look },
+        look: { ...randomLook(), special: sp.look, disguise: sp.look === 'baron' && levelId === 6 },
         phone: false,
         special: sp.look,
         greet: sp.greet,
