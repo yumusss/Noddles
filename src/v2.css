@@ -125,7 +125,7 @@
   display: block;
 }
 
-/* ---- Miso wandering ---- */
+/* ---- Mochi wandering ---- */
 .miso-roam {
   position: absolute;
   z-index: 6;
@@ -255,4 +255,142 @@
     margin-left: auto;
     margin-right: auto;
   }
+}
+
+/* =================== single swipeable kitchen =================== */
+.stage-window.scroller {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.stage-window.scroller::-webkit-scrollbar {
+  display: none;
+}
+.stage-window.scroller.dragging {
+  overflow-x: hidden;
+}
+.stage-window.scroller .track {
+  transform: none !important;
+  transition: none;
+}
+.stage-window.scroller .station {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.stage-window.scroller .vignette,
+.stage-window.scroller .film-grain {
+  position: fixed;
+}
+.kdots {
+  position: relative;
+  z-index: 20;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  padding: 6px 10px max(8px, env(safe-area-inset-bottom));
+  background: #2b2420;
+  border-top: 1px solid rgb(246 239 228 / 0.12);
+}
+.kdot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  color: rgb(246 239 228 / 0.55);
+  font-size: 11px;
+  font-weight: 800;
+  background: none;
+}
+.kdot i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgb(246 239 228 / 0.3);
+  transition:
+    transform 0.25s,
+    background 0.25s;
+}
+.kdot.on {
+  color: var(--cream);
+}
+.kdot.on i {
+  background: var(--persimmon);
+  transform: scale(1.5);
+}
+.kdot.alert i {
+  background: var(--clay);
+  animation: pulse 0.9s ease-in-out infinite;
+}
+
+/* drop zones */
+.pot-drop,
+.serve-drop {
+  position: absolute;
+  z-index: 30;
+  border-radius: 999px;
+  border: 3px dashed rgb(246 239 228 / 0.5);
+  background: rgb(43 36 32 / 0.55);
+  color: var(--cream);
+  font-weight: 900;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.7);
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
+}
+.pot-drop {
+  left: 50%;
+  top: 34%;
+  width: 150px;
+  height: 150px;
+  margin-left: -75px;
+  font-size: 15px;
+}
+.pot-drop span {
+  font-size: 40px;
+}
+.serve-drop {
+  left: 50%;
+  bottom: 22%;
+  width: 150px;
+  height: 92px;
+  margin-left: -75px;
+  border-radius: 24px;
+  font-size: 15px;
+}
+.serve-drop span {
+  font-size: 30px;
+}
+.pot-drop.show,
+.serve-drop.show {
+  opacity: 1;
+  transform: scale(1);
+}
+.pot-drop.hot,
+.serve-drop.hot {
+  border-color: var(--gold2);
+  background: rgb(232 128 60 / 0.55);
+  transform: scale(1.1);
+  animation: ovenpulse 0.5s ease-in-out infinite alternate;
+}
+.out-bowl.carry {
+  cursor: grab;
+  touch-action: none;
+}
+.out-bowl.carry.lifted {
+  opacity: 0.25;
+}
+.drag-ghost {
+  transform: translate(-50%, -60%) rotate(-3deg) scale(1.05);
 }

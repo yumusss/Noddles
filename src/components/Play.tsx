@@ -139,6 +139,7 @@ export default function Play({
   const cooking = stage === 'pot';
   const dragRef = useRef<{ sx: number; sy: number; on: boolean } | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
+  const serveRef = useRef<HTMLDivElement>(null);
 
   const c = custs[idx];
   if (typeof window !== 'undefined' && window.location.search.includes('bot'))
@@ -176,15 +177,35 @@ export default function Play({
     window.setTimeout(() => setNudge((m) => (m === msg ? null : m)), 1600);
   }, []);
 
+  const stageRef = useRef<HTMLDivElement>(null);
   const go = (s: number) => {
-    setStation((cur) => {
-      if (cur === s) return cur;
-      setPanning(true);
-      window.setTimeout(() => setPanning(false), 820);
-      sfx('whoosh');
-      return s;
-    });
+    const el = stageRef.current;
+    if (!el) return;
+    const cur = Math.round(el.scrollLeft / el.clientWidth);
+    if (cur === s) return;
+    setPanning(true);
+    window.setTimeout(() => setPanning(false), 820);
+    sfx('whoosh');
+    el.scrollTo({ left: s * el.clientWidth, behavior: 'smooth' });
   };
+  // keep `station` in sync with the swipe position
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const s = Math.round(el.scrollLeft / el.clientWidth);
+        setStation((cur) => (cur === s ? cur : s));
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
 
   // ---------- customer flow ----------
   useEffect(() => {
@@ -315,7 +336,7 @@ export default function Play({
   const addPiece = (x: number, y: number) => {
     if (!tool || tool.kind !== 'topping') return;
     const d = Math.hypot(x - 150, y - 150);
-    const max = BOWL_R - 18;
+    const max = BOWL_R - 36;
     if (d > max) {
       x = 150 + ((x - 150) / d) * max;
       y = 150 + ((y - 150) / d) * max;
@@ -392,19 +413,36 @@ export default function Play({
     sfx('tap');
     buzz(10);
   };
+  const edgeTimer = useRef(0);
   const moveDrag = (e: React.PointerEvent) => {
     const d = dragRef.current;
     if (!d) return;
-    const r = dropRef.current?.getBoundingClientRect();
+    const target = stage === 'ready' ? serveRef.current : dropRef.current;
+    const r = target?.getBoundingClientRect();
     const over =
       !!r &&
-      e.clientX >= r.left - 20 &&
-      e.clientX <= r.right + 20 &&
-      e.clientY >= r.top - 20 &&
-      e.clientY <= r.bottom + 20;
+      r.width > 0 &&
+      e.clientX >= r.left - 24 &&
+      e.clientX <= r.right + 24 &&
+      e.clientY >= r.top - 24 &&
+      e.clientY <= r.bottom + 24;
     if (over !== d.on) {
       d.on = over;
       if (over) buzz(12);
+    }
+    // carrying the bowl to the edge of the screen pans the kitchen
+    const el = stageRef.current;
+    if (el) {
+      const w = el.clientWidth;
+      const now = performance.now();
+      const cur = Math.round(el.scrollLeft / w);
+      if (e.clientX > window.innerWidth * 0.88 && now > edgeTimer.current && cur < 2) {
+        edgeTimer.current = now + 900;
+        go(cur + 1);
+      } else if (e.clientX < window.innerWidth * 0.12 && now > edgeTimer.current && cur > 0) {
+        edgeTimer.current = now + 900;
+        go(cur - 1);
+      }
     }
     setDrag({ x: e.clientX, y: e.clientY, over });
   };
@@ -412,7 +450,17 @@ export default function Play({
     const d = dragRef.current;
     dragRef.current = null;
     setDrag(null);
-    if (d?.on) toPot();
+    if (!d?.on) return;
+    if (stage === 'ready') serveIt();
+    else toPot();
+  };
+  const startCarry = (e: React.PointerEvent) => {
+    if (stage !== 'ready') return;
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    dragRef.current = { sx: e.clientX, sy: e.clientY, on: false };
+    setDrag({ x: e.clientX, y: e.clientY, over: false });
+    sfx('tap');
+    buzz(10);
   };
 
   const undo = () => {
@@ -537,19 +585,19 @@ export default function Play({
     if (phase === 'talk') return '👂 Müşteriyi dinle, sonra “Siparişi al”a bas.';
     if (phase === 'pay') return '💵 Verilen paradan hesabı çıkar, para üstünü çekmeceden seç.';
     if (phase !== 'waiting') return null;
-    if (station === 0) return '➡ Hazırlık istasyonuna geç.';
+    if (station === 0) return '👉 Sağa kaydır: mutfak orada.';
     if (station === 1) {
-      if (stage !== 'prep') return '➡ Erişte kaynıyor! Ocak istasyonuna geç.';
+      if (stage !== 'prep') return '👉 Erişte kaynıyor! Ocağa kaydır.';
       if (!bowl.style) return '🥣 Önce bir kase seç.';
       if (!bowl.noodle) return '1️⃣ Kalınlığı seç, erişte küvetine dokun, sonra kaseye dokun.';
       if (!bowl.broth || bowl.fill < 0.72)
         return '2️⃣ Suyu ya da sosu seç, kaseye BASILI TUT, çizgiye kadar doldur.';
       if (!bowl.pieces.length)
         return '3️⃣ Malzeme küvetini seç, kaseye dokun ya da parmağını sürükle.';
-      return '4️⃣ Sipariş tamamsa kaseyi tutup 🔥 kaynar suya sürükle.';
+      return '4️⃣ Sipariş tamamsa kaseyi tut, sağa taşı, kaynar suya bırak.';
     }
     if (stage === 'pot') return '🔥 Kadran yeşil “Tam”a gelince Çıkar!';
-    if (stage === 'ready') return '🛎 Servis et!';
+    if (stage === 'ready') return '✋ Kaseyi tut, salona taşı, tezgâha bırak.';
     return null;
   }
 
@@ -593,10 +641,8 @@ export default function Play({
       )}
 
       {/* STATIONS */}
-      <div className="stage-window">
-        <div
-          className={`track ${panning ? 'panning' : ''}`}
-          style={{ transform: `translateX(${-station * 100}%)` }}>
+      <div className={`stage-window scroller ${drag ? 'dragging' : ''}`} ref={stageRef}>
+        <div className={`track ${panning ? 'panning' : ''}`}>
           {/* SALON */}
           <section className="station salon2">
             <div className="salon-cam">
@@ -629,6 +675,12 @@ export default function Play({
                 <div className="counter2-front">
                   <span>NODDLES</span>
                 </div>
+              </div>
+              <div
+                ref={serveRef}
+                className={`serve-drop ${drag && stage === 'ready' ? 'show' : ''} ${drag?.over && stage === 'ready' ? 'hot' : ''}`}>
+                <span>🛎</span>
+                <b>{c.phone ? 'Paketle' : 'Servis'}</b>
               </div>
               <RegisterDecor
                 open={phase === 'pay'}
@@ -681,7 +733,7 @@ export default function Play({
                 )}
                 {phase === 'waiting' && (
                   <button className="btn ghost talk-btn" onClick={() => go(1)}>
-                    Mutfağa geç →
+                    Mutfağa kaydır →
                   </button>
                 )}
               </div>
@@ -810,12 +862,6 @@ export default function Play({
                       ✋ Ocağa sürükle
                     </button>
                   </div>
-                  <div
-                    ref={dropRef}
-                    className={`oven-drop ${drag ? 'show' : ''} ${drag?.over ? 'hot' : ''}`}>
-                    <span>🍜</span>
-                    <b>Ocak</b>
-                  </div>
                   {drag &&
                     createPortal(
                       <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
@@ -938,8 +984,19 @@ export default function Play({
                 thick={bowl.thick}
                 heat={Math.min(1.3, cookP / 100)}
               />
+              <div
+                ref={dropRef}
+                className={`pot-drop ${drag && stage === 'prep' ? 'show' : ''} ${drag?.over && stage === 'prep' ? 'hot' : ''}`}>
+                <span>♨</span>
+                <b>Kaynar su</b>
+              </div>
               {stage === 'ready' && (
-                <div className="out-bowl">
+                <div
+                  className={`out-bowl carry ${drag ? 'lifted' : ''}`}
+                  onPointerDown={startCarry}
+                  onPointerMove={moveDrag}
+                  onPointerUp={endDrag}
+                  onPointerCancel={endDrag}>
                   <BowlCanvas bowl={drawBowl} size={190} />
                   <div className={`cook-badge cb-${bowl.cook}`}>
                     {COOK_LABEL[bowl.cook ?? 'raw']}
@@ -974,10 +1031,12 @@ export default function Play({
               </div>
             )}
             {stage === 'ready' && (
-              <div className="cook-panel">
-                <button className="btn big primary pulse" onClick={serveIt}>
-                  {c.phone ? 'Paketle, Rüzgar’a ver 🛵' : 'Servis et 🛎'}
-                </button>
+              <div className="cook-panel idle">
+                <p>
+                  {c.phone
+                    ? 'Kaseyi tut, salona taşı ve paketle.'
+                    : 'Kaseyi tut, salona taşı ve tezgâha bırak.'}
+                </p>
               </div>
             )}
             {stage === 'prep' && (
@@ -987,11 +1046,6 @@ export default function Play({
                     ? 'Kaseyi hazırlıkta hazırla, sonra kaynar suya sürükle.'
                     : 'Ocak boşta.'}
                 </p>
-                {phase === 'waiting' && (
-                  <button className="btn ghost" onClick={() => go(1)}>
-                    ← Hazırlığa dön
-                  </button>
-                )}
               </div>
             )}
           </section>
@@ -1005,19 +1059,21 @@ export default function Play({
       )}
       {nudge && <div className="nudge2">{nudge}</div>}
 
-      {/* NAV */}
-      <div className="nav">
+      {/* swipe indicator */}
+      <div className="kdots">
         {STATIONS.map((s, i) => (
-          <button key={s} className={`nav-btn ${station === i ? 'on' : ''}`} onClick={() => go(i)}>
-            {['🏮', '🔪', '🔥'][i]} {s}
-            {i === 0 && phase === 'talk' && station !== 0 && (
-              <span className="badge pulse-badge">!</span>
-            )}
-            {i === 2 && stage === 'pot' && station !== 2 && (
-              <span className={`badge ${cookP > 80 ? 'pulse-badge' : ''}`}>
-                {Math.round(cookP)}
-              </span>
-            )}
+          <button
+            key={s}
+            className={`kdot ${station === i ? 'on' : ''} ${
+              (i === 0 && phase === 'talk' && station !== 0) ||
+              (i === 2 && stage === 'pot' && station !== 2 && cookP > 70)
+                ? 'alert'
+                : ''
+            }`}
+            aria-label={s}
+            onClick={() => go(i)}>
+            <i />
+            <span>{s}</span>
           </button>
         ))}
       </div>

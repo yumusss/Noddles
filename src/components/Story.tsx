@@ -7,7 +7,7 @@ import { ShopWall } from './Scenery';
 const TONE: Record<string, string> = {
   hana: 'var(--clay)',
   sef: 'var(--indigo2)',
-  miso: 'var(--persimmon)',
+  miso: 'var(--walnut)',
   ruzgar: 'var(--matcha)',
   baron: '#4b3a5e',
   lezzetova: 'var(--gold2)',

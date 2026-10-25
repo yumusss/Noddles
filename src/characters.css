@@ -262,7 +262,7 @@
   opacity: 0.7;
 }
 
-/* ---------- Miso ---------- */
+/* ---------- Mochi (the cat; class names kept as .miso) ---------- */
 .miso .cat-tail {
   animation: miso-tail 2.6s ease-in-out infinite;
 }

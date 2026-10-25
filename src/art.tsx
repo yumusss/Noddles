@@ -1273,14 +1273,32 @@ export function CustomerArt({ look, mood, size = 96 }: { look: Look; mood: Mood;
   );
 }
 
-/** Miso: a soft orange tabby in the tonal (outline-free) house style. */
+/** Mochi: a brown-and-white tabby in the tonal (outline-free) house style. */
+const MOCHI = {
+  fur: '#a6845f',
+  furL: '#c4a583',
+  furD: '#8b6a4e',
+  stripe: '#5c4332',
+  white: '#fdf6ec',
+  whiteS: '#eadbc7',
+  pink: '#e8a094',
+  earPink: '#f0bcb0',
+  ink: '#2b2420',
+};
+
+function MochiEye({ cx, cy }: { cx: number; cy: number }) {
+  return (
+    <g>
+      <ellipse cx={cx} cy={cy} rx="4.2" ry="5.2" fill="url(#mochiIris)" />
+      <ellipse cx={cx} cy={cy + 0.3} rx="1.7" ry="4.3" fill={MOCHI.ink} />
+      <circle cx={cx + 1.3} cy={cy - 2.2} r="1.25" fill="#fff6e8" />
+      <circle cx={cx - 1.6} cy={cy + 2.4} r="0.6" fill="#fff6e8" opacity=".7" />
+    </g>
+  );
+}
+
 export function CatArt({ size = 70, sleepy = false }: { size?: number; sleepy?: boolean }) {
-  const fur = '#e3934a';
-  const furD = '#c9743a';
-  const furL = '#f0b06e';
-  const belly = '#fbe9d3';
-  const stripe = '#b9602c';
-  const ink = '#2b2420';
+  const { fur, furL, furD, stripe, white, whiteS, pink, earPink, ink } = MOCHI;
   return (
     <svg
       viewBox="0 0 100 90"
@@ -1289,77 +1307,116 @@ export function CatArt({ size = 70, sleepy = false }: { size?: number; sleepy?: 
       aria-hidden="true"
       className={`miso ${sleepy ? 'miso-sleepy' : ''}`}>
       <defs>
-        <radialGradient id="misoBody" cx="45%" cy="35%" r="70%">
+        <radialGradient id="mochiBody" cx="40%" cy="30%" r="75%">
+          <stop offset="0" stopColor={furL} />
+          <stop offset="0.55" stopColor={fur} />
+          <stop offset="1" stopColor={furD} />
+        </radialGradient>
+        <radialGradient id="mochiHead" cx="40%" cy="35%" r="70%">
           <stop offset="0" stopColor={furL} />
           <stop offset="0.6" stopColor={fur} />
           <stop offset="1" stopColor={furD} />
         </radialGradient>
-        <radialGradient id="misoHead" cx="42%" cy="38%" r="68%">
-          <stop offset="0" stopColor={furL} />
-          <stop offset="0.65" stopColor={fur} />
-          <stop offset="1" stopColor={furD} />
+        <radialGradient id="mochiWhite" cx="45%" cy="30%" r="75%">
+          <stop offset="0" stopColor="#fffaf2" />
+          <stop offset="0.7" stopColor={white} />
+          <stop offset="1" stopColor={whiteS} />
+        </radialGradient>
+        <radialGradient id="mochiIris" cx="50%" cy="50%" r="55%">
+          <stop offset="0" stopColor="#e0b35a" />
+          <stop offset="0.45" stopColor="#a9a85a" />
+          <stop offset="1" stopColor="#5f8a52" />
         </radialGradient>
       </defs>
-      {/* tail */}
-      <path
-        className="cat-tail"
-        d="M78 70 q20 -2 20 -22 q0 -10 -9 -11"
-        stroke={fur}
-        strokeWidth="8"
-        fill="none"
-        strokeLinecap="round"
-        style={{ transformOrigin: '78px 70px' }}
-      />
-      <path
-        className="cat-tail"
-        d="M89 48 q1 5 -1 10 M95 50 q0 7 -3 12"
-        stroke={stripe}
-        strokeWidth="2.2"
-        fill="none"
-        strokeLinecap="round"
-        opacity=".7"
-        style={{ transformOrigin: '78px 70px' }}
-      />
-      {/* shadow on floor */}
-      <ellipse cx="54" cy="84" rx="30" ry="4" fill={ink} opacity=".12" />
+      {/* tail (curled round the front, brown with a white tip) */}
+      <g className="cat-tail" style={{ transformOrigin: '74px 74px' }}>
+        <path
+          d="M74 74 q20 -1 21 -19 q1 -11 -8 -14"
+          stroke={fur}
+          strokeWidth="8"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          d="M74 74 q20 -1 21 -19 q1 -11 -8 -14"
+          stroke={furD}
+          strokeWidth="3"
+          fill="none"
+          strokeLinecap="round"
+          opacity=".35"
+          transform="translate(0 2.4)"
+        />
+        <path
+          d="M91 60 q2 -4 1.5 -8 M93.5 50 q0 -4 -2.5 -6"
+          stroke={stripe}
+          strokeWidth="2.4"
+          fill="none"
+          strokeLinecap="round"
+          opacity=".65"
+        />
+        <path
+          d="M92.5 48 q0.5 -5 -5.5 -7"
+          stroke={white}
+          strokeWidth="7"
+          fill="none"
+          strokeLinecap="round"
+        />
+      </g>
+      {/* floor shadow */}
+      <ellipse cx="52" cy="85" rx="30" ry="4" fill={ink} opacity=".12" />
+      {/* hind haunches */}
+      <ellipse cx="31" cy="72" rx="10" ry="11" fill={fur} />
+      <ellipse cx="71" cy="73" rx="8.5" ry="10" fill={fur} />
+      <ellipse cx="29" cy="76" rx="7" ry="7" fill={furD} opacity=".45" />
+      <ellipse cx="73" cy="77" rx="6" ry="6" fill={furD} opacity=".45" />
       {/* body */}
-      <ellipse cx="54" cy="66" rx="29" ry="20" fill="url(#misoBody)" />
-      <ellipse cx="56" cy="73" rx="16" ry="10" fill={belly} />
       <path
-        d="M62 50 q7 -1 12 4 M68 58 q6 0 10 4"
+        d="M26 66 q2 -22 24 -24 q24 2 26 24 q1 18 -26 18 q-27 0 -24 -18z"
+        fill="url(#mochiBody)"
+      />
+      <path
+        d="M30 58 q6 -3 11 2 M28 66 q5 -3 10 1 M72 58 q-6 -3 -11 2 M74 66 q-5 -3 -10 1"
         stroke={stripe}
         strokeWidth="2.6"
         fill="none"
         strokeLinecap="round"
-        opacity=".8"
+        opacity=".7"
       />
-      {/* paws */}
-      <ellipse cx="38" cy="82" rx="8" ry="4.5" fill={furL} />
-      <ellipse cx="56" cy="83" rx="8" ry="4.5" fill={furL} />
+      {/* white chest bib */}
+      <path d="M40 46 q10 -4 20 0 q4 14 2 28 q-12 4 -24 0 q-2 -14 2 -28z" fill="url(#mochiWhite)" />
+      {/* hind paws peeking */}
+      <ellipse cx="29" cy="82.5" rx="6.5" ry="3.6" fill={whiteS} />
+      <ellipse cx="72" cy="82.5" rx="5.5" ry="3.3" fill={whiteS} />
+      {/* front paws */}
+      <ellipse cx="42" cy="82.5" rx="8.5" ry="4.6" fill="url(#mochiWhite)" />
+      <ellipse cx="58" cy="82.5" rx="8.5" ry="4.6" fill="url(#mochiWhite)" />
       <path
-        d="M35 82 v2 M38 81.5 v2.5 M41 82 v2 M53 83 v2 M56 82.5 v2.5 M59 83 v2"
-        stroke={furD}
-        strokeWidth="1"
+        d="M39 82.5 v2.4 M42 82 v3 M45 82.5 v2.4 M55 82.5 v2.4 M58 82 v3 M61 82.5 v2.4"
+        stroke={whiteS}
+        strokeWidth="1.1"
         strokeLinecap="round"
-        opacity=".6"
       />
+      {/* ears */}
+      <path d="M29 30 L23 8 L42 17z" fill={furD} />
+      <path d="M67 30 L73 8 L54 17z" fill={furD} />
+      <path d="M31 26 L27 13 L39 19.5z" fill={earPink} />
+      <path d="M65 26 L69 13 L57 19.5z" fill={earPink} />
       {/* head */}
-      <path d="M25 30 L21 9 L38 19z" fill={fur} />
-      <path d="M63 30 L67 9 L50 19z" fill={fur} />
-      <path d="M27 26 L24.5 14 L35 21z" fill="#f2c0b4" />
-      <path d="M61 26 L63.5 14 L53 21z" fill="#f2c0b4" />
-      <circle cx="44" cy="38" r="22" fill="url(#misoHead)" />
-      <ellipse cx="44" cy="46" rx="12" ry="8" fill={belly} opacity=".85" />
-      {/* forehead M */}
+      <circle cx="48" cy="36" r="22" fill="url(#mochiHead)" />
+      {/* white muzzle + blaze */}
+      <ellipse cx="48" cy="46" rx="13.5" ry="9.5" fill="url(#mochiWhite)" />
+      <path d="M44.5 46 q-0.5 -10 2 -20 q1 -1.5 2.5 0 q2.5 10 2.5 20z" fill={white} opacity=".92" />
+      {/* forehead tabby stripes, flanking the blaze */}
       <path
-        d="M35 20 l2.5 8 M44 17 v9 M53 20 l-2.5 8"
+        d="M36 20 l3 8 M41 17.5 l1.5 7 M55 17.5 l-1.5 7 M60 20 l-3 8"
         stroke={stripe}
         strokeWidth="2.4"
         strokeLinecap="round"
-        opacity=".85"
+        opacity=".8"
       />
+      {/* cheek stripes */}
       <path
-        d="M24 36 q4 -1 7 2 M64 36 q-4 -1 -7 2"
+        d="M27 34 q4 -1 7 2 M28 40 q3 -1 5 1 M69 34 q-4 -1 -7 2 M68 40 q-3 -1 -5 1"
         stroke={stripe}
         strokeWidth="2"
         fill="none"
@@ -1368,39 +1425,42 @@ export function CatArt({ size = 70, sleepy = false }: { size?: number; sleepy?: 
       />
       {sleepy ? (
         <g stroke={ink} strokeWidth="2.2" fill="none" strokeLinecap="round">
-          <path d="M32 40 q4 3 8 0" />
-          <path d="M48 40 q4 3 8 0" />
+          <path d="M35 38.5 q4 3.2 8 0" />
+          <path d="M53 38.5 q4 3.2 8 0" />
         </g>
       ) : (
         <g className="cat-eyes">
-          <ellipse cx="36" cy="39" rx="4" ry="5" fill="#6d8f5e" />
-          <ellipse cx="52" cy="39" rx="4" ry="5" fill="#6d8f5e" />
-          <ellipse cx="36" cy="39" rx="1.6" ry="4.2" fill={ink} />
-          <ellipse cx="52" cy="39" rx="1.6" ry="4.2" fill={ink} />
-          <circle cx="37.2" cy="37" r="1.2" fill="#fff6e8" />
-          <circle cx="53.2" cy="37" r="1.2" fill="#fff6e8" />
+          <MochiEye cx={39} cy={37.5} />
+          <MochiEye cx={57} cy={37.5} />
         </g>
       )}
       {/* cheeks */}
-      <ellipse cx="31" cy="45" rx="3.4" ry="1.8" fill="#e9b8b2" opacity=".7" />
-      <ellipse cx="57" cy="45" rx="3.4" ry="1.8" fill="#e9b8b2" opacity=".7" />
+      <ellipse cx="34" cy="45" rx="3.6" ry="1.9" fill="#e9b8b2" opacity=".6" />
+      <ellipse cx="62" cy="45" rx="3.6" ry="1.9" fill="#e9b8b2" opacity=".6" />
       {/* nose + mouth */}
-      <path d="M41.5 45.5 l2.5 2.5 l2.5 -2.5z" fill="#d9847a" />
+      <path d="M45.2 44.6 q2.8 -1.2 5.6 0 q-0.4 2.6 -2.8 3.4 q-2.4 -0.8 -2.8 -3.4z" fill={pink} />
       <path
-        d="M44 48 q-3 3.5 -6 1.5 M44 48 q3 3.5 6 1.5"
+        d="M48 48 q-3 3.6 -6.2 1.6 M48 48 q3 3.6 6.2 1.6"
         stroke={ink}
-        strokeWidth="1.4"
+        strokeWidth="1.3"
         fill="none"
         strokeLinecap="round"
-        opacity=".8"
+        opacity=".7"
       />
       {/* whiskers */}
       <path
-        d="M24 45 h-11 M24 49 l-10 3 M64 45 h11 M64 49 l10 3"
+        d="M31 45 h-11 M31 49 l-10 3 M65 45 h11 M65 49 l10 3"
         stroke="#fff6e8"
         strokeWidth="1.3"
         strokeLinecap="round"
-        opacity=".85"
+        opacity=".9"
+      />
+      <path
+        d="M31 45 h-11 M31 49 l-10 3 M65 45 h11 M65 49 l10 3"
+        stroke={stripe}
+        strokeWidth="0.5"
+        strokeLinecap="round"
+        opacity=".35"
       />
       {sleepy && (
         <g
@@ -1409,10 +1469,10 @@ export function CatArt({ size = 70, sleepy = false }: { size?: number; sleepy?: 
           opacity=".55"
           fontFamily="Nunito, sans-serif"
           fontWeight="800">
-          <text x="66" y="22" fontSize="9">
+          <text x="70" y="20" fontSize="9">
             z
           </text>
-          <text x="73" y="13" fontSize="7">
+          <text x="77" y="11" fontSize="7">
             z
           </text>
         </g>

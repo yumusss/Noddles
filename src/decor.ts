@@ -179,8 +179,8 @@ export const DECOR_ITEMS: DecorItem[] = [
   {
     id: 'smallart_miso',
     cat: 'smallart',
-    name: 'Miso Posteri',
-    desc: 'Dükkânın yıldızı Miso!',
+    name: 'Mochi Posteri',
+    desc: 'Dükkânın yıldızı Mochi!',
     price: 8000,
     tipBonus: 0.01,
   },
