@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { sfx } from '../audio';
 import { Rain } from './Scenery';
+import type { DayTime, Weather } from '../data';
 
 /** Opening shot of each day: the shop from the street, then the camera pushes in through the door. */
 export default function Establishing({
@@ -8,19 +9,21 @@ export default function Establishing({
   title,
   subtitle,
   meta,
-  rain,
+  time = 'night',
+  weather = 'clear',
   onDone,
 }: {
   day: number;
   title: string;
   subtitle: string;
   meta: string;
-  rain: boolean;
+  time?: DayTime;
+  weather?: Weather;
   onDone: () => void;
 }) {
   const [push, setPush] = useState(false);
   return (
-    <div className={`establish ${push ? 'push' : ''}`}>
+    <div className={`establish t-${time} w-${weather} ${push ? 'push' : ''}`}>
       <div className="est-scene">
         <div className="est-sky" />
         <div className="est-moon" />
@@ -50,7 +53,7 @@ export default function Establishing({
           <div className="est-lantern r" />
         </div>
         <div className="est-street" />
-        {rain && <Rain count={50} />}
+        {weather === 'rain' && <Rain count={50} />}
       </div>
       <div className="est-bars top" />
       <div className="est-bars bottom" />

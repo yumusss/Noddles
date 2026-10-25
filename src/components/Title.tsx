@@ -1,6 +1,6 @@
 import { CatArt } from '../art';
 import { BowlSide } from './FoodCanvas';
-import { Rain, Lanterns } from './Scenery';
+import { Lanterns } from './Scenery';
 
 export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: () => void }) {
   return (
@@ -18,7 +18,6 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
           />
         ))}
       </div>
-      <Rain count={40} />
       <div className="skyline" />
       <Lanterns count={5} />
       <div className="title-wrap">
@@ -61,7 +60,7 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
       <button className="btn big primary pulse" onClick={onPlay}>
         {hasSave ? 'Devam Et' : 'Dükkânı Aç'}
       </button>
-      <div className="title-foot">10 bölüm • 26 malzeme • bir mahalleyi kurtar</div>
+      <div className="title-foot">10 bölüm • 32 malzeme • bir mahalleyi kurtar</div>
     </div>
   );
 }

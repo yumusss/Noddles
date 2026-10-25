@@ -1,4 +1,16 @@
 :root {
+  /* art direction palette (see ART_DIRECTION.md) */
+  --cream: #f6efe4;
+  --linen: #ece2d2;
+  --sand: #d9c4a3;
+  --oak: #c4935b;
+  --walnut: #7b4f2e;
+  --clay: #c8553d;
+  --persimmon: #e8803c;
+  --matcha: #7c9a6e;
+  --indigo2: #3b4a6b;
+  --gold2: #d9a441;
+  --blush: #e9b8b2;
   --night: #1b1030;
   --night2: #2b1846;
   --wood: #8a5530;

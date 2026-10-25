@@ -76,8 +76,13 @@ export interface Line {
 
 // ---------- Levels ----------
 
+export type DayTime = 'morning' | 'noon' | 'sunset' | 'night';
+export type Weather = 'clear' | 'cloudy' | 'rain';
+
 export interface Level {
   id: number;
+  time: DayTime;
+  weather: Weather;
   title: string;
   subtitle: string;
   customers: number; // customers in the day
@@ -92,6 +97,8 @@ export interface Level {
 export const LEVELS: Level[] = [
   {
     id: 1,
+    time: 'morning',
+    weather: 'clear',
     customers: 5,
     phone: 0,
     complexity: 1,
@@ -125,6 +132,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 2,
+    time: 'noon',
+    weather: 'clear',
     customers: 6,
     phone: 0,
     complexity: 1,
@@ -147,6 +156,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 3,
+    time: 'noon',
+    weather: 'cloudy',
     customers: 7,
     phone: 2,
     complexity: 2,
@@ -181,6 +192,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 4,
+    time: 'morning',
+    weather: 'clear',
     customers: 7,
     phone: 2,
     complexity: 2,
@@ -204,6 +217,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 5,
+    time: 'sunset',
+    weather: 'rain',
     customers: 8,
     phone: 2,
     complexity: 3,
@@ -228,6 +243,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 6,
+    time: 'night',
+    weather: 'clear',
     customers: 8,
     phone: 2,
     complexity: 3,
@@ -256,6 +273,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 7,
+    time: 'noon',
+    weather: 'clear',
     customers: 8,
     phone: 2,
     complexity: 3,
@@ -281,6 +300,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 8,
+    time: 'sunset',
+    weather: 'clear',
     customers: 9,
     phone: 3,
     complexity: 4,
@@ -305,6 +326,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 9,
+    time: 'morning',
+    weather: 'rain',
     customers: 9,
     phone: 3,
     complexity: 4,
@@ -331,6 +354,8 @@ export const LEVELS: Level[] = [
   },
   {
     id: 10,
+    time: 'night',
+    weather: 'clear',
     customers: 10,
     phone: 3,
     complexity: 4,

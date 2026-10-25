@@ -1028,7 +1028,8 @@ export default function Play({
           title={L.title}
           subtitle={L.subtitle}
           meta={`${L.customers} müşteri${L.phone ? ` • ${L.phone} telefon siparişi` : ''}`}
-          rain={L.id === 3 || L.id === 5 || L.id === 9}
+          time={L.time}
+          weather={L.weather}
           onDone={() => {
             setIntro(false);
             setStarted(true);
