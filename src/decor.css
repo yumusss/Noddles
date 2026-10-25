@@ -1,14 +1,18 @@
 /* =====================================================================
    DECORATION — v3 line-art scene: restaurant interior, counter props,
-   register, tip bowl, change panel, shop screen, establishing shot.
+   register, tip box, change panel, shop screen, establishing shot.
    Rules (ART_DIRECTION.md v3): thin ink outlines, flat fills, one
    shadow tone, one highlight. No blur, no backdrop-filter, no blend
    modes on big layers, no SVG filters. Shadows are ink alpha.
+
+   Salon layout (percent of .rest). Wall = top 56%, floor below.
+   left: street window (4–30%) over the tansu     centre: lanterns, calm
+   right: kitchen pass (66–96%) with noren + strips, stools at its foot
    ===================================================================== */
 
 :root {
-  --rest-wall-h: 54%;
-  --oak-l: #d8ad78;
+  --rest-wall-h: 56%;
+  --oak-l: #d9b07a;
   --oak-d: #a1764a;
   --ink-a: 43 36 32;
 }
@@ -54,8 +58,8 @@
   --sky-b: #3a3f63;
   --sun: 0;
   --glow: 1;
-  --dim: 0.68;
-  --shade: 0.34;
+  --dim: 0.62;
+  --shade: 0.3;
   --shade-c: #2f3b56;
   --win: #ffd89a;
 }
@@ -82,9 +86,9 @@
 .rest.t-night.w-cloudy {
   --sky-a: #1b1f3a;
   --sky-b: #3a3f63;
-  --shade: 0.36;
+  --shade: 0.32;
   --shade-c: #2f3b56;
-  --dim: 0.68;
+  --dim: 0.62;
   --glow: 1;
   --sun: 0;
 }
@@ -94,6 +98,7 @@
   --shade-c: #7c5f66;
 }
 
+/* ---------- wall: finish on top, indigo wainscot below, oak dado rail ---------- */
 .rest-wall {
   position: absolute;
   top: 0;
@@ -102,18 +107,42 @@
   height: var(--rest-wall-h);
   overflow: hidden;
 }
+.rest-wainscot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30%;
+  z-index: 0;
+  background:
+    repeating-linear-gradient(90deg, #0000 0 64px, rgb(var(--ink-a) / 0.45) 64px 65px), #3b4a6b;
+  box-shadow: inset 0 6px 0 #2e3a55;
+}
+.rest-dado {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 30%;
+  height: 9px;
+  margin-bottom: -4px;
+  z-index: 0;
+  background: #c4935b;
+  border-top: 1px solid rgb(var(--ink-a) / 0.85);
+  border-bottom: 1px solid rgb(var(--ink-a) / 0.85);
+  box-shadow: inset 0 3px 0 #d9b07a;
+}
 /* a single flat sunlight polygon on the wall (comes through the window) */
 .rest-sunwall {
   position: absolute;
   left: 30%;
-  top: 10%;
-  width: 24%;
-  height: 86%;
+  top: 12%;
+  width: 20%;
+  height: 60%;
   pointer-events: none;
   z-index: 0;
-  opacity: calc(var(--sun) * 0.42);
+  opacity: calc(var(--sun) * 0.4);
   background: var(--sunc);
-  clip-path: polygon(0 0, 100% 10%, 100% 100%, 0 90%);
+  clip-path: polygon(0 0, 100% 14%, 100% 100%, 0 86%);
   transition: opacity 1.5s;
 }
 .rest-baseboard {
@@ -121,18 +150,19 @@
   left: 0;
   right: 0;
   top: var(--rest-wall-h);
-  height: 1.6%;
-  margin-top: -0.8%;
-  background: #8a6144;
-  border-top: 1px solid rgb(var(--ink-a) / 0.8);
-  border-bottom: 1px solid rgb(var(--ink-a) / 0.8);
+  height: 1.4%;
+  margin-top: -0.7%;
+  background: #5f3c22;
+  border-top: 1px solid rgb(var(--ink-a) / 0.85);
+  border-bottom: 1px solid rgb(var(--ink-a) / 0.85);
 }
 
 /* ---------- wall finishes (stage + shop swatches): flat + ink lines ---------- */
 .wall_wood {
+  /* cedar slats */
   background:
-    repeating-linear-gradient(90deg, #0000 0 30px, rgb(var(--ink-a) / 0.5) 30px 31px),
-    repeating-linear-gradient(90deg, #d6b48a 0 62px, #cfab80 62px 93px), #d6b48a;
+    repeating-linear-gradient(0deg, #0000 0 22px, rgb(var(--ink-a) / 0.45) 22px 23px),
+    repeating-linear-gradient(0deg, #c99a68 0 46px, #c08f5c 46px 92px), #c99a68;
 }
 .wall_washi {
   background:
@@ -209,31 +239,32 @@
 /* sun on the floor: flat skewed window shape */
 .rest-sun {
   position: absolute;
-  left: 10%;
-  width: 36%;
+  left: 8%;
+  width: 30%;
   top: calc(var(--rest-wall-h) + 1%);
-  height: 20%;
+  height: 18%;
   pointer-events: none;
   transform: skewX(-38deg);
   background: linear-gradient(90deg, var(--sunc) 0 47%, transparent 47% 53%, var(--sunc) 53%);
-  opacity: calc(var(--sun) * 0.4);
+  opacity: calc(var(--sun) * 0.38);
   transition: opacity 1.5s;
 }
 
-/* ---------- street window ---------- */
+/* ---------- street window (left) ---------- */
 .rest-window {
   position: absolute;
-  top: 13%;
+  top: 10%;
   left: 4%;
-  width: 25%;
-  height: 58%;
+  width: 26%;
+  height: 50%;
   border-radius: 3px;
   overflow: hidden;
+  z-index: 1;
   background: var(--sky-b);
   border: 2px solid rgb(var(--ink-a) / 0.85);
   box-shadow:
-    0 0 0 4px #7b4f2e,
-    0 0 0 5px rgb(var(--ink-a) / 0.85);
+    0 0 0 5px #7b4f2e,
+    0 0 0 6px rgb(var(--ink-a) / 0.85);
 }
 .rw-scene {
   position: absolute;
@@ -281,15 +312,15 @@
       transparent calc(50% + 2px)
     ),
     linear-gradient(
-      transparent calc(38% - 2px),
-      #7b4f2e calc(38% - 2px) calc(38% + 2px),
-      transparent calc(38% + 2px)
+      transparent calc(34% - 2px),
+      #7b4f2e calc(34% - 2px) calc(34% + 2px),
+      transparent calc(34% + 2px)
     );
 }
 .rw-sill {
   position: absolute;
-  left: -6px;
-  right: -6px;
+  left: -8px;
+  right: -8px;
   bottom: 0;
   height: 7px;
   z-index: 4;
@@ -302,8 +333,8 @@
   position: absolute;
   left: 8%;
   right: 8%;
-  top: 8%;
-  height: 34%;
+  top: 6%;
+  height: 30%;
   z-index: 2;
   display: grid;
   place-items: center;
@@ -329,25 +360,81 @@
   opacity: calc(0.75 + var(--glow) * 0.25);
 }
 
-/* ---------- big art ---------- */
+/* ---------- tansu under the window (+ cat) ---------- */
+.rest-tansu {
+  position: absolute;
+  left: 3%;
+  width: 28%;
+  bottom: 0;
+  height: 36%;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+}
+.tansu-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.rest-cat {
+  position: absolute;
+  right: 4%;
+  bottom: 56%;
+}
+.rest-cat svg {
+  display: block;
+}
+
+/* ---------- kamidana shrine + clock (upper centre-left / right) ---------- */
+.rest-shrine {
+  position: absolute;
+  left: 34%;
+  top: 7%;
+  width: 9%;
+  height: 20%;
+  z-index: 1;
+}
+.shrine-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.rest-clock {
+  position: absolute;
+  left: 57%;
+  top: 9%;
+  width: 7%;
+  aspect-ratio: 1;
+  z-index: 1;
+}
+.clock-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+/* ---------- big art (centre, between shrine and clock) ---------- */
 .rest-bigart {
   position: absolute;
-  left: 36%;
-  right: 36%;
-  top: 12%;
-  height: 38%;
+  left: 44%;
+  width: 12%;
+  top: 8%;
+  height: 20%;
   z-index: 1;
 }
 .art-frame {
   width: 100%;
   height: 100%;
-  padding: 5%;
+  padding: 4%;
   background: #f6efe4;
   border: 2px solid rgb(var(--ink-a) / 0.85);
   box-shadow:
-    inset 0 0 0 4px #8a6144,
-    inset 0 0 0 5px rgb(var(--ink-a) / 0.6),
-    6px 8px 0 rgb(var(--ink-a) / 0.16);
+    inset 0 0 0 3px #8a6144,
+    inset 0 0 0 4px rgb(var(--ink-a) / 0.6),
+    5px 6px 0 rgb(var(--ink-a) / 0.16);
 }
 .art-svg {
   display: block;
@@ -355,13 +442,13 @@
   height: 100%;
 }
 
-/* ---------- small art ---------- */
+/* ---------- small art (below the clock, right of centre) ---------- */
 .rest-smallart {
   position: absolute;
-  left: 46%;
-  top: 52%;
-  width: 8%;
-  height: 24%;
+  left: 57.5%;
+  top: 30%;
+  width: 6%;
+  height: 20%;
   z-index: 1;
   display: grid;
   place-items: center;
@@ -376,114 +463,69 @@
   letter-spacing: 1px;
 }
 
-/* ---------- chalk menu board ---------- */
-.rest-menu {
-  position: absolute;
-  top: 9%;
-  right: 4%;
-  width: 25%;
-  height: 20%;
-  z-index: 1;
-  background: #3f4a44;
-  border: 2px solid rgb(var(--ink-a) / 0.85);
-  border-radius: 3px;
-  text-align: center;
-  color: #f6efe4;
-  padding: 2% 4% 0;
-  box-shadow:
-    inset 0 0 0 4px #8a6144,
-    inset 0 0 0 5px rgb(var(--ink-a) / 0.6),
-    5px 6px 0 rgb(var(--ink-a) / 0.16);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.rm-title {
-  font-family: var(--display);
-  font-weight: 700;
-  font-size: clamp(9px, 3.6cqw, 17px);
-  letter-spacing: 1px;
-  line-height: 1.1;
-  text-transform: uppercase;
-  margin-top: 2px;
-}
-.rm-line {
-  width: 60%;
-  height: 4px;
-  margin: 1px 0 2px;
-  opacity: 0.7;
-}
-.rest-menu small {
-  display: block;
-  flex: none;
-  font-size: clamp(5.5px, 2.1cqw, 9.5px);
-  font-family: var(--font);
-  font-weight: 700;
-  line-height: 1.3;
-  opacity: 0.85;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.rm-doodle {
-  flex: none;
-  width: 26%;
-  height: auto;
-  margin-top: auto;
-  opacity: 0.55;
-}
-
-/* ---------- kitchen pass window ---------- */
+/* ---------- kitchen pass (right) ---------- */
 .rest-pass {
   position: absolute;
   right: 4%;
-  top: 34%;
-  width: 25%;
-  height: 56%;
+  top: 4%;
+  width: 30%;
+  height: 92%;
   z-index: 1;
 }
+/* hanging menu strips above the opening */
+.rp-strips {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 0;
+  height: 26%;
+  z-index: 4;
+}
+.tz-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+.tz-word {
+  font-family: var(--font);
+  letter-spacing: 0.3px;
+}
+/* the opening */
 .rp-open {
   position: absolute;
-  inset: 0 0 10% 0;
-  border: 2px solid rgb(var(--ink-a) / 0.85);
-  border-bottom: 0;
-  border-radius: 3px 3px 0 0;
-  background:
-    repeating-linear-gradient(90deg, #0000 0 30px, rgb(var(--ink-a) / 0.35) 30px 31px),
-    repeating-linear-gradient(0deg, #0000 0 18px, rgb(var(--ink-a) / 0.35) 18px 19px), #efe6d9;
+  left: 0;
+  right: 0;
+  top: 26%;
+  bottom: 12%;
   overflow: hidden;
-  box-shadow:
-    inset 0 0 0 4px #8a6144,
-    inset 0 0 0 5px rgb(var(--ink-a) / 0.6);
+  background:
+    repeating-linear-gradient(90deg, #0000 0 26px, rgb(var(--ink-a) / 0.3) 26px 27px),
+    repeating-linear-gradient(0deg, #0000 0 16px, rgb(var(--ink-a) / 0.3) 16px 17px), #efe6d9;
 }
-.rp-open::before {
-  /* warm kitchen light: one flat trapezoid */
-  content: '';
+.rp-kitchen {
   position: absolute;
-  left: 15%;
-  right: 15%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* warm kitchen light: one flat trapezoid */
+.rp-light {
+  position: absolute;
+  left: 10%;
+  right: 10%;
   top: 0;
   height: 100%;
   background: #ffd9a0;
-  clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
-  opacity: calc(0.18 + var(--glow) * 0.3);
+  clip-path: polygon(25% 0, 75% 0, 100% 100%, 0 100%);
+  opacity: calc(0.16 + var(--glow) * 0.26);
   transition: opacity 1.5s;
-}
-.rp-pot {
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  bottom: 0;
-  width: 84%;
-  height: 80%;
-  z-index: 2;
+  pointer-events: none;
 }
 .rp-steam {
   animation: steam-rise 2.8s ease-in-out infinite;
-  transform-origin: 70px 44px;
+  transform-origin: 94px 60px;
 }
 @keyframes steam-rise {
   0% {
@@ -498,66 +540,77 @@
     opacity: 0;
   }
 }
-.rp-rail {
+/* noren over the top of the opening */
+.rp-noren {
   position: absolute;
-  left: 4%;
-  right: 4%;
-  top: 0;
+  left: 2%;
+  right: 2%;
+  top: 25%;
   height: 24%;
   z-index: 3;
   display: block;
   overflow: visible;
 }
+/* walnut frame around the opening */
+.rp-frame {
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 25%;
+  bottom: 11%;
+  z-index: 2;
+  pointer-events: none;
+  border: 2px solid rgb(var(--ink-a) / 0.85);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 5px #7b4f2e,
+    inset 0 0 0 6px rgb(var(--ink-a) / 0.6);
+}
+/* oak pass ledge with the service bell */
 .rp-ledge {
   position: absolute;
-  left: -4%;
-  right: -4%;
-  bottom: 4%;
-  height: 7%;
+  left: -6%;
+  right: -6%;
+  bottom: 6%;
+  height: 6%;
   z-index: 5;
   background: var(--oak-l);
   border: 1.5px solid rgb(var(--ink-a) / 0.85);
   border-radius: 2px;
-  box-shadow: 0 4px 0 rgb(var(--ink-a) / 0.14);
+  box-shadow:
+    inset 0 -4px 0 var(--oak-d),
+    0 4px 0 rgb(var(--ink-a) / 0.14);
 }
-
-/* ---------- shelf + cat ---------- */
-.rest-shelf {
+.rp-bell {
   position: absolute;
-  left: 38%;
-  right: 38%;
-  bottom: 6%;
-  height: 22%;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-}
-.shelf-svg {
-  width: 100%;
-  height: 100%;
-  display: block;
+  right: 10%;
+  bottom: 100%;
+  width: clamp(12px, 4cqw, 20px);
+  height: auto;
   overflow: visible;
 }
-.rest-cat {
+
+/* stools at the foot of the pass */
+.rest-stools {
   position: absolute;
-  right: -4%;
-  bottom: 12%;
-}
-.rest-cat svg {
-  display: block;
+  right: 6%;
+  width: 26%;
+  bottom: 33%;
+  height: 12%;
+  z-index: 1;
+  overflow: visible;
 }
 
-/* ---------- lamps ---------- */
+/* ---------- lamps: one row across the top ---------- */
 .rest-lamps {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 40%;
+  height: 34%;
   display: flex;
   justify-content: space-between;
-  padding: 0 29%;
+  padding: 0 34% 0 32%;
   pointer-events: none;
   z-index: 2;
 }
@@ -573,7 +626,7 @@
 .pend {
   position: relative;
   height: 100%;
-  width: clamp(28px, 9cqw, 48px);
+  width: clamp(22px, 7cqw, 40px);
   display: block;
   overflow: visible;
 }
@@ -583,19 +636,20 @@
   overflow: visible;
 }
 .rest-lamps.red .rlamp {
-  height: 100%;
   transform-origin: top center;
   animation: sway 4.2s ease-in-out infinite;
 }
+.rest-lamps.red .rlamp:nth-child(2n) {
+  animation: none;
+}
 .rest-lamps.paper .pend {
-  height: 92%;
-  width: clamp(34px, 11cqw, 60px);
+  width: clamp(28px, 9cqw, 50px);
 }
 .rest-lamps.edison .pend {
-  width: clamp(16px, 5cqw, 26px);
+  width: clamp(14px, 4.5cqw, 22px);
 }
 .rest-lamps.festival {
-  top: 10%;
+  top: 8%;
   height: 16%;
   display: block;
   padding: 0;
@@ -627,52 +681,61 @@
     opacity 1.5s,
     background 1.5s;
 }
-/* flat lamp light cones (no blur): visible only when lamps glow */
+/* flat lamp light wedges (no blur): visible only when lamps glow */
 .rest-light {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  opacity: calc(var(--glow) * 0.14);
+  opacity: calc(var(--glow) * 0.13);
   transition: opacity 1.5s;
 }
 
-/* ---------- plants ---------- */
+/* ---------- plants (left, in front of the tansu) ---------- */
 .rest-plant {
   position: absolute;
-  left: 15%;
+  left: 1%;
   bottom: 33%;
-  height: 22%;
+  height: 24%;
   width: auto;
   overflow: visible;
-  z-index: 1;
+  z-index: 2;
 }
 .rest-plant.bonsai {
-  height: 12%;
-  left: 16%;
-  bottom: 32%;
-  z-index: 3;
+  height: 11%;
+  left: 20%;
+  bottom: 45%;
+  z-index: 1;
 }
 .rest-plant.monstera {
-  height: 24%;
-  left: 2%;
-  bottom: 34%;
+  height: 25%;
+  left: 0;
+  bottom: 33%;
 }
 
-/* ---------- counter decor ---------- */
+/* ---------- counter decor (sits on Play's counter) ---------- */
 .rest-counter {
   position: absolute;
   z-index: 5;
-  left: 34%;
+  left: 41%;
   bottom: calc(30% + 10px);
-  width: clamp(34px, 11cqw, 56px);
+  width: clamp(30px, 10cqw, 52px);
   height: auto;
   overflow: visible;
+}
+.rest-counter.counter-flowers {
+  left: auto;
+  right: 2%;
+  bottom: calc(30% + 6px);
+  width: clamp(44px, 14cqw, 76px);
 }
 .maneki-paw {
   transform-origin: 72px 70px;
   animation: paw 1.4s ease-in-out infinite;
+}
+.shrine-svg .maneki-paw {
+  transform-origin: 62px 66px;
 }
 @keyframes paw {
   0%,
@@ -684,16 +747,17 @@
   }
 }
 
-/* ---------- specials ---------- */
+/* ---------- specials (back wall, right of centre, under the clock) ---------- */
 .rest-special {
   position: absolute;
-  right: 3%;
-  bottom: 31%;
-  width: 18%;
-  height: 24%;
+  left: 52%;
+  bottom: 44%;
+  width: 14%;
+  height: 16%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  z-index: 1;
 }
 .sp-svg {
   display: block;
@@ -756,26 +820,27 @@
 /* ---------- tables + guests ---------- */
 .rest-table {
   position: absolute;
-  width: 26%;
-  bottom: 32%;
+  width: 24%;
+  bottom: 31%;
   z-index: 2;
 }
 .rest-table.near.l {
-  left: 15%;
+  left: 13%;
 }
 .rest-table.near.r {
-  right: 15%;
+  right: 14%;
+  z-index: 2;
 }
 .rest-table.far {
-  width: 18%;
-  bottom: 41%;
+  width: 16%;
+  bottom: 42%;
   z-index: 1;
 }
 .rest-table.far.l {
-  left: 31%;
+  left: 30%;
 }
 .rest-table.far.r {
-  right: 31%;
+  right: 34%;
 }
 .rt-table {
   position: relative;
@@ -825,10 +890,10 @@
   transform-origin: 76px 44px;
 }
 .rest-table.r .rt-steam {
-  animation-delay: 1.2s;
+  animation: none;
 }
 
-/* ---------- vignette + closeup ---------- */
+/* ---------- vignette ---------- */
 .rest-vignette {
   position: absolute;
   inset: 0;
@@ -837,14 +902,17 @@
 }
 
 /* =====================================================================
-   COUNTER, REGISTER, TIP BOWL (sit in Play's .salon-cam over .rest)
+   COUNTER, REGISTER, TIP BOX (sit in Play's .salon-cam over .rest)
+   Layout on the counter, left to right: big register, tip box right
+   beside it, (customer), decor piece, ikebana at the far right end.
    ===================================================================== */
 .salon2 {
   background: #e8dcc8;
 }
 .counter2 {
   background:
-    repeating-linear-gradient(90deg, #0000 0 70px, rgb(var(--ink-a) / 0.35) 70px 71px), #c4935b !important;
+    repeating-linear-gradient(90deg, #0000 0 84px, rgb(var(--ink-a) / 0.3) 84px 85px),
+    linear-gradient(#0000 0 46%, rgb(var(--ink-a) / 0.5) 46% calc(46% + 1px), #0000 0), #c4935b !important;
   background-blend-mode: normal !important;
   border-top: 2px solid rgb(var(--ink-a) / 0.85);
   box-shadow: none;
@@ -875,13 +943,14 @@
   display: none;
 }
 
-/* ---------- register ---------- */
+/* ---------- register (big, left) ---------- */
 .register {
   position: absolute;
   z-index: 6;
   left: 1.5%;
   bottom: calc(30% - 4px);
-  width: clamp(118px, 30%, 150px);
+  width: var(--reg-w);
+  --reg-w: clamp(156px, 40%, 212px);
 }
 .reg-svg {
   display: block;
@@ -891,7 +960,7 @@
 }
 .reg-digits {
   font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   fill: #ffc473;
   letter-spacing: 0.3px;
@@ -901,7 +970,7 @@
   transform-box: view-box;
 }
 .register.open .reg-drawer {
-  transform: translateY(15px);
+  transform: translateY(17px);
 }
 .reg-tray {
   opacity: 0;
@@ -911,13 +980,13 @@
   opacity: 1;
 }
 
-/* ---------- tip bowl ---------- */
+/* ---------- tip box: right beside the register ---------- */
 .tipjar {
   position: absolute;
   z-index: 6;
-  right: 3%;
+  left: calc(1.5% + clamp(156px, 40%, 212px) + 6px);
   bottom: calc(30% - 2px);
-  width: clamp(70px, 18%, 90px);
+  width: clamp(48px, 13%, 66px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -957,12 +1026,12 @@
 .tj-text {
   font-family: var(--display);
   font-weight: 700;
-  font-size: 6.4px;
+  font-size: 7px;
   fill: #5a4630;
   letter-spacing: 0.2px;
 }
 .tj-amount {
-  margin-top: -4px;
+  margin-top: -3px;
   font-size: 11px;
   font-weight: 800;
   color: #2b2420;
@@ -970,6 +1039,7 @@
   border: 1.5px solid rgb(var(--ink-a) / 0.8);
   padding: 0 7px;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 /* =====================================================================
@@ -2131,36 +2201,46 @@
   height: 90px;
 }
 
-/* ---------- phone-width salon: smaller plant, tighter tables ---------- */
+/* ---------- phone-width salon: tighter tables, smaller props ---------- */
 @container (max-width: 560px) {
-  .rm-doodle {
-    display: none;
-  }
   .rest-plant {
-    height: 17%;
-    left: 13%;
+    height: 18%;
   }
   .rest-plant.monstera {
-    height: 18%;
-    left: 1%;
+    height: 19%;
   }
   .rest-plant.bonsai {
-    height: 10%;
+    height: 9%;
   }
   .rest-table.near.l {
-    left: 17%;
+    left: 11%;
   }
   .rest-table.near.r {
-    right: 17%;
+    right: 12%;
   }
   .rest-table.far {
-    width: 16%;
-    bottom: 41%;
+    width: 15%;
   }
   .rest-table.far.l {
-    left: 33%;
+    left: 29%;
   }
   .rest-table.far.r {
-    right: 33%;
+    right: 34%;
+  }
+  .rest-lamps {
+    padding: 0 35% 0 33%;
+  }
+  .rest-clock {
+    width: 8%;
+  }
+  .rest-shrine {
+    width: 11%;
+  }
+  .rest-bigart {
+    left: 45%;
+    width: 11%;
+  }
+  .rest-smallart {
+    width: 7%;
   }
 }

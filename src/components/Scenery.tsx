@@ -6,24 +6,30 @@ import { tableCount, type Decor } from '../decor';
 import type { DayTime, Weather } from '../data';
 
 /* =====================================================================
-   v3 — one line language (ART_DIRECTION.md). Every shape: thin ink
-   outline (#2b2420, constant on screen via non-scaling-stroke), flat
-   fill + one shadow tone + one highlight. No gradients, no blur,
-   no SVG filters. Steam = outlined Ghibli clouds.
+   v3 — one line language (ART_DIRECTION.md), same weight/flatness as
+   Kamado.tsx: thin ink outline (#2b2420 @ .85, ~1px on screen via
+   non-scaling-stroke), flat fill + one shadow tone + one highlight.
+   No gradients, no blur, no SVG filters. Steam = outlined clouds.
+
+   The salon: "Fener Sokağı" — a 40-year-old ramen-ya. Cedar slat
+   walls over an indigo wainscot, a row of red lanterns, a street
+   window on the left, the kitchen pass with a noren and hanging menu
+   strips on the right, a tansu with sake under the window, stools at
+   the pass, tables in the room. Center stays calm for the customer.
    ===================================================================== */
 
 const INK = '#2b2420';
 const HI = '#fff6e8';
 const ink = {
   stroke: INK,
-  strokeOpacity: 0.82,
-  strokeWidth: 1.3,
+  strokeOpacity: 0.85,
+  strokeWidth: 1.15,
   vectorEffect: 'non-scaling-stroke',
   strokeLinejoin: 'round',
   strokeLinecap: 'round',
 } as const satisfies SVGProps<SVGElement>;
 /** faint interior detail line */
-const line = { ...ink, strokeOpacity: 0.28, fill: 'none' } as const;
+const line = { ...ink, strokeOpacity: 0.3, fill: 'none' } as const;
 
 const C = {
   cream: '#f6efe4',
@@ -31,7 +37,7 @@ const C = {
   linen: '#ece2d2',
   sand: '#d9c4a3',
   oak: '#c4935b',
-  oakL: '#d8ad78',
+  oakL: '#d9b07a',
   oakD: '#a1764a',
   walnut: '#7b4f2e',
   walnutD: '#5f3c22',
@@ -43,12 +49,17 @@ const C = {
   matchaD: '#627e56',
   matchaL: '#9bb48a',
   indigo: '#3b4a6b',
-  indigoD: '#2f3b56',
+  indigoD: '#2e3a55',
+  indigoL: '#56689a',
   gold: '#d9a441',
   goldD: '#b5862f',
   blush: '#e9b8b2',
   steel: '#c9ced6',
   steelD: '#9aa1aa',
+  copper: '#b87333',
+  copperD: '#8a4f22',
+  celadon: '#a9d0b8',
+  celadonD: '#7fb094',
 };
 
 /** Outlined steam cloud, centered on (0,0), ~44 wide. */
@@ -93,24 +104,35 @@ export function Rain({ count = 30 }: { count?: number }) {
   );
 }
 
-/* ---------- a single hanging lantern (title + lamps) ---------- */
+/* ---------- a single hanging red lantern (title + salon lamps) ---------- */
 function RedLanternSvg({ kanji, cord = 40 }: { kanji?: string; cord?: number }) {
   return (
     <svg viewBox={`0 ${40 - cord} 40 ${cord + 60}`} preserveAspectRatio="xMidYMax meet">
       <ellipse cx="20" cy="68" rx="30" ry="34" className="halo" />
       <path d={`M20 ${40 - cord - 600} V40`} {...ink} />
-      <rect x="13" y="39" width="14" height="5" rx="1.5" fill={C.walnut} {...ink} />
-      <ellipse cx="20" cy="66" rx="16" ry="22" fill={C.clay} {...ink} />
-      <path d="M28 48 q10 18 0 36 q6 -18 0 -36z" fill={C.clayD} />
-      <path d="M10 52 q-4 14 0 28 M30 52 q4 14 0 28 M20 44 v44" {...line} />
-      <ellipse cx="13" cy="54" rx="2.4" ry="4.5" fill={HI} opacity=".55" />
+      <rect x="12" y="38" width="16" height="6" rx="1.5" fill={C.walnutD} {...ink} />
+      <path
+        d="M6 66 q0 -22 14 -22 q14 0 14 22 q0 22 -14 22 q-14 0 -14 -22z"
+        fill={C.clay}
+        {...ink}
+      />
+      <path d="M26 46 q10 20 0 40 q6 -20 0 -40z" fill={C.clayD} />
+      <path d="M9 56 q11 3 22 0 M7 66 q13 3 26 0 M9 76 q11 3 22 0" {...line} strokeOpacity=".4" />
+      <path d="M11 54 q1 -6 5 -8" stroke={HI} strokeOpacity=".6" strokeWidth="1.6" fill="none" />
       {kanji && (
-        <text x="20" y="71" textAnchor="middle" fontSize="12" fontWeight="700" fill={HI}>
+        <text
+          x="20"
+          y="71"
+          textAnchor="middle"
+          fontSize="13"
+          fontWeight="700"
+          fontFamily="serif"
+          fill={HI}>
           {kanji}
         </text>
       )}
-      <rect x="13" y="87" width="14" height="5" rx="1.5" fill={C.walnut} {...ink} />
-      <path d="M20 92 v6" stroke={C.gold} strokeWidth="2" strokeLinecap="round" />
+      <rect x="12" y="86" width="16" height="6" rx="1.5" fill={C.walnutD} {...ink} />
+      <path d="M20 92 v7" stroke={C.gold} strokeWidth="2.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -150,7 +172,7 @@ export function ShopWall({
         {cat && <div className="board-cat">{cat}</div>}
       </div>
       <div className="shelf">
-        <Ceramics />
+        <Tansu />
       </div>
       <Lanterns count={3} />
     </div>
@@ -163,67 +185,84 @@ export function ShopWall({
 
 const GUEST_SEEDS = [4821, 90133, 27719, 61207];
 
-/* ---------- the street outside the window ---------- */
+/* ---------- the lantern-lit street outside the window ---------- */
 
 function StreetScene() {
   return (
     <svg viewBox="0 0 120 160" preserveAspectRatio="xMidYMax slice" className="rw-scene">
       <rect width="120" height="160" className="rw-sky" />
-      <rect y="70" width="120" height="70" className="rw-sky2" />
+      <rect y="64" width="120" height="76" className="rw-sky2" />
       <g className="rw-clouds">
-        <Cloud x={30} y={30} s={0.9} />
-        <Cloud x={92} y={48} s={0.7} />
+        <Cloud x={32} y={26} s={0.9} />
+        <Cloud x={94} y={44} s={0.7} />
       </g>
       {/* far hills */}
       <path d="M-4 96 q22 -16 44 -4 q20 -14 44 -2 q16 -8 40 -2 V140 H-4z" fill="#cfd5c7" {...ink} />
       {/* shop fronts */}
-      <g>
-        <rect x="-4" y="84" width="46" height="52" fill="#ead2c3" {...ink} />
-        <rect x="42" y="74" width="40" height="62" fill={C.cream} {...ink} />
-        <rect x="82" y="88" width="46" height="48" fill="#d6dccc" {...ink} />
-        {/* windows */}
-        <rect x="4" y="94" width="10" height="12" rx="1" className="rw-win" {...ink} />
-        <rect x="24" y="94" width="10" height="12" rx="1" className="rw-win" {...ink} />
-        <rect x="48" y="82" width="28" height="16" rx="1.5" className="rw-win" {...ink} />
-        <path d="M48 90 h28 M62 82 v16" {...line} strokeOpacity=".45" />
-        <rect x="90" y="96" width="10" height="12" rx="1" className="rw-win" {...ink} />
-        <rect x="108" y="96" width="10" height="12" rx="1" className="rw-win" {...ink} />
-        {/* awnings */}
-        <path
-          d="M-4 110 h46 v5 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0z"
-          fill={C.clay}
-          {...ink}
-        />
-        <path d="M-4 110 h46 l0 -4 h-46z" fill={C.clayD} {...ink} />
-        <rect x="44" y="104" width="36" height="6" rx="1" fill={C.walnut} {...ink} />
-        <path
-          d="M82 112 h46 v5 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0z"
-          fill={C.matcha}
-          {...ink}
-        />
-        {/* doors / lower windows */}
-        <rect x="8" y="118" width="9" height="18" fill={C.walnut} {...ink} />
-        <rect x="24" y="118" width="12" height="12" className="rw-win" {...ink} />
-        <rect x="50" y="114" width="24" height="22" rx="1" className="rw-win" {...ink} />
-        <path d="M62 114 v22" {...line} strokeOpacity=".45" />
-        <rect x="92" y="120" width="22" height="16" className="rw-win" {...ink} />
-      </g>
+      <rect x="-4" y="82" width="46" height="54" fill="#ead2c3" {...ink} />
+      <rect x="42" y="70" width="40" height="66" fill={C.cream} {...ink} />
+      <rect x="82" y="86" width="46" height="50" fill="#d6dccc" {...ink} />
+      {/* tiled eaves */}
+      <path d="M-6 82 h50 l-3 -7 h-44z" fill={C.walnut} {...ink} />
+      <path d="M40 70 h44 l-3 -7 h-38z" fill={C.indigo} {...ink} />
+      <path d="M80 86 h50 l-3 -7 h-44z" fill={C.walnut} {...ink} />
+      {/* windows */}
+      <rect x="4" y="92" width="10" height="12" rx="1" className="rw-win" {...ink} />
+      <rect x="24" y="92" width="10" height="12" rx="1" className="rw-win" {...ink} />
+      <rect x="48" y="78" width="28" height="16" rx="1.5" className="rw-win" {...ink} />
+      <path d="M48 86 h28 M62 78 v16" {...line} strokeOpacity=".45" />
+      <rect x="90" y="94" width="10" height="12" rx="1" className="rw-win" {...ink} />
+      <rect x="108" y="94" width="10" height="12" rx="1" className="rw-win" {...ink} />
+      {/* awnings + noren */}
+      <path
+        d="M-4 110 h46 v5 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0z"
+        fill={C.clay}
+        {...ink}
+      />
+      <path d="M-4 106 h46 v4 h-46z" fill={C.clayD} {...ink} />
+      <rect x="44" y="102" width="36" height="5" rx="1" fill={C.walnut} {...ink} />
+      <path
+        d="M48 107 h12 v14 q-6 3 -12 0z M64 107 h12 v14 q-6 3 -12 0z"
+        fill={C.indigo}
+        {...ink}
+      />
+      <path
+        d="M82 112 h46 v5 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0 q-2.9 4 -5.75 0z"
+        fill={C.matcha}
+        {...ink}
+      />
+      {/* doors / lower windows */}
+      <rect x="8" y="118" width="9" height="18" fill={C.walnut} {...ink} />
+      <rect x="24" y="118" width="12" height="12" className="rw-win" {...ink} />
+      <rect x="50" y="122" width="24" height="14" rx="1" className="rw-win" {...ink} />
+      <path d="M62 122 v14" {...line} strokeOpacity=".45" />
+      <rect x="92" y="120" width="22" height="16" className="rw-win" {...ink} />
+      {/* small street lanterns under the eaves */}
+      {[
+        [2, 86],
+        [38, 86],
+        [46, 74],
+        [78, 74],
+        [86, 90],
+        [124, 90],
+      ].map(([x, y], i) => (
+        <g key={i} transform={`translate(${x} ${y})`}>
+          <circle r="8" className="halo" />
+          <path d="M0 0 v3" {...ink} />
+          <ellipse cy="8" rx="3.2" ry="4.6" fill={C.clay} {...ink} />
+          <path d="M1.4 4.5 q2 3.5 0 7 q1 -3.5 0 -7z" fill={C.clayD} />
+        </g>
+      ))}
       {/* street */}
       <rect x="-4" y="136" width="128" height="30" fill="#bfb3a3" {...ink} />
       <rect x="-4" y="136" width="128" height="4" fill={C.linen} {...ink} />
       <path d="M8 150 h10 M26 150 h10 M44 150 h10 M62 150 h10 M80 150 h10 M98 150 h10" {...line} />
       {/* lamp post */}
-      <path d="M22 136 V96" {...ink} strokeWidth="2.2" />
-      <path d="M22 96 q0 -6 6 -6" {...ink} fill="none" />
-      <circle cx="29" cy="90" r="3.2" className="rw-win" {...ink} />
+      <path d="M22 136 V92" {...ink} strokeWidth="2.2" />
+      <path d="M22 92 q0 -6 6 -6" {...ink} fill="none" />
+      <circle cx="29" cy="86" r="3.2" className="rw-win" {...ink} />
       {/* tree */}
-      <path
-        d="M100 136 q2 -14 0 -26"
-        {...ink}
-        strokeWidth="3"
-        stroke={C.walnut}
-        strokeOpacity="1"
-      />
+      <path d="M100 136 q2 -14 0 -26" stroke={C.walnut} strokeWidth="3" strokeLinecap="round" />
       <path d="M100 136 q2 -14 0 -26" {...ink} fill="none" />
       <path
         d="M82 112 c-6 -8 2 -16 10 -14 c0 -10 16 -12 20 -2 c10 -4 16 8 8 14 c6 8 -6 14 -12 8 c-6 8 -18 6 -18 -2 c-8 2 -14 -2 -8 -4z"
@@ -489,83 +528,6 @@ export function SmallArt({ kind }: { kind: string }) {
       </svg>
     );
   return null;
-}
-
-/* ---------- lamps ---------- */
-
-export function Lamps({ kind }: { kind: string }) {
-  if (kind === 'lamps_paper')
-    return (
-      <div className="rest-lamps paper">
-        {[0, 1].map((i) => (
-          <svg key={i} viewBox="0 0 60 100" preserveAspectRatio="xMidYMax meet" className="pend">
-            <circle cx="30" cy="60" r="34" className="halo" />
-            <path d="M30 -600 V36" {...ink} />
-            <circle cx="30" cy="58" r="22" fill={C.cream} {...ink} />
-            <path d="M44 42 q12 18 -4 34 q6 -18 4 -34z" fill={C.creamD} />
-            <path d="M14 58 q16 -4 32 0 M16 50 q14 -3 28 0 M16 66 q14 3 28 0" {...line} />
-            <ellipse cx="22" cy="48" rx="3" ry="5" fill={HI} opacity=".7" />
-            <rect x="26" y="78" width="8" height="4" rx="1.5" fill={C.walnut} {...ink} />
-          </svg>
-        ))}
-      </div>
-    );
-  if (kind === 'lamps_edison')
-    return (
-      <div className="rest-lamps edison">
-        {[0, 1].map((i) => (
-          <svg
-            key={i}
-            viewBox="0 0 40 100"
-            preserveAspectRatio="xMidYMax meet"
-            className="pend"
-            style={{ height: i ? '88%' : '100%' }}>
-            <circle cx="20" cy="70" r="26" className="halo" />
-            <path d="M20 -600 V44" {...ink} />
-            <rect x="14" y="44" width="12" height="10" rx="2" fill={C.walnut} {...ink} />
-            <path d="M12 56 q-6 16 2 26 q6 6 12 0 q8 -10 2 -26z" fill="#f4d79a" {...ink} />
-            <path d="M24 56 q6 16 2 26 q-2 2 -4 3 q6 -6 4 -14 q-2 -8 -2 -15z" fill="#e2b96a" />
-            <path d="M17 60 v12 q3 5 6 0 v-12" fill="none" stroke={C.goldD} strokeWidth="1.2" />
-            <ellipse cx="15" cy="64" rx="1.5" ry="3" fill={HI} opacity=".7" />
-          </svg>
-        ))}
-      </div>
-    );
-  if (kind === 'lamps_festival')
-    return (
-      <div className="rest-lamps festival">
-        <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="garland">
-          <path d="M0 4 Q150 40 300 4" {...ink} fill="none" />
-        </svg>
-        <svg viewBox="0 0 300 60" preserveAspectRatio="xMidYMid meet" className="garland-lamps">
-          {[C.clay, C.gold, C.matcha, C.blush, C.indigo, C.persimmon, C.clay].map((c, i) => {
-            const x = 24 + i * 42;
-            const t = x / 300;
-            const y = 4 + 36 * 4 * t * (1 - t) * 0.5;
-            return (
-              <g key={i} transform={`translate(${x} ${y})`}>
-                <circle cx="0" cy="18" r="16" className="halo" fill={c} />
-                <path d="M0 0 v5" {...ink} />
-                <rect x="-4" y="5" width="8" height="3" rx="1" fill={C.walnut} {...ink} />
-                <ellipse cx="0" cy="18" rx="8" ry="10" fill={c} {...ink} />
-                <path d="M4 10 q5 8 0 16 q2 -8 0 -16z" fill={INK} opacity=".18" />
-                <ellipse cx="-3" cy="13" rx="1.4" ry="2.4" fill={HI} opacity=".6" />
-                <rect x="-4" y="27" width="8" height="3" rx="1" fill={C.walnut} {...ink} />
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-    );
-  return (
-    <div className="rest-lamps red">
-      {[0, 1].map((i) => (
-        <div key={i} className="rlamp" style={{ animationDelay: `${i * 0.8}s` }}>
-          <RedLanternSvg kanji={['麺', '福'][i]} cord={40} />
-        </div>
-      ))}
-    </div>
-  );
 }
 
 /* ---------- plants ---------- */
@@ -880,141 +842,461 @@ export function Special({ kind }: { kind: string }) {
   return null;
 }
 
-/* ---------- fixed furniture: shelf, pass, menu, window ---------- */
+/* ---------- lamps (decor) ---------- */
 
-function Ceramics() {
+export function Lamps({ kind }: { kind: string }) {
+  if (kind === 'lamps_paper')
+    return (
+      <div className="rest-lamps paper">
+        {[0, 1, 2].map((i) => (
+          <svg
+            key={i}
+            viewBox="0 0 60 100"
+            preserveAspectRatio="xMidYMax meet"
+            className="pend"
+            style={{ height: i === 1 ? '86%' : '100%' }}>
+            <circle cx="30" cy="60" r="34" className="halo" />
+            <path d="M30 -600 V36" {...ink} />
+            <rect x="24" y="34" width="12" height="5" rx="1.5" fill={C.walnutD} {...ink} />
+            <circle cx="30" cy="60" r="22" fill={C.cream} {...ink} />
+            <path d="M44 44 q12 18 -4 34 q6 -18 4 -34z" fill={C.creamD} />
+            <path d="M14 60 q16 -4 32 0 M16 52 q14 -3 28 0 M16 68 q14 3 28 0" {...line} />
+            <path
+              d="M18 52 q2 -6 8 -8"
+              stroke={HI}
+              strokeOpacity=".7"
+              strokeWidth="1.8"
+              fill="none"
+            />
+            <rect x="25" y="80" width="10" height="4" rx="1.5" fill={C.walnutD} {...ink} />
+          </svg>
+        ))}
+      </div>
+    );
+  if (kind === 'lamps_edison')
+    return (
+      <div className="rest-lamps edison">
+        {[0, 1, 2, 3].map((i) => (
+          <svg
+            key={i}
+            viewBox="0 0 40 100"
+            preserveAspectRatio="xMidYMax meet"
+            className="pend"
+            style={{ height: i % 2 ? '84%' : '100%' }}>
+            <circle cx="20" cy="70" r="26" className="halo" />
+            <path d="M20 -600 V44" {...ink} />
+            <rect x="14" y="44" width="12" height="10" rx="2" fill={C.walnutD} {...ink} />
+            <path d="M12 56 q-6 16 2 26 q6 6 12 0 q8 -10 2 -26z" fill="#f4d79a" {...ink} />
+            <path d="M24 56 q6 16 2 26 q-2 2 -4 3 q6 -6 4 -14 q-2 -8 -2 -15z" fill="#e2b96a" />
+            <path d="M17 60 v12 q3 5 6 0 v-12" fill="none" stroke={C.goldD} strokeWidth="1.2" />
+            <ellipse cx="15" cy="64" rx="1.5" ry="3" fill={HI} opacity=".7" />
+          </svg>
+        ))}
+      </div>
+    );
+  if (kind === 'lamps_festival')
+    return (
+      <div className="rest-lamps festival">
+        <svg viewBox="0 0 300 60" preserveAspectRatio="none" className="garland">
+          <path d="M0 4 Q150 40 300 4" {...ink} fill="none" />
+        </svg>
+        <svg viewBox="0 0 300 60" preserveAspectRatio="xMidYMid meet" className="garland-lamps">
+          {[C.clay, C.gold, C.matcha, C.blush, C.indigo, C.persimmon, C.clay].map((c, i) => {
+            const x = 24 + i * 42;
+            const t = x / 300;
+            const y = 4 + 36 * 4 * t * (1 - t) * 0.5;
+            return (
+              <g key={i} transform={`translate(${x} ${y})`}>
+                <circle cx="0" cy="18" r="16" className="halo" fill={c} />
+                <path d="M0 0 v5" {...ink} />
+                <rect x="-4" y="5" width="8" height="3" rx="1" fill={C.walnutD} {...ink} />
+                <ellipse cx="0" cy="18" rx="8" ry="10" fill={c} {...ink} />
+                <path d="M4 10 q5 8 0 16 q2 -8 0 -16z" fill={INK} opacity=".18" />
+                <ellipse cx="-3" cy="13" rx="1.4" ry="2.4" fill={HI} opacity=".6" />
+                <rect x="-4" y="27" width="8" height="3" rx="1" fill={C.walnutD} {...ink} />
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    );
   return (
-    <svg viewBox="0 0 300 100" preserveAspectRatio="xMidYMax meet" className="shelf-svg">
-      {/* board */}
-      <rect x="0" y="82" width="300" height="9" rx="2" fill={C.oakL} {...ink} />
-      <rect x="0" y="86" width="300" height="5" fill={C.oakD} />
-      <path d="M0 92 v12 M300 92 v12" {...ink} />
-      <path d="M30 92 l-10 10 M270 92 l10 10" {...ink} />
-      {/* tall vase */}
+    <div className="rest-lamps red">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="rlamp" style={{ animationDelay: `${i * 0.7}s` }}>
+          <RedLanternSvg kanji={['麺', '福', '味', '湯'][i]} cord={i % 2 ? 26 : 40} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ---------- fixed furniture ---------- */
+
+/** Walnut tansu under the window: drawers with iron pulls, sake and ceramics on top. */
+function Tansu() {
+  return (
+    <svg viewBox="0 0 300 150" preserveAspectRatio="xMidYMax meet" className="tansu-svg">
+      {/* chest */}
+      <ellipse cx="150" cy="148" rx="150" ry="3" fill={INK} opacity=".16" />
+      <rect x="6" y="66" width="288" height="80" rx="2" fill={C.walnut} {...ink} />
+      <path d="M238 66 h56 v80 h-56z" fill={C.walnutD} />
+      <rect x="2" y="62" width="296" height="8" rx="2" fill={C.oakD} {...ink} />
+      <path d="M2 62 h296 v3 H2z" fill={C.oakL} />
+      {/* drawers */}
+      {[
+        [14, 78, 130, 28],
+        [152, 78, 134, 28],
+        [14, 112, 84, 28],
+        [104, 112, 182, 28],
+      ].map(([x, y, w, h], i) => (
+        <g key={i}>
+          <rect
+            x={x}
+            y={y}
+            width={w}
+            height={h}
+            rx="1.5"
+            fill={C.walnut}
+            {...ink}
+            strokeOpacity=".6"
+          />
+          <rect x={x + 2} y={y + 2} width={w - 4} height="3" fill={HI} opacity=".12" />
+          <path
+            d={`M${x + w / 2 - 9} ${y + h / 2} h18`}
+            stroke={INK}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <circle cx={x + w / 2} cy={y + h / 2 - 3} r="2.6" fill={INK} />
+        </g>
+      ))}
+      <path d="M12 146 v4 M288 146 v4" {...ink} strokeWidth="2" />
+      {/* sake bottles */}
+      <path d="M30 62 v-30 q0 -4 4 -4 h4 v-10 h10 v10 h4 q4 0 4 4 v30z" fill={C.indigo} {...ink} />
+      <path d="M46 62 v-30 q0 -4 -2 -4 h4 q4 0 4 4 v30z" fill={C.indigoD} />
+      <rect x="33" y="40" width="16" height="12" fill={C.cream} {...ink} strokeOpacity=".5" />
+      <path d="M36 44 h10 M36 48 h7" stroke={C.clay} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M62 62 v-34 q0 -4 4 -4 h3 v-8 h8 v8 h3 q4 0 4 4 v34z" fill={C.cream} {...ink} />
+      <path d="M76 62 v-34 q0 -4 -2 -4 h4 q4 0 4 4 v34z" fill={C.creamD} />
+      <rect x="65" y="38" width="14" height="14" fill={C.clay} {...ink} strokeOpacity=".5" />
+      <text
+        x="72"
+        y="49"
+        textAnchor="middle"
+        fontSize="9"
+        fontFamily="serif"
+        fontWeight="700"
+        fill={HI}>
+        酒
+      </text>
+      {/* tokkuri + cups */}
       <path
-        d="M34 82 q-14 -10 -10 -36 q2 -14 12 -20 h6 q10 6 12 20 q4 26 -10 36z"
-        fill={C.matcha}
+        d="M98 62 q-8 -10 -4 -22 q2 -6 8 -8 h4 q6 2 8 8 q4 12 -4 22z"
+        fill={C.celadon}
         {...ink}
       />
+      <path d="M108 62 q6 -10 2 -22 q-2 -6 -6 -8 h2 q6 2 8 8 q4 12 -4 22z" fill={C.celadonD} />
+      <rect x="100" y="28" width="8" height="5" rx="1.5" fill={C.celadonD} {...ink} />
       <path
-        d="M44 82 q10 -10 8 -36 q-2 -14 -10 -20 h-2 q10 6 12 20 q4 26 -10 36z"
-        fill={C.matchaD}
+        d="M118 62 v-9 q0 -3 3 -3 h8 q3 0 3 3 v9z M134 62 v-9 q0 -3 3 -3 h8 q3 0 3 3 v9z"
+        fill={C.celadon}
+        {...ink}
       />
-      <rect x="34" y="21" width="12" height="5" rx="1.5" fill={C.matchaL} {...ink} />
-      <ellipse cx="33" cy="44" rx="2.5" ry="6" fill={HI} opacity=".6" />
       {/* stacked bowls */}
       {[0, 1, 2].map((i) => (
-        <g key={i} transform={`translate(0 ${-i * 11})`}>
+        <g key={i} transform={`translate(0 ${-i * 9})`}>
           <path
-            d="M96 82 q-2 -16 22 -16 q24 0 22 16z"
+            d="M168 62 q-2 -14 20 -14 q22 0 20 14z"
             fill={i === 1 ? C.cream : C.linen}
             {...ink}
           />
-          <path d="M118 82 q22 -2 22 -16 q-6 10 -22 16z" fill={C.creamD} />
-          <path d="M100 70 q18 -3 36 0" stroke={C.indigo} strokeWidth="2.2" fill="none" />
+          <path d="M188 62 q20 -2 20 -14 q-6 10 -20 14z" fill={C.creamD} />
+          <path d="M172 52 q16 -3 32 0" stroke={C.indigo} strokeWidth="2" fill="none" />
         </g>
       ))}
       {/* teapot */}
-      <ellipse cx="186" cy="68" rx="22" ry="15" fill={C.clay} {...ink} />
-      <path d="M196 54 q14 14 0 28 q6 -14 0 -28z" fill={C.clayD} />
+      <ellipse cx="248" cy="48" rx="22" ry="14" fill={C.clay} {...ink} />
+      <path d="M258 36 q14 12 0 26 q6 -12 0 -26z" fill={C.clayD} />
       <path
-        d="M206 62 q12 -2 10 -14"
-        {...ink}
+        d="M268 44 q12 -2 10 -14"
         stroke={C.clay}
-        strokeOpacity="1"
         strokeWidth="5"
         fill="none"
+        strokeLinecap="round"
       />
-      <path d="M206 62 q12 -2 10 -14" {...ink} fill="none" />
-      <path d="M176 50 q10 -14 20 0" {...ink} fill="none" strokeWidth="1.6" />
-      <rect x="178" y="50" width="16" height="5" rx="2" fill={C.clayD} {...ink} />
-      <circle cx="186" cy="49" r="3" fill={C.gold} {...ink} />
-      <ellipse cx="176" cy="62" rx="3" ry="4.5" fill={HI} opacity=".55" />
-      {/* bottle */}
-      <path d="M246 82 v-30 q0 -6 6 -6 h8 q6 0 6 6 v30z" fill={C.indigo} {...ink} />
-      <path d="M258 82 v-30 q0 -6 -2 -6 h4 q6 0 6 6 v30z" fill={C.indigoD} />
-      <rect x="250" y="38" width="12" height="9" rx="2" fill="#56689a" {...ink} />
-      <rect x="249" y="60" width="12" height="12" fill={C.cream} {...ink} />
+      <path d="M268 44 q12 -2 10 -14" {...ink} fill="none" />
+      <path d="M238 32 q10 -14 20 0" {...ink} fill="none" strokeWidth="1.6" />
+      <rect x="240" y="32" width="16" height="4" rx="2" fill={C.clayD} {...ink} />
+      <circle cx="248" cy="31" r="2.6" fill={C.gold} {...ink} />
+      <path d="M232 44 q1 -6 5 -8" stroke={HI} strokeOpacity=".6" strokeWidth="2" fill="none" />
     </svg>
   );
 }
 
-function PassWindow() {
+/** Small kamidana shrine shelf with a maneki-neko and two offering cups. */
+function Kamidana() {
+  return (
+    <svg viewBox="0 0 100 92" preserveAspectRatio="xMidYMax meet" className="shrine-svg">
+      {/* roof */}
+      <path d="M2 24 L50 4 L98 24 L92 28 L50 12 L8 28z" fill={C.walnutD} {...ink} />
+      <path d="M12 28 h76 v4 h-76z" fill={C.walnut} {...ink} />
+      {/* shimenawa rope */}
+      <path
+        d="M12 36 q38 10 76 0"
+        {...ink}
+        stroke={C.oak}
+        strokeOpacity="1"
+        strokeWidth="3"
+        fill="none"
+      />
+      <path d="M12 36 q38 10 76 0" {...ink} fill="none" />
+      {[30, 50, 70].map((x) => (
+        <path
+          key={x}
+          d={`M${x} ${39 + (x === 50 ? 1.5 : 0.5)} l-3 8 h6z`}
+          fill={C.cream}
+          {...ink}
+        />
+      ))}
+      {/* shelf */}
+      <rect x="6" y="80" width="88" height="6" rx="1.5" fill={C.oakL} {...ink} />
+      <path d="M6 83 h88 v3 H6z" fill={C.oakD} />
+      <path d="M18 86 l-6 6 M82 86 l6 6" {...ink} />
+      {/* cups */}
+      <path d="M16 80 v-8 q0 -3 3 -3 h7 q3 0 3 3 v8z" fill={C.cream} {...ink} />
+      <path d="M71 80 v-8 q0 -3 3 -3 h7 q3 0 3 3 v8z" fill={C.cream} {...ink} />
+      {/* maneki-neko */}
+      <path d="M34 80 q-4 -22 16 -24 q20 2 16 24z" fill={C.cream} {...ink} />
+      <path d="M56 58 q12 4 10 22 h-6 q2 -16 -6 -22z" fill={C.creamD} />
+      <g className="maneki-paw">
+        <path d="M62 66 q4 -14 2 -22 q-6 2 -7 10 q-2 8 0 12z" fill={C.cream} {...ink} />
+        <circle cx="64" cy="43" r="4.5" fill={C.cream} {...ink} />
+      </g>
+      <circle cx="48" cy="50" r="12" fill={C.cream} {...ink} />
+      <path d="M38 44 l1 -10 l8 6z M58 44 l-1 -9 l-8 5z" fill={C.cream} {...ink} />
+      <path d="M40 43 l1 -6 l5 4z M56 43 l-1 -5 l-5 3z" fill={C.blush} />
+      <path d="M42 49 q2 -2 4 0 M50 49 q2 -2 4 0" {...ink} strokeWidth="1.6" fill="none" />
+      <circle cx="48" cy="52" r="1.2" fill={C.clay} />
+      <path d="M45 55 q3 2 6 0" {...ink} fill="none" />
+      <path d="M38 61 q10 -5 20 0 l-1 3 q-9 -4 -18 0z" fill={C.clay} {...ink} />
+      <circle cx="48" cy="63" r="2.4" fill={C.gold} {...ink} />
+      <path d="M42 70 h12" stroke={C.gold} strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Round walnut wall clock, 7:10 — the quiet dinner hour. */
+function WallClock() {
+  return (
+    <svg viewBox="0 0 60 60" className="clock-svg">
+      <ellipse cx="33" cy="33" rx="26" ry="26" fill={INK} opacity=".14" />
+      <circle cx="30" cy="30" r="27" fill={C.walnut} {...ink} />
+      <path d="M30 3 a27 27 0 0 1 0 54 a22 22 0 0 0 0 -54z" fill={C.walnutD} />
+      <circle cx="30" cy="30" r="21" fill={C.cream} {...ink} />
+      {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
+        const a = (i / 12) * Math.PI * 2;
+        const r0 = i % 3 ? 18.5 : 16.5;
+        return (
+          <path
+            key={i}
+            d={`M${30 + Math.sin(a) * r0} ${30 - Math.cos(a) * r0} L${30 + Math.sin(a) * 20} ${30 - Math.cos(a) * 20}`}
+            stroke={INK}
+            strokeWidth={i % 3 ? 1 : 1.8}
+            strokeOpacity=".8"
+          />
+        );
+      })}
+      <path d="M30 30 L21 37" stroke={INK} strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M30 30 L40 20" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M30 30 L30 13" stroke={C.clay} strokeWidth="1" strokeLinecap="round" />
+      <circle cx="30" cy="30" r="1.8" fill={C.clay} {...ink} />
+      <path d="M14 20 q4 -8 12 -10" stroke={HI} strokeOpacity=".7" strokeWidth="1.6" fill="none" />
+    </svg>
+  );
+}
+
+/** Hanging paper menu strips (tanzaku) on a rail: the day's noodles + kanji marks. */
+function Tanzaku({ menu }: { menu: string }) {
+  const words = menu
+    .split('•')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+  const strips: { text: string[]; kanji?: string; red?: boolean }[] = [
+    { text: [], kanji: '麺' },
+    ...words.map((w) => ({ text: w.toUpperCase().split('').slice(0, 6) })),
+    { text: [], kanji: '湯', red: true },
+    { text: [], kanji: '味' },
+  ];
+  const n = strips.length;
+  return (
+    <svg viewBox={`0 0 ${n * 22 + 6} 60`} preserveAspectRatio="xMidYMin meet" className="tz-svg">
+      <rect x="0" y="0" width={n * 22 + 6} height="4" rx="1.5" fill={C.walnutD} {...ink} />
+      {strips.map((s, i) => {
+        const x = 4 + i * 22;
+        const h = 36 + (i % 2) * 8 + (s.kanji ? 0 : 6);
+        return (
+          <g key={i}>
+            <path d={`M${x + 9} 4 v3`} {...ink} />
+            <rect x={x} y="7" width="18" height={h} fill={s.red ? C.clay : C.cream} {...ink} />
+            <rect x={x} y="7" width="18" height="4" fill={s.red ? C.clayD : C.clay} />
+            {s.kanji ? (
+              <text
+                x={x + 9}
+                y={7 + h / 2 + 5}
+                textAnchor="middle"
+                fontSize="12"
+                fontFamily="serif"
+                fontWeight="700"
+                fill={s.red ? HI : INK}>
+                {s.kanji}
+              </text>
+            ) : (
+              <text
+                x={x + 9}
+                y="20"
+                textAnchor="middle"
+                fontSize="6.2"
+                fontWeight="800"
+                fill={INK}
+                className="tz-word">
+                {s.text.map((ch, k) => (
+                  <tspan key={k} x={x + 9} dy={k ? 6.6 : 0}>
+                    {ch}
+                  </tspan>
+                ))}
+              </text>
+            )}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+/** Kitchen pass: framed opening with a noren, tiles, the copper stock pot steaming, a ledge. */
+function PassWindow({ menu }: { menu: string }) {
   return (
     <div className="rest-pass">
+      <div className="rp-strips">
+        <Tanzaku menu={menu} />
+      </div>
       <div className="rp-open">
-        <svg viewBox="0 0 140 100" preserveAspectRatio="xMidYMax meet" className="rp-pot">
-          <g className="rp-steam">
-            <Cloud x={56} y={30} s={0.75} />
-            <Cloud x={88} y={20} s={0.6} />
-          </g>
-          <rect x="30" y="50" width="80" height="44" rx="6" fill={C.steel} {...ink} />
-          <path d="M92 50 h18 v44 h-18z" fill={C.steelD} />
-          <rect x="30" y="50" width="80" height="44" rx="6" fill="none" {...ink} />
+        <svg viewBox="0 0 160 120" preserveAspectRatio="xMidYMax slice" className="rp-kitchen">
+          {/* back shelf with bowls */}
+          <rect x="0" y="40" width="160" height="5" fill={C.oakL} {...ink} />
+          {[18, 48, 78].map((x) => (
+            <g key={x}>
+              <path d={`M${x} 40 q-1 -9 12 -9 q13 0 12 9z`} fill={C.cream} {...ink} />
+              <path d={`M${x + 2} 34 q10 -2 20 0`} stroke={C.clay} strokeWidth="1.6" fill="none" />
+            </g>
+          ))}
+          <path d="M112 40 v-16 q0 -3 3 -3 h10 q3 0 3 3 v16z" fill={C.indigo} {...ink} />
+          <path d="M134 40 v-12 q0 -3 3 -3 h10 q3 0 3 3 v12z" fill={C.celadon} {...ink} />
+          {/* ladle on a hook */}
           <path
-            d="M22 60 h8 M110 60 h8"
-            {...ink}
-            strokeWidth="5"
-            stroke={C.steelD}
-            strokeOpacity="1"
-          />
-          <path d="M22 60 h8 M110 60 h8" {...ink} fill="none" />
-          <ellipse cx="70" cy="50" rx="40" ry="6" fill="#e3e6ea" {...ink} />
-          <rect x="64" y="40" width="12" height="5" rx="2" fill={C.walnut} {...ink} />
-          <path d="M40 60 v24" stroke={HI} strokeWidth="3" opacity=".6" strokeLinecap="round" />
-          <path
-            d="M12 24 v38 q0 8 8 8 q8 0 8 -8"
-            {...ink}
-            stroke={C.walnut}
-            strokeOpacity="1"
+            d="M22 54 v22 q0 7 7 7 q7 0 7 -7"
+            stroke={C.copper}
             strokeWidth="3"
             fill="none"
+            strokeLinecap="round"
           />
-          <path d="M12 24 v38 q0 8 8 8 q8 0 8 -8" {...ink} fill="none" />
+          <path d="M22 54 v22 q0 7 7 7 q7 0 7 -7" {...ink} fill="none" />
+          {/* pot */}
+          <g className="rp-steam">
+            <Cloud x={84} y={52} s={0.8} />
+            <Cloud x={112} y={44} s={0.62} />
+          </g>
+          <path d="M50 70 h88 v36 q0 6 -44 6 t-44 -6z" fill={C.copper} {...ink} />
+          <path d="M110 72 v38 q28 -2 28 -6 V70z" fill={C.copperD} />
+          <path d="M50 70 h88 v36 q0 6 -44 6 t-44 -6z" fill="none" {...ink} />
+          <path d="M42 80 h8 M138 80 h8" stroke={INK} strokeWidth="5" strokeLinecap="round" />
+          <path
+            d="M42 80 h8 M138 80 h8"
+            stroke={C.copperD}
+            strokeWidth="2.4"
+            strokeLinecap="round"
+          />
+          <ellipse cx="94" cy="70" rx="46" ry="7" fill="#ece6d6" {...ink} />
+          <ellipse cx="94" cy="70" rx="46" ry="7" fill="none" stroke={C.copper} strokeWidth="2.6" />
+          <path
+            d="M58 82 v18"
+            stroke={HI}
+            strokeOpacity=".6"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+          <path
+            d="M60 68 q20 -4 40 -2"
+            stroke={HI}
+            strokeOpacity=".7"
+            strokeWidth="1.8"
+            fill="none"
+          />
+        </svg>
+        <div className="rp-light" />
+      </div>
+      <svg viewBox="0 0 160 70" preserveAspectRatio="none" className="rp-noren">
+        <rect x="0" y="0" width="160" height="6" rx="2" fill={C.walnutD} {...ink} />
+        <path d="M4 6 h74 v52 q-18 7 -37 2 t-37 -2z" fill={C.indigo} {...ink} />
+        <path d="M82 6 h74 v52 q-18 7 -37 2 t-37 -2z" fill={C.indigo} {...ink} />
+        <path d="M4 6 h16 v56 q-8 2 -16 0z M82 6 h16 v56 q-8 2 -16 0z" fill={C.indigoD} />
+        <circle cx="41" cy="34" r="12" fill="none" stroke={C.cream} strokeWidth="2.6" />
+        <circle cx="119" cy="34" r="12" fill="none" stroke={C.cream} strokeWidth="2.6" />
+        <text
+          x="41"
+          y="39"
+          textAnchor="middle"
+          fontSize="13"
+          fontFamily="serif"
+          fontWeight="700"
+          fill={C.cream}>
+          麺
+        </text>
+        <circle cx="119" cy="34" r="4.5" fill={C.clay} />
+      </svg>
+      <div className="rp-frame" />
+      <div className="rp-ledge">
+        <svg viewBox="0 0 24 24" className="rp-bell">
+          <path d="M4 16 q0 -10 8 -10 q8 0 8 10z" fill={C.gold} {...ink} />
+          <path d="M14 7 q6 2 6 9 h-3 q0 -6 -3 -9z" fill={C.goldD} />
+          <rect x="2" y="16" width="20" height="3" rx="1.5" fill={C.walnutD} {...ink} />
+          <circle cx="12" cy="5" r="2" fill={C.gold} {...ink} />
         </svg>
       </div>
-      <svg viewBox="0 0 100 24" preserveAspectRatio="none" className="rp-rail">
-        <rect x="0" y="0" width="100" height="2.5" fill={C.oakD} />
-        {[6, 38, 70].map((x, i) => (
-          <path
-            key={x}
-            d={`M${x} 2 h24 v${[20, 15, 18][i]} q-6 3 -12 0 q-6 3 -12 0z`}
-            fill={C.cream}
-            {...ink}
-            vectorEffect="non-scaling-stroke"
-          />
-        ))}
-        {[6, 38, 70].map((x) => (
-          <rect key={x} x={x} y="2" width="24" height="3" fill={C.clay} />
-        ))}
-      </svg>
-      <div className="rp-ledge" />
     </div>
   );
 }
 
-function MenuBoard({ menu }: { menu: string }) {
+/** Three wooden stools at the pass counter. */
+function Stools() {
   return (
-    <div className="rest-menu">
-      <div className="rm-title">Menü</div>
-      <svg viewBox="0 0 100 6" preserveAspectRatio="none" className="rm-line">
-        <path
-          d="M2 3 q25 -3 50 0 t46 0"
-          stroke={C.cream}
-          strokeWidth="1.2"
-          fill="none"
-          strokeLinecap="round"
-        />
-      </svg>
-      <small>{menu}</small>
-      <svg viewBox="0 0 60 34" className="rm-doodle">
-        <g fill="none" stroke={C.cream} strokeWidth="2" strokeLinecap="round">
-          <path d="M8 16 h44 q-2 14 -22 14 q-20 0 -22 -14z" />
-          <path d="M18 16 l24 -12 M24 16 l24 -10" />
-          <path d="M24 10 q-3 -4 0 -8 M32 8 q-3 -4 0 -8" opacity=".7" />
+    <svg viewBox="0 0 200 70" preserveAspectRatio="xMidYMax meet" className="rest-stools">
+      {[30, 100, 170].map((x) => (
+        <g key={x}>
+          <ellipse cx={x} cy="67" rx="24" ry="3" fill={INK} opacity=".14" />
+          <path
+            d={`M${x - 15} 22 l-4 44 M${x + 15} 22 l4 44`}
+            stroke={C.walnutD}
+            strokeWidth="4"
+            strokeLinecap="round"
+          />
+          <path d={`M${x - 15} 22 l-4 44 M${x + 15} 22 l4 44`} {...ink} fill="none" />
+          <path d={`M${x - 16} 46 h32`} stroke={C.walnutD} strokeWidth="3" />
+          <path d={`M${x - 16} 46 h32`} {...ink} />
+          <rect x={x - 22} y="12" width="44" height="12" rx="5" fill={C.clay} {...ink} />
+          <path d={`M${x + 8} 12 h10 q4 0 4 6 q0 6 -4 6 h-10z`} fill={C.clayD} />
+          <path
+            d={`M${x - 16} 16 h14`}
+            stroke={HI}
+            strokeOpacity=".5"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
         </g>
-      </svg>
-    </div>
+      ))}
+    </svg>
   );
 }
 
@@ -1132,12 +1414,14 @@ export function Floor({ kind }: { kind: string }) {
   );
 }
 
-/* flat light cones under the two lamps + the pass (no blur) */
+/* flat light wedges under the lantern row (no blur) */
 function LightCones() {
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="rest-light">
-      <polygon points="29,18 8,100 50,100" fill="#ffd9a0" />
-      <polygon points="71,18 50,100 92,100" fill="#ffd9a0" />
+      <polygon points="38,16 24,100 52,100" fill="#ffd9a0" />
+      <polygon points="50,12 36,100 64,100" fill="#ffd9a0" />
+      <polygon points="62,16 48,100 76,100" fill="#ffd9a0" />
+      <polygon points="86,30 72,100 100,100" fill="#ffd9a0" />
     </svg>
   );
 }
@@ -1148,30 +1432,40 @@ function Table({ look, className, steam }: { look: Look; className?: string; ste
   return (
     <div className={`rest-table ${className ?? ''}`}>
       <svg viewBox="0 0 200 60" className="rt-chair">
-        <rect x="56" y="6" width="88" height="54" rx="12" fill={C.walnut} {...ink} />
+        <rect x="56" y="6" width="88" height="54" rx="10" fill={C.walnut} {...ink} />
+        <path d="M124 6 h10 q10 0 10 10 v44 h-20z" fill={C.walnutD} />
         <rect
           x="64"
           y="14"
           width="72"
-          height="38"
-          rx="8"
-          fill={C.oakD}
+          height="34"
+          rx="6"
+          fill={C.indigo}
           {...ink}
-          strokeOpacity=".4"
+          strokeOpacity=".5"
         />
+        <path d="M70 20 q2 -3 6 -3" stroke={HI} strokeOpacity=".5" strokeWidth="1.6" fill="none" />
       </svg>
       <div className="rt-guest">
         <Avatar look={look} mood="happy" size={90} eating />
       </div>
       <svg viewBox="0 0 200 124" className="rt-table">
-        <ellipse cx="100" cy="116" rx="72" ry="6" fill={INK} opacity=".14" />
-        {/* side chair (right) */}
-        <rect x="156" y="40" width="34" height="50" rx="6" fill={C.walnut} {...ink} />
-        <rect x="160" y="70" width="26" height="6" rx="2" fill={C.walnutD} />
-        <path d="M160 90 v18 M186 90 v18" {...ink} strokeWidth="2.4" />
+        <ellipse cx="100" cy="116" rx="76" ry="6" fill={INK} opacity=".14" />
+        {/* side stool (right) */}
+        <rect x="160" y="44" width="30" height="12" rx="5" fill={C.clay} {...ink} />
+        <path d="M180 44 h6 q4 0 4 6 q0 6 -4 6 h-6z" fill={C.clayD} />
+        <path
+          d="M166 56 l-3 50 M184 56 l3 50"
+          stroke={C.walnutD}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+        <path d="M166 56 l-3 50 M184 56 l3 50" {...ink} fill="none" />
+        <path d="M165 84 h20" {...ink} strokeWidth="2" />
         {/* pedestal */}
         <rect x="92" y="80" width="16" height="30" fill={C.walnut} {...ink} />
-        <ellipse cx="100" cy="110" rx="30" ry="6" fill={C.walnut} {...ink} />
+        <path d="M100 80 h8 v30 h-8z" fill={C.walnutD} />
+        <ellipse cx="100" cy="110" rx="32" ry="6" fill={C.walnut} {...ink} />
         {/* top: shade edge, then face */}
         <ellipse cx="100" cy="74" rx="88" ry="22" fill={C.oakD} {...ink} />
         <ellipse cx="100" cy="68" rx="88" ry="22" fill={C.oakL} {...ink} />
@@ -1203,35 +1497,105 @@ function Table({ look, className, steam }: { look: Look; className?: string; ste
         <circle cx="80" cy="58" r="1.4" fill="none" stroke={C.matchaD} strokeWidth=".8" />
         <path
           d="M86 62 l26 -14 M90 64 l26 -12"
-          {...ink}
           stroke={C.walnut}
-          strokeOpacity="1"
           strokeWidth="2"
+          strokeLinecap="round"
         />
         {steam && (
           <g className="rt-steam">
             <Cloud x={76} y={44} s={0.42} />
           </g>
         )}
-        {/* teapot + cup */}
-        <ellipse cx="146" cy="60" rx="11" ry="9" fill={C.matcha} {...ink} />
-        <path d="M152 52 q6 8 0 16 q3 -8 0 -16z" fill={C.matchaD} />
+        {/* tokkuri + cup */}
         <path
-          d="M156 58 q6 -2 5 -8"
+          d="M138 70 q-6 -8 -3 -18 q1 -5 6 -6 h4 q5 1 6 6 q3 10 -3 18z"
+          fill={C.celadon}
           {...ink}
-          stroke={C.matcha}
-          strokeOpacity="1"
-          strokeWidth="3"
-          fill="none"
         />
-        <path d="M156 58 q6 -2 5 -8" {...ink} fill="none" />
-        <path d="M140 52 q6 -8 12 0" {...ink} fill="none" strokeWidth="1.2" />
-        <circle cx="146" cy="51" r="1.8" fill={C.gold} />
-        <ellipse cx="141" cy="56" rx="1.6" ry="2.6" fill={HI} opacity=".6" />
-        <path d="M118 70 q0 6 6 6 q6 0 6 -6z" fill={C.cream} {...ink} />
-        <ellipse cx="124" cy="70" rx="6" ry="2.2" fill={C.matchaL} {...ink} strokeOpacity=".4" />
+        <path d="M146 70 q5 -8 2 -18 q-1 -5 -4 -6 h2 q5 1 6 6 q3 10 -3 18z" fill={C.celadonD} />
+        <rect x="140" y="43" width="6" height="4" rx="1.5" fill={C.celadonD} {...ink} />
+        <path d="M118 72 q0 6 6 6 q6 0 6 -6z" fill={C.cream} {...ink} />
+        <ellipse cx="124" cy="72" rx="6" ry="2.2" fill={C.matchaL} {...ink} strokeOpacity=".4" />
+        {/* small lantern-lit menu card */}
+        <path d="M30 66 l8 -12 h14 l-8 12z" fill={C.cream} {...ink} />
+        <path d="M36 60 l6 0 M34 63 l6 0" stroke={C.clay} strokeWidth="1" strokeLinecap="round" />
       </svg>
     </div>
+  );
+}
+
+/* ---------- ikebana at the counter's right end (rendered by Restaurant) ---------- */
+
+export function CounterFlowers() {
+  return (
+    <svg viewBox="0 0 110 130" className="rest-counter counter-flowers" aria-hidden="true">
+      <ellipse cx="55" cy="126" rx="30" ry="3.5" fill={INK} opacity=".18" />
+      {/* branches */}
+      <path
+        d="M55 92 q-10 -30 -34 -46 M55 92 q6 -38 24 -60 M55 92 q14 -22 42 -30"
+        stroke={C.walnut}
+        strokeWidth="2.6"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <path
+        d="M55 92 q-10 -30 -34 -46 M55 92 q6 -38 24 -60 M55 92 q14 -22 42 -30"
+        {...ink}
+        fill="none"
+      />
+      <path
+        d="M55 92 q-2 -34 4 -62"
+        stroke={C.matchaD}
+        strokeWidth="2.6"
+        fill="none"
+        strokeLinecap="round"
+      />
+      <path d="M55 92 q-2 -34 4 -62" {...ink} fill="none" />
+      {/* leaves */}
+      <path
+        d="M58 48 q12 -10 10 -26 q-10 10 -10 26z M48 70 q-14 -4 -16 -20 q12 4 16 20z M66 70 q14 -8 26 -4 q-12 8 -26 4z"
+        fill={C.matcha}
+        {...ink}
+      />
+      <path d="M60 46 q6 -10 7 -20" {...line} strokeOpacity=".5" />
+      {/* blossoms */}
+      {[
+        [21, 46, C.blush],
+        [79, 32, C.gold],
+        [97, 62, C.blush],
+        [59, 30, '#fbf7f0'],
+        [34, 60, '#fbf7f0'],
+      ].map(([x, y, c], i) => (
+        <g key={i} transform={`translate(${x} ${y})`}>
+          {[0, 60, 120, 180, 240, 300].map((a) => (
+            <ellipse
+              key={a}
+              cx="0"
+              cy="-5.5"
+              rx="3.4"
+              ry="5.5"
+              fill={String(c)}
+              {...ink}
+              strokeOpacity=".55"
+              transform={`rotate(${a})`}
+            />
+          ))}
+          <circle r="2.2" fill={C.persimmon} />
+        </g>
+      ))}
+      {/* vase */}
+      <path d="M36 88 h38 q4 0 3 4 l-4 30 h-36 l-4 -30 q-1 -4 3 -4z" fill={C.indigo} {...ink} />
+      <path d="M60 88 h14 q4 0 3 4 l-4 30 h-12z" fill={C.indigoD} />
+      <path d="M34 98 h42" stroke={C.cream} strokeWidth="2.2" strokeLinecap="round" />
+      <path
+        d="M40 104 q0 8 3 14"
+        stroke={HI}
+        strokeOpacity=".6"
+        strokeWidth="2"
+        fill="none"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 
@@ -1271,7 +1635,10 @@ export function Restaurant({
   const w: Weather = wet ? 'rain' : weather;
   return (
     <div className={`rest t-${t} w-${w}`} aria-hidden="true">
+      {/* ---- wall ---- */}
       <div className={`rest-wall ${decor.wall}`}>
+        <div className="rest-wainscot" />
+        <div className="rest-dado" />
         <div className="rest-sunwall" />
         <div className="rest-window">
           <StreetScene />
@@ -1282,6 +1649,16 @@ export function Restaurant({
           <div className="rw-frame" />
           <div className="rw-sill" />
         </div>
+        <div className="rest-tansu">
+          <Tansu />
+          {cat && <div className="rest-cat">{cat}</div>}
+        </div>
+        <div className="rest-shrine">
+          <Kamidana />
+        </div>
+        <div className="rest-clock">
+          <WallClock />
+        </div>
         <div className="rest-bigart">
           {decor.bigart !== 'bigart_none' && (
             <div className="art-frame">
@@ -1289,27 +1666,25 @@ export function Restaurant({
             </div>
           )}
         </div>
-        <div className="rest-shelf">
-          <Ceramics />
-          {cat && <div className="rest-cat">{cat}</div>}
-        </div>
         <div className="rest-smallart">
           <SmallArt kind={decor.smallart} />
         </div>
-        <MenuBoard menu={menu} />
-        <PassWindow />
+        <PassWindow menu={menu} />
       </div>
+      {/* ---- floor ---- */}
       <div className={`rest-floor ${decor.floor}`}>
         <Floor kind={decor.floor} />
       </div>
       <div className="rest-baseboard" />
       <div className="rest-sun" />
+      <Stools />
       {n >= 4 && (
         <>
           <Table look={looks[2]} className="far l" />
           <Table look={looks[3]} className="far r" />
         </>
       )}
+      <Special kind={decor.special} />
       {n >= 2 && (
         <>
           <Table look={looks[0]} className="near l" steam />
@@ -1317,11 +1692,12 @@ export function Restaurant({
         </>
       )}
       <Plant kind={decor.plants} />
-      <Special kind={decor.special} />
       <div className="rest-shade" />
       <LightCones />
       <Lamps kind={decor.lamps} />
+      {/* ---- counter layer (over Play's counter) ---- */}
       <CounterDecor kind={decor.counter} />
+      <CounterFlowers />
       <div className="rest-vignette" />
     </div>
   );
