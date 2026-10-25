@@ -4369,3 +4369,41 @@ button {
 .stove2 .out-bowl {
   top: 10% !important;
 }
+
+/* =================== v5: toon characters =================== */
+.avatar-wrap {
+  position: relative;
+}
+.avatar-wrap .avatar {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.av-over {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.av-hearts {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  pointer-events: none;
+}
+.av-hearts i {
+  position: absolute;
+  font-style: normal;
+  color: #ff3b6b;
+  font-size: 26px;
+  animation: heart 1.6s ease-out infinite;
+}
+.av-hearts i:nth-child(2) {
+  left: 40px;
+  animation-delay: 0.5s;
+}
+.av-hearts i:nth-child(3) {
+  left: -46px;
+  animation-delay: 1s;
+}
