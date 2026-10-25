@@ -1,36 +1,38 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LEVELS } from './data';
-import { setMusic, setSfx, sfx, startMusic, stopMusic, unlockAudio } from './audio';
-import Title from './components/Title';
-import LevelMap from './components/LevelMap';
-import Story from './components/Story';
-import Unlock from './components/Unlock';
-import Play, { type DayResult } from './components/Play';
-import Results from './components/Results';
-import { net } from './money';
-import { DEFAULT_DECOR, DEFAULT_OWNED, type DecorState } from './decor';
-import DecorShop from './components/DecorShop';
-import Ending from './components/Ending';
+import { LEVELS } from './game/data';
+import { setMusic, setSfx, sfx, startMusic, stopMusic, unlockAudio } from './game/audio';
+import { DEFAULT_DECOR, DEFAULT_OWNED, withDefaults, type DecorState } from './game/decor';
+import type { DayResult } from './game/session';
+import Title from './ui/Title';
+import LevelMap from './ui/LevelMap';
+import Story from './ui/Story';
+import Unlock from './ui/Unlock';
+import Play from './ui/Play';
+import Results from './ui/Results';
+import DecorShop from './ui/DecorShop';
+import Ending from './ui/Ending';
 
 export interface Save {
-  reached: number;
+  reached: number; // highest unlocked level (1..11)
   cash: number;
-  decor?: DecorState;
-  owned?: string[];
+  decor: DecorState;
+  owned: string[];
   stars: number[];
   best: number[];
+  tipCoins: number;
   sfx: boolean;
   music: boolean;
 }
 
-const KEY = 'noddles-save-v1';
+const KEY = 'noddles-save-v2';
 const fresh: Save = {
   reached: 1,
-  cash: 4000,
+  cash: 600,
   decor: DEFAULT_DECOR,
   owned: DEFAULT_OWNED,
   stars: Array(10).fill(0),
   best: Array(10).fill(0),
+  tipCoins: 0,
   sfx: true,
   music: true,
 };
@@ -38,7 +40,11 @@ const fresh: Save = {
 function load(): Save {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...fresh, ...JSON.parse(raw) };
+    if (raw) {
+      const s = { ...fresh, ...JSON.parse(raw) } as Save;
+      s.decor = withDefaults(s.decor);
+      return s;
+    }
   } catch {
     /* storage unavailable */
   }
@@ -88,23 +94,22 @@ export default function App() {
     setScreen({ s: 'intro', level });
   };
 
-  const finishDay = (level: number, result: DayResult) => {
-    result = { ...result, cashBefore: save.cash, cashAfter: save.cash + net(result.ledger) };
+  const finishDay = (level: number, result: DayResult, tipCoins: number) => {
     setSave((s) => {
       const stars = [...s.stars];
       const best = [...s.best];
       stars[level - 1] = Math.max(stars[level - 1], result.stars);
-      best[level - 1] = Math.max(best[level - 1], result.coins);
-      const reached = result.stars > 0 ? Math.max(s.reached, Math.min(10, level + 1)) : s.reached;
-      return {
-        ...s,
-        cash: s.cash + net(result.ledger),
-        stars,
-        best,
-        reached: level === 10 && result.stars > 0 ? 11 : reached,
-      };
+      best[level - 1] = Math.max(best[level - 1], Math.round(result.avg));
+      let reached = s.reached;
+      if (result.stars > 0) reached = Math.max(reached, Math.min(11, level + 1));
+      return { ...s, cash: result.cashAfter, stars, best, reached, tipCoins };
     });
     setScreen({ s: 'results', level, result });
+  };
+
+  const reset = () => {
+    setSave(fresh);
+    setScreen({ s: 'title' });
   };
 
   return (
@@ -127,41 +132,34 @@ export default function App() {
           onPick={startLevel}
           onBack={() => setScreen({ s: 'title' })}
           onToggle={toggle}
+          onReset={reset}
           onEnding={() => setScreen({ s: 'ending' })}
           onDecor={() => setScreen({ s: 'decor' })}
         />
       )}
       {screen.s === 'decor' && (
-        <DecorShop
-          save={save}
-          onChange={(cash, decor, owned) => setSave((s) => ({ ...s, cash, decor, owned }))}
-          onBack={() => setScreen({ s: 'map' })}
-        />
+        <DecorShop save={save} onChange={(cash, decor, owned) => setSave((s) => ({ ...s, cash, decor, owned }))} onBack={() => setScreen({ s: 'map' })} />
       )}
       {screen.s === 'intro' && (
         <Story
           key={'i' + screen.level}
-          heading={`Bölüm ${screen.level}`}
+          heading={`${screen.level}. Gün`}
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].intro}
           decor={save.decor}
           tod={LEVELS[screen.level - 1].time}
+          rain={LEVELS[screen.level - 1].rain}
           onDone={() => setScreen({ s: 'unlock', level: screen.level })}
         />
       )}
-      {screen.s === 'unlock' && (
-        <Unlock
-          level={LEVELS[screen.level - 1]}
-          onDone={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
-        />
-      )}
+      {screen.s === 'unlock' && <Unlock level={LEVELS[screen.level - 1]} onDone={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })} />}
       {screen.s === 'play' && (
         <Play
           key={screen.key}
           levelId={screen.level}
           save={save}
           onToggle={toggle}
-          onDone={(r) => finishDay(screen.level, r)}
+          onDone={(r, coins) => finishDay(screen.level, r, coins)}
           onQuit={() => setScreen({ s: 'map' })}
           onRestart={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
         />
@@ -185,7 +183,7 @@ export default function App() {
           tod="gunbatimi"
           onDone={() => {
             if (screen.level === 10) setScreen({ s: 'ending' });
-            else startLevel(screen.level + 1);
+            else setScreen({ s: 'map' });
           }}
         />
       )}

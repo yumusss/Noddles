@@ -110,7 +110,14 @@ export type Sfx =
   | 'star'
   | 'bubble'
   | 'whoosh'
-  | 'trash';
+  | 'trash'
+  | 'sizzle'
+  | 'pour'
+  | 'scooter'
+  | 'cat'
+  | 'pick'
+  | 'place'
+  | 'type';
 
 export function sfx(name: Sfx) {
   if (!sfxOn) return;
@@ -175,6 +182,31 @@ export function sfx(name: Sfx) {
       break;
     case 'trash':
       noise(0.25, { freq: 300, vol: 0.3 });
+      break;
+    case 'sizzle':
+      noise(0.6, { freq: 3200, q: 0.3, vol: 0.08 });
+      break;
+    case 'pour':
+      noise(0.25, { freq: 700, q: 0.5, vol: 0.12 });
+      tone(420 + Math.random() * 80, 0.12, { type: 'sine', vol: 0.05, slide: 1.3 });
+      break;
+    case 'scooter':
+      tone(110, 0.9, { type: 'sawtooth', vol: 0.07, slide: 2.2 });
+      noise(0.5, { freq: 500, vol: 0.08, delay: 0.1 });
+      break;
+    case 'cat':
+      tone(620, 0.22, { type: 'sine', vol: 0.12, slide: 1.35 });
+      tone(840, 0.18, { type: 'sine', vol: 0.08, delay: 0.2, slide: 0.8 });
+      break;
+    case 'pick':
+      tone(480, 0.07, { type: 'triangle', vol: 0.12, slide: 1.4 });
+      break;
+    case 'place':
+      tone(360, 0.09, { type: 'sine', vol: 0.18, slide: 0.7 });
+      noise(0.08, { freq: 600, vol: 0.1 });
+      break;
+    case 'type':
+      tone(1800 + Math.random() * 400, 0.025, { type: 'square', vol: 0.025 });
       break;
   }
 }

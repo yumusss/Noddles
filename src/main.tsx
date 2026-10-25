@@ -1,29 +1,16 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
-import App from './App.tsx';
-import Gallery from './components/Gallery.tsx';
-import AvTest from './components/AvTest.tsx';
+import App from './App';
+import { registerSW } from 'virtual:pwa-register';
 
-// Scale the UI chrome up on tablets so kids get big, easy targets.
-function setUi() {
-  const ui = Math.max(
-    1,
-    Math.min(1.75, Math.min(window.innerWidth / 430, window.innerHeight / 680))
-  );
-  document.documentElement.style.setProperty('--ui', ui.toFixed(3));
-}
-setUi();
-window.addEventListener('resize', setUi);
+registerSW({ immediate: true });
+
+// No pinch-zoom on iOS Safari (the viewport meta is not enough there).
+document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {window.location.search.includes('gallery') ? (
-      <Gallery />
-    ) : window.location.search.includes('avtest') ? (
-      <AvTest />
-    ) : (
-      <App />
-    )}
+    <App />
   </StrictMode>
 );
