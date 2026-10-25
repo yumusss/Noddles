@@ -34,4 +34,4 @@ npm install
 npm run dev
 ```
 
-`main` ve `v2` dallarına push → GitHub Actions ile GitHub Pages’e yayın.
+`main` ve `v3` dallarına push → GitHub Actions ile GitHub Pages’e yayın.
