@@ -20,10 +20,10 @@ const pct = (b: number) => `${(b * 100).toFixed((b * 100) % 1 ? 1 : 0)}%`;
 function ItemPreview({ item }: { item: DecorItem }) {
   const { cat, id } = item;
   const none = id.endsWith('_none') || id === 'tables_0';
-  if (cat === 'wall') return <div className={`prev swatch rest-wall ${id}`} />;
+  if (cat === 'wall') return <div className={`prev swatch ${id}`} />;
   if (cat === 'floor')
     return (
-      <div className={`prev swatch rest-floor ${id}`}>
+      <div className={`prev swatch ${id}`}>
         <div className="rest-floor-tex" />
       </div>
     );
