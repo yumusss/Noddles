@@ -848,13 +848,8 @@ export function Lamps({ kind }: { kind: string }) {
   if (kind === 'lamps_paper')
     return (
       <div className="rest-lamps paper">
-        {[0, 1, 2].map((i) => (
-          <svg
-            key={i}
-            viewBox="0 0 60 100"
-            preserveAspectRatio="xMidYMax meet"
-            className="pend"
-            style={{ height: i === 1 ? '86%' : '100%' }}>
+        {[0, 1].map((i) => (
+          <svg key={i} viewBox="0 0 60 100" preserveAspectRatio="xMidYMax meet" className="pend">
             <circle cx="30" cy="60" r="34" className="halo" />
             <path d="M30 -600 V36" {...ink} />
             <rect x="24" y="34" width="12" height="5" rx="1.5" fill={C.walnutD} {...ink} />
@@ -876,13 +871,13 @@ export function Lamps({ kind }: { kind: string }) {
   if (kind === 'lamps_edison')
     return (
       <div className="rest-lamps edison">
-        {[0, 1, 2, 3].map((i) => (
+        {[0, 1].map((i) => (
           <svg
             key={i}
             viewBox="0 0 40 100"
             preserveAspectRatio="xMidYMax meet"
             className="pend"
-            style={{ height: i % 2 ? '84%' : '100%' }}>
+            style={{ height: i ? '88%' : '100%' }}>
             <circle cx="20" cy="70" r="26" className="halo" />
             <path d="M20 -600 V44" {...ink} />
             <rect x="14" y="44" width="12" height="10" rx="2" fill={C.walnutD} {...ink} />
@@ -922,9 +917,9 @@ export function Lamps({ kind }: { kind: string }) {
     );
   return (
     <div className="rest-lamps red">
-      {[0, 1, 2, 3].map((i) => (
+      {[0, 1].map((i) => (
         <div key={i} className="rlamp" style={{ animationDelay: `${i * 0.7}s` }}>
-          <RedLanternSvg kanji={['麺', '福', '味', '湯'][i]} cord={i % 2 ? 26 : 40} />
+          <RedLanternSvg kanji={['麺', '福'][i]} cord={40} />
         </div>
       ))}
     </div>
@@ -1183,7 +1178,7 @@ function PassWindow({ menu }: { menu: string }) {
         <Tanzaku menu={menu} />
       </div>
       <div className="rp-open">
-        <svg viewBox="0 0 160 120" preserveAspectRatio="xMidYMax slice" className="rp-kitchen">
+        <svg viewBox="0 0 160 120" preserveAspectRatio="xMidYMax meet" className="rp-kitchen">
           {/* back shelf with bowls */}
           <rect x="0" y="40" width="160" height="5" fill={C.oakL} {...ink} />
           {[18, 48, 78].map((x) => (
@@ -1418,10 +1413,9 @@ export function Floor({ kind }: { kind: string }) {
 function LightCones() {
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="rest-light">
-      <polygon points="38,16 24,100 52,100" fill="#ffd9a0" />
-      <polygon points="50,12 36,100 64,100" fill="#ffd9a0" />
-      <polygon points="62,16 48,100 76,100" fill="#ffd9a0" />
-      <polygon points="86,30 72,100 100,100" fill="#ffd9a0" />
+      <polygon points="35,22 18,100 52,100" fill="#ffd9a0" />
+      <polygon points="64,22 47,100 81,100" fill="#ffd9a0" />
+      <polygon points="86,36 70,100 102,100" fill="#ffd9a0" />
     </svg>
   );
 }

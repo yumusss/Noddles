@@ -112,7 +112,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  height: 30%;
+  height: 24%;
   z-index: 0;
   background:
     repeating-linear-gradient(90deg, #0000 0 64px, rgb(var(--ink-a) / 0.45) 64px 65px), #3b4a6b;
@@ -122,7 +122,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 30%;
+  bottom: 24%;
   height: 9px;
   margin-bottom: -4px;
   z-index: 0;
@@ -134,10 +134,10 @@
 /* a single flat sunlight polygon on the wall (comes through the window) */
 .rest-sunwall {
   position: absolute;
-  left: 30%;
-  top: 12%;
-  width: 20%;
-  height: 60%;
+  left: 27%;
+  top: 16%;
+  width: 18%;
+  height: 56%;
   pointer-events: none;
   z-index: 0;
   opacity: calc(var(--sun) * 0.4);
@@ -253,10 +253,10 @@
 /* ---------- street window (left) ---------- */
 .rest-window {
   position: absolute;
-  top: 10%;
-  left: 4%;
-  width: 26%;
-  height: 50%;
+  top: 15%;
+  left: 3%;
+  width: 23%;
+  height: 46%;
   border-radius: 3px;
   overflow: hidden;
   z-index: 1;
@@ -363,10 +363,10 @@
 /* ---------- tansu under the window (+ cat) ---------- */
 .rest-tansu {
   position: absolute;
-  left: 3%;
-  width: 28%;
+  left: 2%;
+  width: 25%;
   bottom: 0;
-  height: 36%;
+  height: 34%;
   z-index: 1;
   display: flex;
   align-items: flex-end;
@@ -389,10 +389,10 @@
 /* ---------- kamidana shrine + clock (upper centre-left / right) ---------- */
 .rest-shrine {
   position: absolute;
-  left: 34%;
-  top: 7%;
+  left: 28.5%;
+  top: 52%;
   width: 9%;
-  height: 20%;
+  height: 22%;
   z-index: 1;
 }
 .shrine-svg {
@@ -403,9 +403,9 @@
 }
 .rest-clock {
   position: absolute;
-  left: 57%;
-  top: 9%;
-  width: 7%;
+  left: 47%;
+  top: 54%;
+  width: 6.5%;
   aspect-ratio: 1;
   z-index: 1;
 }
@@ -419,10 +419,10 @@
 /* ---------- big art (centre, between shrine and clock) ---------- */
 .rest-bigart {
   position: absolute;
-  left: 44%;
-  width: 12%;
-  top: 8%;
-  height: 20%;
+  left: 41.5%;
+  width: 15%;
+  top: 24%;
+  height: 24%;
   z-index: 1;
 }
 .art-frame {
@@ -445,10 +445,10 @@
 /* ---------- small art (below the clock, right of centre) ---------- */
 .rest-smallart {
   position: absolute;
-  left: 57.5%;
-  top: 30%;
-  width: 6%;
-  height: 20%;
+  left: 39.5%;
+  top: 52%;
+  width: 5.5%;
+  height: 22%;
   z-index: 1;
   display: grid;
   place-items: center;
@@ -466,19 +466,19 @@
 /* ---------- kitchen pass (right) ---------- */
 .rest-pass {
   position: absolute;
-  right: 4%;
-  top: 4%;
-  width: 30%;
-  height: 92%;
+  right: 3%;
+  top: 13%;
+  width: 27%;
+  height: 83%;
   z-index: 1;
 }
 /* hanging menu strips above the opening */
 .rp-strips {
   position: absolute;
-  left: -2%;
-  right: -2%;
+  left: -3%;
+  right: 24%;
   top: 0;
-  height: 26%;
+  height: 24%;
   z-index: 4;
 }
 .tz-svg {
@@ -496,7 +496,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: 26%;
+  top: 24%;
   bottom: 12%;
   overflow: hidden;
   background:
@@ -545,8 +545,8 @@
   position: absolute;
   left: 2%;
   right: 2%;
-  top: 25%;
-  height: 24%;
+  top: 23%;
+  height: 26%;
   z-index: 3;
   display: block;
   overflow: visible;
@@ -556,7 +556,7 @@
   position: absolute;
   left: -2%;
   right: -2%;
-  top: 25%;
+  top: 23%;
   bottom: 11%;
   z-index: 2;
   pointer-events: none;
@@ -593,9 +593,9 @@
 /* stools at the foot of the pass */
 .rest-stools {
   position: absolute;
-  right: 6%;
-  width: 26%;
-  bottom: 33%;
+  right: 5%;
+  width: 24%;
+  bottom: 34%;
   height: 12%;
   z-index: 1;
   overflow: visible;
@@ -607,10 +607,10 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 34%;
+  height: 28%;
   display: flex;
   justify-content: space-between;
-  padding: 0 34% 0 32%;
+  padding: 0 32% 0 29%;
   pointer-events: none;
   z-index: 2;
 }
@@ -638,9 +638,6 @@
 .rest-lamps.red .rlamp {
   transform-origin: top center;
   animation: sway 4.2s ease-in-out infinite;
-}
-.rest-lamps.red .rlamp:nth-child(2n) {
-  animation: none;
 }
 .rest-lamps.paper .pend {
   width: clamp(28px, 9cqw, 50px);
@@ -718,7 +715,7 @@
 .rest-counter {
   position: absolute;
   z-index: 5;
-  left: 41%;
+  left: 62%;
   bottom: calc(30% + 10px);
   width: clamp(30px, 10cqw, 52px);
   height: auto;
@@ -750,10 +747,10 @@
 /* ---------- specials (back wall, right of centre, under the clock) ---------- */
 .rest-special {
   position: absolute;
-  left: 52%;
-  bottom: 44%;
-  width: 14%;
-  height: 16%;
+  left: 55.5%;
+  bottom: 44.5%;
+  width: 12%;
+  height: 15%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -2228,19 +2225,20 @@
     right: 34%;
   }
   .rest-lamps {
-    padding: 0 35% 0 33%;
+    padding: 0 33% 0 30%;
   }
   .rest-clock {
-    width: 8%;
+    width: 7.5%;
   }
   .rest-shrine {
-    width: 11%;
-  }
-  .rest-bigart {
-    left: 45%;
-    width: 11%;
+    width: 10%;
   }
   .rest-smallart {
-    width: 7%;
+    width: 6.5%;
+    left: 39%;
+  }
+  .rest-special {
+    left: 56%;
+    width: 12%;
   }
 }
