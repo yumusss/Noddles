@@ -13,6 +13,8 @@ Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devra
 - Konuşarak sipariş veren müşteriler: adet (“3 dilim chashu”), bol/biraz, “olmasın”, acılı, vejetaryen, pişirme tercihi
 - 26 malzeme: 4 erişte, 4 su, 18 garnitür; her parça kaseye tek tek yerleşir
 - Ocakta pişirme göstergesi: çiğ, diri, tam kıvam, yumuşak, lapa
+- Tezgâhta kasa: müşteri parayla öder, para üstünü sen çekmeceden verirsin; bahşişler kavanoza
+- Gün sonu hesap defteri: satış, bahşiş, malzeme gideri, kira, faturalar, net kâr ve kasadaki para
 - Memnuniyet puanı ve ona göre bahşiş; 3. bölümden itibaren telefon siparişleri ve kurye Rüzgar
 - Özel misafirler: Baron Kraker, eleştirmen Madam Lezzetova, Hana Nine
 - Seri (combo) bahşişleri, 3 yıldızlı hedefler, kayıtlı ilerleme

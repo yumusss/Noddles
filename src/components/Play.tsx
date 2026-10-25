@@ -2,7 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
 import { Avatar } from '../avatar';
-import { Donabe, type Piece } from '../bowl';
+import type { Piece } from '../bowl';
+import Stove from './Stove';
+import { ChangePanel, RegisterDecor, TipJar } from './Cash';
+import {
+  RENT,
+  UTILITIES,
+  cashGiven,
+  costCents,
+  fmt,
+  priceCents,
+  tipCents,
+  type DayLedger,
+} from '../money';
 import { BOWL_R, THICK_LABEL, THICK_W, type Thick } from '../food';
 import { BowlCanvas, BowlSide, Tray } from './FoodCanvas';
 import {
@@ -23,6 +35,9 @@ import type { Save } from '../App';
 
 export interface DayResult {
   coins: number;
+  ledger: DayLedger;
+  cashBefore?: number;
+  cashAfter?: number;
   stars: number;
   served: number;
   perfect: number;
@@ -30,7 +45,7 @@ export interface DayResult {
   avg: number;
 }
 
-type Phase = 'walkin' | 'talk' | 'waiting' | 'eating' | 'react' | 'leave';
+type Phase = 'walkin' | 'talk' | 'waiting' | 'eating' | 'react' | 'pay' | 'leave';
 type Tool = { kind: 'noodle' | 'broth' | 'topping'; id: string } | null;
 type Tab = 'noodle' | 'broth' | 'topping';
 type Stage = 'prep' | 'pot' | 'ready';
@@ -76,6 +91,29 @@ export default function Play({
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [shownScore, setShownScore] = useState(0);
   const [coins, setCoins] = useState(0);
+  const [ledger, setLedger] = useState<DayLedger>(() => ({
+    sales: 0,
+    tips: 0,
+    bonus: 0,
+    ingredients: 0,
+    waste: 0,
+    overChange: 0,
+    unpaid: 0,
+    bowls: 0,
+    changeMistakes: 0,
+    rent: RENT(levelId),
+    utilities: UTILITIES(levelId),
+  }));
+  const [jar, setJar] = useState(0);
+  const [jarBump, setJarBump] = useState(0);
+  const [bill, setBill] = useState<{
+    due: number;
+    given: number;
+    tip: number;
+    bonus: number;
+    paid: boolean;
+  } | null>(null);
+  const [lifting, setLifting] = useState(false);
   const [scores, setScores] = useState<number[]>([]);
   const [nudge, setNudge] = useState<string | null>(null);
   const [orderAt, setOrderAt] = useState(0);
@@ -158,6 +196,7 @@ export default function Play({
             const avg = all.length ? Math.round(all.reduce((a, b) => a + b, 0) / all.length) : 0;
             onDone({
               coins,
+              ledger,
               stars: starsFor(avg),
               served: all.length,
               perfect: all.filter((s) => s >= 90).length,
@@ -173,7 +212,7 @@ export default function Play({
       }, 1100);
       return () => window.clearTimeout(t);
     }
-  }, [phase, started, paused, c.phone, idx, custs.length, scores, coins, onDone]);
+  }, [phase, started, paused, c.phone, idx, custs.length, scores, coins, ledger, onDone]);
 
   useEffect(() => {
     if (phase !== 'talk' || typed >= speech.length) return;
@@ -321,6 +360,8 @@ export default function Play({
     sfx('tap');
   };
   const trash = () => {
+    const wasted = costCents(bowl);
+    if (wasted > 0) setLedger((l) => ({ ...l, waste: l.waste + wasted }));
     setBowl(emptyBowl());
     setTab('noodle');
     setTool(null);
@@ -337,11 +378,17 @@ export default function Play({
   };
 
   const takeOut = () => {
+    if (lifting) return;
     const cs = cookStateAt(cookP);
-    setBowl((b) => ({ ...b, cook: cs }));
-    setStage('ready');
-    sfx(cs === 'perfect' || cs === 'dente' ? 'perfect' : cs === 'soft' ? 'coins' : 'fail');
+    setLifting(true);
+    sfx('splash');
     buzz(20);
+    window.setTimeout(() => {
+      setBowl((b) => ({ ...b, cook: cs }));
+      setStage('ready');
+      setLifting(false);
+      sfx(cs === 'perfect' || cs === 'dente' ? 'perfect' : cs === 'soft' ? 'coins' : 'fail');
+    }, 1150);
   };
 
   const serveIt = () => {
@@ -350,14 +397,60 @@ export default function Play({
     setVerdict(v);
     setPhase('eating');
     setScores((s) => [...s, v.score]);
-    setCoins((m) => m + v.price + v.tip + v.bonus);
+    const due = priceCents(c.order);
+    const paid = v.score >= 30;
+    const tip = paid ? tipCents(v.score, due) : 0;
+    const bonus = paid ? v.bonus * 10 : 0;
+    setBill({ due, given: c.phone ? due : cashGiven(due, levelId), tip, bonus, paid });
+    const cost = costCents(bowl);
+    setLedger((l) => ({
+      ...l,
+      ingredients: l.ingredients + cost,
+      bowls: l.bowls + 1,
+      unpaid: l.unpaid + (paid ? 0 : 1),
+      // phone orders are prepaid by card
+      sales: l.sales + (c.phone && paid ? due : 0),
+      tips: l.tips + (c.phone ? tip : 0),
+      bonus: l.bonus + (c.phone ? bonus : 0),
+    }));
+    if (c.phone && paid) setCoins((m) => m + due + tip + bonus);
     go(0);
     window.setTimeout(() => sfx(c.phone ? 'door' : 'splash'), 800);
   };
 
   const nextCustomer = () => {
+    if (bill && bill.paid && !c.phone) {
+      setPhase('pay');
+      sfx('ding');
+      return;
+    }
+    if (bill && c.phone && bill.tip) {
+      setJar((j) => j + bill.tip + bill.bonus);
+      setJarBump((n) => n + 1);
+    }
     setPhase('leave');
     sfx('coins');
+  };
+
+  const finishPayment = (gave: number, mistakes: number) => {
+    if (!bill) return;
+    const over = Math.max(0, gave - (bill.given - bill.due));
+    setLedger((l) => ({
+      ...l,
+      sales: l.sales + bill.due,
+      tips: l.tips + bill.tip,
+      bonus: l.bonus + bill.bonus,
+      overChange: l.overChange + over,
+      changeMistakes: l.changeMistakes + mistakes,
+    }));
+    setCoins((m) => m + bill.due + bill.tip + bill.bonus - over);
+    if (bill.tip || bill.bonus) {
+      setJar((j) => j + bill.tip + bill.bonus);
+      setJarBump((n) => n + 1);
+      window.setTimeout(() => sfx('coins'), 300);
+    }
+    if (over) flash(`Fazla para üstü verdin: ${fmt(over)} kaybettin`);
+    setPhase('leave');
   };
 
   // ---------- derived ----------
@@ -382,6 +475,7 @@ export default function Play({
   function tutorial(): string | null {
     if (levelId > 2 || !started) return null;
     if (phase === 'talk') return '👂 Müşteriyi dinle, sonra “Siparişi al”a bas.';
+    if (phase === 'pay') return '💵 Verilen paradan hesabı çıkar, para üstünü çekmeceden seç.';
     if (phase !== 'waiting') return null;
     if (station === 0) return '➡ Hazırlık istasyonuna geç.';
     if (station === 1) {
@@ -421,7 +515,7 @@ export default function Play({
         <div className="hud-coins">
           <Coin size={18} />
           <b key={coins} className="bump">
-            {coins}
+            {fmt(coins)}
           </b>
         </div>
       </div>
@@ -471,6 +565,11 @@ export default function Play({
                   <span>NODDLES</span>
                 </div>
               </div>
+              <RegisterDecor
+                open={phase === 'pay'}
+                display={bill && (phase === 'react' || phase === 'pay') ? fmt(bill.due) : '$0.00'}
+              />
+              <TipJar amount={jar} bump={jarBump} />
               {c.phone && (phase === 'walkin' || phase === 'talk' || phase === 'waiting') && (
                 <div className={`phone-stand ${phase === 'walkin' ? 'ringing' : ''}`}>📱</div>
               )}
@@ -533,13 +632,20 @@ export default function Play({
                   />
                   <span>{shownScore}% memnun</span>
                 </div>
-                <div className="pay-row">
-                  <span>
-                    <Coin size={16} /> {verdict.price}
-                  </span>
-                  <span className={verdict.tip ? 'tip-on' : 'tip-off'}>Bahşiş +{verdict.tip}</span>
-                  {verdict.bonus > 0 && <span className="tip-on">⭐ +{verdict.bonus}</span>}
-                </div>
+                {bill && (
+                  <div className="pay-row">
+                    {bill.paid ? (
+                      <span>
+                        <Coin size={16} /> Hesap {fmt(bill.due)}
+                        {c.phone ? ' (kartla ödendi)' : ''}
+                      </span>
+                    ) : (
+                      <span className="tip-off">Ödemeyi reddetti</span>
+                    )}
+                    <span className={bill.tip ? 'tip-on' : 'tip-off'}>Bahşiş {fmt(bill.tip)}</span>
+                    {bill.bonus > 0 && <span className="tip-on">⭐ Bonus {fmt(bill.bonus)}</span>}
+                  </div>
+                )}
                 {(verdict.praise.length > 0 || verdict.notes.length > 0) && (
                   <ul className="notes">
                     {verdict.praise.slice(0, 2).map((p) => (
@@ -553,9 +659,23 @@ export default function Play({
                   </ul>
                 )}
                 <button className="btn primary talk-btn" onClick={nextCustomer}>
-                  {idx + 1 >= custs.length ? 'Günü bitir' : 'Sıradaki müşteri →'}
+                  {bill && bill.paid && !c.phone
+                    ? 'Kasaya geç 💵'
+                    : idx + 1 >= custs.length
+                      ? 'Günü bitir'
+                      : 'Sıradaki müşteri →'}
                 </button>
               </div>
+            )}
+            {phase === 'pay' && bill && (
+              <ChangePanel
+                key={c.id}
+                name={c.name}
+                due={bill.due}
+                given={bill.given}
+                showAnswer={levelId <= 2}
+                onDone={finishPayment}
+              />
             )}
           </section>
 
@@ -703,13 +823,12 @@ export default function Play({
 
           {/* STOVE */}
           <section className="station stove2">
-            <div className="hood" />
-            <div className="tiles" />
             <div className="donabe-wrap">
-              <Donabe
-                active={stage === 'pot'}
-                lidOff={stage === 'ready'}
-                hot={Math.min(1, cookP / 100)}
+              <Stove
+                mode={lifting ? 'lift' : stage === 'pot' ? 'boil' : 'idle'}
+                noodle={stage === 'ready' ? undefined : bowl.noodle}
+                thick={bowl.thick}
+                heat={Math.min(1.3, cookP / 100)}
               />
               {stage === 'ready' && (
                 <div className="out-bowl">

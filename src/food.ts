@@ -180,7 +180,7 @@ const chashu: Draw = (c, r) => {
   c.lineCap = 'round';
   c.lineWidth = 7;
   c.beginPath();
-  for (let a = 0, rr = 4; a < TAU * 2.6; a += 0.15, rr += 0.95) {
+  for (let a = 0, rr = 4; a < TAU * 2.6; a += 0.15, rr += 0.32) {
     const x = 64 + Math.cos(a) * rr;
     const y = 64 + Math.sin(a) * rr;
     if (a === 0) c.moveTo(x, y);
@@ -202,33 +202,78 @@ const chashu: Draw = (c, r) => {
   gloss(c, 50, 48, 22, 9, -0.7, 0.3);
 };
 
-const greenOnion: Draw = (c, r) => {
-  for (let i = 0; i < 7; i++) {
-    const x = 64 + (r() - 0.5) * 70;
-    const y = 64 + (r() - 0.5) * 70;
-    const rr = 9 + r() * 5;
-    const rot = r() * Math.PI;
-    c.save();
-    c.translate(x, y);
-    c.rotate(rot);
-    c.scale(1, 0.8 + r() * 0.2);
+function onionRing(c: Ctx, r: () => number, x: number, y: number, R: number, white: boolean) {
+  const rot = r() * Math.PI;
+  const sq = 0.62 + r() * 0.36; // diagonal cuts look oval
+  const wall = R * (white ? 0.4 : 0.27 + r() * 0.06);
+  const broken = r() < 0.18;
+  c.save();
+  c.translate(x, y);
+  c.rotate(rot);
+  c.scale(1, sq);
+  const ring = new Path2D();
+  const a0 = broken ? r() * TAU : 0;
+  const a1 = broken ? a0 + TAU * (0.55 + r() * 0.25) : TAU;
+  ring.arc(0, 0, R, a0, a1);
+  if (broken) ring.arc(0, 0, R - wall, a1, a0, true);
+  else {
+    ring.moveTo(R - wall, 0);
+    ring.arc(0, 0, R - wall, 0, TAU, true);
+  }
+  ring.closePath();
+  // soft drop shadow so the ring sits on the food
+  c.save();
+  c.shadowColor = 'rgba(20,40,10,.45)';
+  c.shadowBlur = 4;
+  c.shadowOffsetY = 2;
+  const g = c.createRadialGradient(-R * 0.25, -R * 0.3, R * 0.2, 0, 0, R);
+  if (white) {
+    g.addColorStop(0, '#fbfdf2');
+    g.addColorStop(0.7, '#e6f1cf');
+    g.addColorStop(1, '#bcd79a');
+  } else {
+    g.addColorStop(0, '#c9eca6');
+    g.addColorStop(0.55, '#7cc455');
+    g.addColorStop(1, '#3c8a2a');
+  }
+  c.fillStyle = g;
+  c.fill(ring, 'evenodd');
+  c.restore();
+  // translucent inner membrane + outer skin line
+  c.lineWidth = 1.6;
+  c.strokeStyle = white ? 'rgba(150,180,110,.7)' : 'rgba(30,90,25,.75)';
+  c.beginPath();
+  c.arc(0, 0, R - 0.4, a0, a1);
+  c.stroke();
+  c.strokeStyle = 'rgba(245,255,230,.85)';
+  c.lineWidth = 1.4;
+  c.beginPath();
+  c.arc(0, 0, R - wall + 0.5, a0, a1);
+  c.stroke();
+  // inner layer line (scallions are layered)
+  if (!white) {
+    c.strokeStyle = 'rgba(210,245,180,.6)';
+    c.lineWidth = 1.2;
     c.beginPath();
-    c.arc(0, 0, rr, 0, TAU);
-    c.lineWidth = rr * 0.55;
-    const g = c.createLinearGradient(-rr, -rr, rr, rr);
-    g.addColorStop(0, '#9ad47e');
-    g.addColorStop(1, '#2f7a2c');
-    c.strokeStyle = g;
+    c.arc(0, 0, R - wall * 0.5, a0, a1);
     c.stroke();
-    c.beginPath();
-    c.arc(0, 0, rr * 0.55, 0, TAU);
-    c.fillStyle = 'rgba(226,246,206,.75)';
-    c.fill();
-    c.beginPath();
-    c.arc(-rr * 0.3, -rr * 0.35, rr * 0.25, 0, TAU);
-    c.fillStyle = 'rgba(255,255,255,.5)';
-    c.fill();
-    c.restore();
+  }
+  // wet highlight
+  c.strokeStyle = 'rgba(255,255,255,.8)';
+  c.lineWidth = 2.2;
+  c.lineCap = 'round';
+  c.beginPath();
+  c.arc(0, 0, R - wall * 0.35, Math.PI * 1.1, Math.PI * 1.45);
+  c.stroke();
+  c.restore();
+}
+
+const greenOnion: Draw = (c, r) => {
+  const n = 5 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + r() * 0.6;
+    const d = i === 0 ? 0 : 26 + r() * 12;
+    onionRing(c, r, 64 + Math.cos(a) * d, 64 + Math.sin(a) * d, 15 + r() * 7, r() < 0.15);
   }
 };
 
@@ -428,7 +473,7 @@ const naruto: Draw = (c) => {
   c.lineWidth = 5.5;
   c.lineCap = 'round';
   c.beginPath();
-  for (let a = 0, rr = 2; a < TAU * 2.7; a += 0.12, rr += 0.75) {
+  for (let a = 0, rr = 2; a < TAU * 2.7; a += 0.12, rr += 0.21) {
     const x = 64 + Math.cos(a) * rr;
     const y = 64 + Math.sin(a) * rr;
     if (a === 0) c.moveTo(x, y);
@@ -697,29 +742,29 @@ export function sprite(id: string, variant = 0): HTMLCanvasElement {
 }
 
 export const PIECE_SIZE: Record<string, number> = {
-  yumurta: 52,
-  chashu: 58,
-  yesil: 46,
-  nori: 50,
-  misir: 40,
-  mantar: 44,
-  aciyag: 44,
-  tofu: 34,
-  karides: 66,
-  naruto: 46,
-  bambu: 44,
-  susam: 40,
-  pakchoi: 60,
-  filiz: 52,
-  biber: 40,
-  kimchi: 46,
-  lime: 40,
-  citir: 40,
+  yumurta: 80,
+  chashu: 86,
+  yesil: 78,
+  nori: 76,
+  misir: 56,
+  mantar: 64,
+  aciyag: 58,
+  tofu: 50,
+  karides: 96,
+  naruto: 66,
+  bambu: 64,
+  susam: 56,
+  pakchoi: 88,
+  filiz: 74,
+  biber: 58,
+  kimchi: 66,
+  lime: 58,
+  citir: 56,
 };
 
 export function drawPiece(c: Ctx, p: PieceLike) {
   const img = sprite(p.id, p.k);
-  const size = (PIECE_SIZE[p.id] ?? 44) * p.s * 1.18;
+  const size = (PIECE_SIZE[p.id] ?? 60) * p.s;
   c.save();
   c.translate(p.x, p.y);
   c.rotate((p.r * Math.PI) / 180);
@@ -979,8 +1024,8 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
         x = nx;
         y = ny;
       }
-      c.strokeStyle = tint(liq.color, -0.15, 0.8);
-      c.lineWidth = 2.6 + r() * 2;
+      c.strokeStyle = tint(liq.color, 0.05, 0.55);
+      c.lineWidth = 1.8 + r() * 1.4;
       c.stroke();
       c.strokeStyle = 'rgba(255,255,255,.4)';
       c.lineWidth = 0.9;
@@ -1123,7 +1168,7 @@ export function trayImage(id: string, thick: Thick = 'orta'): HTMLCanvasElement 
     const img = nest(id, thick, 'raw', true);
     for (let i = 0; i < 3; i++) c.drawImage(img, 6 + i * 62, 4 + (i % 2) * 14, 110, 110);
   } else {
-    const size = (PIECE_SIZE[id] ?? 44) * 1.2;
+    const size = (PIECE_SIZE[id] ?? 60) * 0.85;
     const n = Math.min(70, Math.round(((W - 40) * (H - 40) * 2.2) / (size * size)));
     for (let i = 0; i < n; i++) {
       const x = 32 + r() * (W - 64);

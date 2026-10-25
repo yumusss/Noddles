@@ -7,10 +7,12 @@ import Story from './components/Story';
 import Unlock from './components/Unlock';
 import Play, { type DayResult } from './components/Play';
 import Results from './components/Results';
+import { net } from './money';
 import Ending from './components/Ending';
 
 export interface Save {
   reached: number;
+  cash: number;
   stars: number[];
   best: number[];
   sfx: boolean;
@@ -20,6 +22,7 @@ export interface Save {
 const KEY = 'noddles-save-v1';
 const fresh: Save = {
   reached: 1,
+  cash: 4000,
   stars: Array(10).fill(0),
   best: Array(10).fill(0),
   sfx: true,
@@ -79,13 +82,20 @@ export default function App() {
   };
 
   const finishDay = (level: number, result: DayResult) => {
+    result = { ...result, cashBefore: save.cash, cashAfter: save.cash + net(result.ledger) };
     setSave((s) => {
       const stars = [...s.stars];
       const best = [...s.best];
       stars[level - 1] = Math.max(stars[level - 1], result.stars);
       best[level - 1] = Math.max(best[level - 1], result.coins);
       const reached = result.stars > 0 ? Math.max(s.reached, Math.min(10, level + 1)) : s.reached;
-      return { ...s, stars, best, reached: level === 10 && result.stars > 0 ? 11 : reached };
+      return {
+        ...s,
+        cash: s.cash + net(result.ledger),
+        stars,
+        best,
+        reached: level === 10 && result.stars > 0 ? 11 : reached,
+      };
     });
     setScreen({ s: 'results', level, result });
   };

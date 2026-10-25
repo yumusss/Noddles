@@ -2,6 +2,7 @@ import { LEVELS, INGREDIENTS } from '../data';
 import { CatArt, Star } from '../art';
 import { Tray } from './FoodCanvas';
 import { sfx } from '../audio';
+import { fmt } from '../money';
 import type { Save } from '../App';
 import { Rain } from './Scenery';
 
@@ -28,6 +29,7 @@ export default function LevelMap({
           ‹
         </button>
         <div className="map-title">Fener Sokağı</div>
+        <div className="map-stars cash">💵 {fmt(save.cash ?? 4000)}</div>
         <div className="map-stars">
           <Star on size={18} /> {total}/30
         </div>

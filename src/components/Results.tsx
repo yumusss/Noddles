@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Level } from '../data';
-import { Coin, Star } from '../art';
+import { Star } from '../art';
+import { fmt, net } from '../money';
 import { sfx } from '../audio';
 import type { DayResult } from './Play';
 
@@ -18,7 +19,6 @@ export default function Results({
   onMap: () => void;
 }) {
   const [shown, setShown] = useState(0);
-  const [coins, setCoins] = useState(0);
   useEffect(() => {
     const timers: number[] = [];
     for (let i = 1; i <= result.stars; i++)
@@ -34,7 +34,7 @@ export default function Results({
     const start = performance.now();
     const id = window.setInterval(() => {
       const p = Math.min(1, (performance.now() - start) / 1200);
-      setCoins(Math.round(result.coins * p));
+      void p;
       if (p >= 1) window.clearInterval(id);
     }, 30);
     return () => {
@@ -77,9 +77,6 @@ export default function Results({
             </div>
           ))}
         </div>
-        <div className="res-coins">
-          <Coin size={28} /> {coins}
-        </div>
         <div className="res-targets">
           <span className={result.avg >= 55 ? 'hit' : ''}>★ %55</span>
           <span className={result.avg >= 75 ? 'hit' : ''}>★★ %75</span>
@@ -103,6 +100,7 @@ export default function Results({
             <span>mutsuz</span>
           </div>
         </div>
+        <Ledger result={result} />
         {pass ? (
           <>
             <button className="btn big primary" onClick={onNext}>
@@ -127,6 +125,57 @@ export default function Results({
           Harita
         </button>
       </div>
+    </div>
+  );
+}
+
+function Ledger({ result }: { result: DayResult }) {
+  const l = result.ledger;
+  const n = net(l);
+  const income: [string, number][] = [
+    [`Satışlar (${l.bowls - l.unpaid} kase)`, l.sales],
+    ['Bahşiş kavanozu', l.tips],
+  ];
+  if (l.bonus) income.push(['Özel misafir bonusu', l.bonus]);
+  const costs: [string, number][] = [['Malzeme gideri', l.ingredients]];
+  if (l.waste) costs.push(['Çöpe giden kaseler', l.waste]);
+  if (l.overChange) costs.push(['Fazla verilen para üstü', l.overChange]);
+  costs.push(['Dükkân kirası', l.rent], ['Elektrik, su & gaz', l.utilities]);
+  return (
+    <div className="ledger">
+      <div className="lg-title">Günlük hesap defteri</div>
+      {income.map(([k, v]) => (
+        <div key={k} className="lg-row in">
+          <span>{k}</span>
+          <b>+{fmt(v)}</b>
+        </div>
+      ))}
+      {costs.map(([k, v]) => (
+        <div key={k} className="lg-row out">
+          <span>{k}</span>
+          <b>−{fmt(v)}</b>
+        </div>
+      ))}
+      {l.unpaid > 0 && <div className="lg-note">{l.unpaid} müşteri beğenmediği için ödemedi.</div>}
+      {l.changeMistakes > 0 && (
+        <div className="lg-note">Para üstünde {l.changeMistakes} hata yaptın.</div>
+      )}
+      <div className={`lg-row total ${n >= 0 ? 'pos' : 'neg'}`}>
+        <span>{n >= 0 ? 'Günlük kâr' : 'Günlük zarar'}</span>
+        <b>
+          {n >= 0 ? '+' : ''}
+          {fmt(n)}
+        </b>
+      </div>
+      {result.cashAfter !== undefined && (
+        <div className="lg-cash">
+          <span>Kasadaki para</span>
+          <b>
+            {fmt(result.cashBefore ?? 0)} →{' '}
+            <em className={n >= 0 ? 'pos' : 'neg'}>{fmt(result.cashAfter)}</em>
+          </b>
+        </div>
+      )}
     </div>
   );
 }
