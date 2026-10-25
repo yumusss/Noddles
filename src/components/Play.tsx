@@ -836,6 +836,13 @@ export default function Play({
               <div className="prep-board" ref={boardRef}>
                 {stage === 'prep' ? (
                   <>
+                    {tool && (
+                      <div className="tool-chip">
+                        {tool.kind === 'noodle'
+                          ? `${THICK_LABEL[thick]} ${INGREDIENTS[tool.id].name}`
+                          : INGREDIENTS[tool.id].name}
+                      </div>
+                    )}
                     <div className={`bowl-wrap ${tool?.kind === 'broth' ? 'pour' : ''}`}>
                       <BowlCanvas
                         bowl={drawBowl}
@@ -895,10 +902,9 @@ export default function Play({
               </div>
             </div>
 
-            <aside className="rail">
-              <div className="rail-sec">
-                <div className="rail-h">Kase</div>
-                <div className="rail-row">
+            <aside className="panel">
+              <div className="panel-top">
+                <div className="style-row">
                   {bowlStyles.map((id) => (
                     <button
                       key={id}
@@ -909,13 +915,10 @@ export default function Play({
                         buzz(10);
                       }}
                       aria-label={BOWLS[id].name}>
-                      <BowlCanvas bowl={BOWL_THUMB[id]} size={44} />
+                      <BowlCanvas bowl={BOWL_THUMB[id]} size={36} />
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="rail-sec">
-                <div className="rail-h">Erişte</div>
                 <div className="thick-row">
                   {(['ince', 'orta', 'kalin'] as Thick[]).map((t) => (
                     <button
@@ -925,56 +928,48 @@ export default function Play({
                         setThick(t);
                         sfx('tap');
                       }}>
-                      <i style={{ height: THICK_W[t] * 1.4 }} />
+                      <i style={{ height: THICK_W[t] * 1.2 }} />
                       <span>{THICK_LABEL[t]}</span>
                     </button>
                   ))}
                 </div>
-                <div className="bins">
-                  {noodles.map((id) => (
-                    <BinButton
-                      key={id}
-                      id={id}
-                      tab="noodle"
-                      bowl={bowl}
-                      tool={tool}
-                      thick={thick}
-                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
-                    />
-                  ))}
-                </div>
               </div>
-              <div className="rail-sec">
-                <div className="rail-h">Su & Sos</div>
-                <div className="bins">
-                  {[...broths, ...sauces].map((id) => (
-                    <BinButton
-                      key={id}
-                      id={id}
-                      tab="broth"
-                      bowl={bowl}
-                      tool={tool}
-                      thick={thick}
-                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
-                    />
-                  ))}
-                </div>
+              <div className="tubs base">
+                {noodles.map((id) => (
+                  <BinButton
+                    key={id}
+                    id={id}
+                    tab="noodle"
+                    bowl={bowl}
+                    tool={tool}
+                    thick={thick}
+                    onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
+                  />
+                ))}
+                {[...broths, ...sauces].map((id) => (
+                  <BinButton
+                    key={id}
+                    id={id}
+                    tab="broth"
+                    bowl={bowl}
+                    tool={tool}
+                    thick={thick}
+                    onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
+                  />
+                ))}
               </div>
-              <div className="rail-sec">
-                <div className="rail-h">Malzemeler</div>
-                <div className="bins">
-                  {toppings.map((id) => (
-                    <BinButton
-                      key={id}
-                      id={id}
-                      tab="topping"
-                      bowl={bowl}
-                      tool={tool}
-                      thick={thick}
-                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
-                    />
-                  ))}
-                </div>
+              <div className="tubs tops">
+                {toppings.map((id) => (
+                  <BinButton
+                    key={id}
+                    id={id}
+                    tab="topping"
+                    bowl={bowl}
+                    tool={tool}
+                    thick={thick}
+                    onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
+                  />
+                ))}
               </div>
             </aside>
           </section>
@@ -1081,8 +1076,7 @@ function BinButton({
         onPick(tab);
         sfx('tap');
       }}>
-      <Tray id={id} thick={thick} width={tab === 'topping' ? 92 : 120} />
-      <span>{INGREDIENTS[id].name}</span>
+      <Tray id={id} thick={thick} width={64} />
       {tab === 'topping' && count > 0 && <em>{count}</em>}
     </button>
   );

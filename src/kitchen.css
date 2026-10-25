@@ -7,11 +7,12 @@
 }
 .kitchen {
   display: grid;
-  grid-template-columns: 1fr 112px;
-  grid-template-rows: 36% 1fr;
+  grid-template-columns: 1fr;
+  grid-template-rows: 22% minmax(0, 1fr) auto;
   grid-template-areas:
-    'pot rail'
-    'prep rail';
+    'pot'
+    'prep'
+    'rail';
   background: #3f3630;
 }
 .pot-area {
@@ -46,9 +47,10 @@
 }
 .prep-area .prep-board {
   flex: 1;
-  margin: 8px 10px 10px;
+  margin: 6px 10px 8px;
   border-radius: 22px;
   min-height: 0;
+  overflow: hidden;
 }
 .prep-area .prep-tools {
   gap: 8px;
@@ -57,11 +59,12 @@
   padding: 10px 14px;
   font-size: 15px;
 }
-.rail {
+.panel {
   grid-area: rail;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px 6px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px max(8px, env(safe-area-inset-bottom));
   background:
     linear-gradient(#0000, rgb(43 36 32 / 0.3)),
     repeating-linear-gradient(90deg, #4a4038 0 3px, #433a33 3px 6px);
@@ -69,67 +72,116 @@
   box-shadow: inset 8px 0 16px rgb(43 36 32 / 0.35);
   scrollbar-width: none;
 }
-.rail::-webkit-scrollbar {
-  display: none;
-}
-.rail-sec + .rail-sec {
-  margin-top: 10px;
-}
-.rail-h {
-  font-size: 10px;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: rgb(246 239 228 / 0.55);
-  font-weight: 900;
-  margin: 2px 2px 5px;
-}
-.rail-row {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 4px;
-}
-.rail .bowl-opt {
-  padding: 3px;
-  border-radius: 10px;
-}
-.rail .bowl-opt canvas {
-  width: 40px !important;
-  height: 40px !important;
-}
-.rail .thick-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  margin: 0 0 6px;
-}
-.rail .thick {
-  padding: 4px 0;
-  border-radius: 8px;
-  font-size: 9px;
-}
-.rail .thick i {
-  display: block;
-  width: 60%;
-  margin: 0 auto 2px;
-  border-radius: 4px;
-  background: #f6d27a;
-}
-.rail .bins {
-  display: grid;
-  grid-template-columns: 1fr;
+.panel-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 6px;
 }
-.rail .bin {
-  padding: 4px 2px 3px;
-  border-radius: 12px;
+.style-row {
+  flex: 1;
+  display: flex;
+  gap: 3px;
+  overflow: hidden;
 }
-.rail .bin .tray-cv {
-  width: 92px !important;
-  height: 65px !important;
+.panel .bowl-opt {
+  padding: 2px;
+  border-radius: 10px;
+  background: none;
+  box-shadow: none;
 }
-.rail .bin span {
+.panel .bowl-opt canvas {
+  width: 34px !important;
+  height: 34px !important;
+}
+.panel .bowl-opt.on {
+  outline: 2px solid var(--gold2);
+  outline-offset: -1px;
+  background: rgb(246 239 228 / 0.1);
+}
+.panel .thick-row {
+  display: flex;
+  gap: 3px;
+}
+.panel .thick {
+  padding: 3px 7px;
+  border-radius: 8px;
+  font-size: 9px;
+  min-width: 38px;
+}
+.panel .thick i {
+  display: block;
+  width: 70%;
+  margin: 0 auto 2px;
+  border-radius: 3px;
+  background: #f6d27a;
+}
+.tubs {
+  display: grid;
+  gap: 4px;
+}
+.tubs.base {
+  grid-template-columns: repeat(10, 1fr);
+}
+.tubs.tops {
+  grid-template-columns: repeat(6, 1fr);
+}
+.panel .bin {
+  padding: 0;
+  border-radius: 50%;
+  background: none;
+  box-shadow: none;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.panel .bin .tray-cv {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
+}
+.panel .bin.sel {
+  outline: 3px solid var(--gold2);
+  outline-offset: -2px;
+}
+.panel .bin.in::after {
+  display: none;
+}
+.panel .bin em {
+  position: absolute;
+  right: 0;
+  top: 0;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--matcha);
+  color: #fff;
   font-size: 10px;
-  line-height: 1.05;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+/* selected tool label over the bowl */
+.prep-area .tool-chip {
+  position: absolute;
+  top: 8px;
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  width: max-content;
+  height: auto;
+  transform: translateX(-50%);
+  z-index: 6;
+  background: #2b2420dd;
+  color: var(--cream);
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
 }
 
 /* cooking controls + serving hatch inside the pot area */
@@ -258,23 +310,28 @@
 /* tablet / landscape */
 @media (min-width: 760px) and (orientation: landscape) {
   .kitchen {
-    grid-template-columns: 38% 1fr 170px;
+    grid-template-columns: 34% 1fr 330px;
     grid-template-rows: 1fr;
     grid-template-areas: 'pot prep rail';
+  }
+  .panel {
+    overflow-y: auto;
+    border-left: 3px solid #2b2420;
+    padding-top: 10px;
+  }
+  .tubs.base {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .tubs.tops {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .panel .bowl-opt canvas {
+    width: 40px !important;
+    height: 40px !important;
   }
   .pot-area {
     border-bottom: 0;
     border-right: 3px solid #2b2420;
-  }
-  .rail .bins {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .rail .bin .tray-cv {
-    width: 72px !important;
-    height: 51px !important;
-  }
-  .rail-row {
-    grid-template-columns: repeat(4, 1fr);
   }
   .prep-area .prep-board .bowl-cv {
     width: min(40vw, 70vh) !important;
