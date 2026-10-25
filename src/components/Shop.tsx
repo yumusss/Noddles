@@ -12,7 +12,17 @@ import {
   type DecorItem,
 } from '../decor';
 import { CatArt } from '../art';
-import { BigArt, CounterDecor, Neon, Plant, Restaurant, SmallArt, Special } from './Scenery';
+import {
+  BigArt,
+  CounterDecor,
+  Floor,
+  Lamps,
+  Neon,
+  Plant,
+  Restaurant,
+  SmallArt,
+  Special,
+} from './Scenery';
 
 const pct = (b: number) => `${(b * 100).toFixed((b * 100) % 1 ? 1 : 0)}%`;
 
@@ -103,116 +113,52 @@ function CatIcon({ cat }: { cat: DecorCat }) {
   }
 }
 
-/* ---------- drawn previews ---------- */
+/* ---------- drawn previews (v3 line art) ---------- */
 
-const LAMP_COLORS: Record<string, string[]> = {
-  lamps_red: ['#c8553d', '#c8553d', '#c8553d'],
-  lamps_paper: ['#f6efe4', '#f6efe4', '#f6efe4'],
-  lamps_edison: ['#e8b86e', '#e8b86e', '#e8b86e'],
-  lamps_festival: ['#c8553d', '#d9a441', '#7c9a6e'],
-};
-
-function LampPreview({ id }: { id: string }) {
-  const cols = LAMP_COLORS[id] ?? LAMP_COLORS.lamps_red;
-  const xs = [34, 80, 126];
-  const ys = id === 'lamps_edison' ? [40, 56, 46] : [42, 50, 42];
-  return (
-    <svg viewBox="0 0 160 120" className="pv-svg">
-      <defs>
-        <linearGradient id={`pl-${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#4a3a5e" />
-          <stop offset="1" stopColor="#2f2838" />
-        </linearGradient>
-        {cols.map((c, i) => (
-          <radialGradient key={i} id={`pl-${id}-${i}`} cx=".42" cy=".36" r=".75">
-            <stop offset="0" stopColor="#fff6e8" stopOpacity=".95" />
-            <stop offset=".35" stopColor={c} />
-            <stop offset="1" stopColor={c} stopOpacity=".55" />
-          </radialGradient>
-        ))}
-      </defs>
-      <rect width="160" height="120" fill={`url(#pl-${id})`} />
-      {xs.map((x, i) => {
-        const c = cols[i];
-        const y = ys[i];
-        return (
-          <g key={i}>
-            <circle cx={x} cy={y + 10} r="30" fill={c} opacity=".16" />
-            <circle cx={x} cy={y + 10} r="18" fill={c} opacity=".2" />
-            <path d={`M${x} 0 v${y - 14}`} stroke="#8a7a66" strokeWidth="1.4" />
-            {id === 'lamps_paper' ? (
-              <circle cx={x} cy={y + 2} r="16" fill={`url(#pl-${id}-${i})`} />
-            ) : id === 'lamps_edison' ? (
-              <g>
-                <rect x={x - 4} y={y - 15} width="8" height="7" rx="2" fill="#a97a4c" />
-                <path
-                  d={`M${x - 7} ${y - 6} q-5 12 2 20 q5 5 10 0 q7 -8 2 -20z`}
-                  fill={`url(#pl-${id}-${i})`}
-                />
-                <path
-                  d={`M${x - 3} ${y + 2} q3 -6 6 0 q-3 6 -6 0`}
-                  fill="none"
-                  stroke="#fff1c6"
-                  strokeWidth="1"
-                />
-              </g>
-            ) : (
-              <g>
-                <rect x={x - 9} y={y - 16} width="18" height="4" rx="2" fill="#5a4030" />
-                <path
-                  d={`M${x - 14} ${y - 10} q0 -5 14 -5 q14 0 14 5 v18 q0 5 -14 5 q-14 0 -14 -5z`}
-                  fill={`url(#pl-${id}-${i})`}
-                />
-                <path
-                  d={`M${x - 14} ${y - 4} h28 M${x - 14} ${y + 3} h28`}
-                  stroke="#2b2420"
-                  strokeWidth=".8"
-                  opacity=".22"
-                />
-                <rect x={x - 9} y={y + 10} width="18" height="4" rx="2" fill="#5a4030" />
-              </g>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
+const INK = '#2b2420';
+const ink = {
+  stroke: INK,
+  strokeOpacity: 0.82,
+  strokeWidth: 1.3,
+  vectorEffect: 'non-scaling-stroke',
+  strokeLinejoin: 'round',
+  strokeLinecap: 'round',
+} as const;
 
 function TablePreview({ id }: { id: string }) {
   const n = id === 'tables_4' ? 4 : id === 'tables_2' ? 2 : 0;
   const spots =
     n === 4
       ? [
-          [44, 70],
-          [116, 70],
-          [62, 46],
-          [98, 46],
+          [62, 50],
+          [98, 50],
+          [44, 76],
+          [116, 76],
         ]
       : n === 2
         ? [
-            [48, 62],
-            [112, 62],
+            [48, 68],
+            [112, 68],
           ]
         : [];
   return (
     <svg viewBox="0 0 160 120" className="pv-svg">
-      <defs>
-        <linearGradient id={`pt-${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="#ece2d2" />
-          <stop offset="1" stopColor="#d6b48a" />
-        </linearGradient>
-      </defs>
-      <rect width="160" height="120" fill={`url(#pt-${id})`} />
-      <rect y="78" width="160" height="42" fill="#c89a68" />
-      <rect y="78" width="160" height="3" fill="#e2c093" />
+      <rect width="160" height="120" fill="#ece2d2" />
+      <rect y="40" width="160" height="80" fill="#cfa273" />
+      <path d="M0 40 h160" {...ink} />
+      <path
+        d="M20 120 L48 40 M60 120 L72 40 M100 120 L88 40 M140 120 L112 40"
+        {...ink}
+        strokeOpacity=".2"
+      />
       {n === 0 && (
         <g>
+          <rect x="0" y="86" width="160" height="34" fill="#c4935b" />
+          <rect x="0" y="80" width="160" height="8" fill="#e2c093" {...ink} />
           {[40, 80, 120].map((x) => (
             <g key={x}>
-              <ellipse cx={x} cy="100" rx="13" ry="4" fill="#2b2420" opacity=".15" />
-              <rect x={x - 9} y="70" width="18" height="24" rx="4" fill="#8d5d3a" />
-              <ellipse cx={x} cy="70" rx="11" ry="4" fill="#c08d5e" />
+              <rect x={x - 9} y="60" width="18" height="22" rx="4" fill="#8d5d3a" {...ink} />
+              <ellipse cx={x} cy="60" rx="11" ry="4" fill="#c08d5e" {...ink} />
             </g>
           ))}
         </g>
@@ -222,14 +168,28 @@ function TablePreview({ id }: { id: string }) {
         const r = far ? 15 : 20;
         return (
           <g key={i}>
-            <ellipse cx={x + 3} cy={y + 24} rx={r} ry={5} fill="#2b2420" opacity=".15" />
-            <rect x={x - 2} y={y} width="4" height={far ? 16 : 22} fill="#7b4f2e" />
-            <ellipse cx={x} cy={y + (far ? 17 : 23)} rx={far ? 7 : 9} ry="2.5" fill="#7b4f2e" />
-            <ellipse cx={x} cy={y + 1.5} rx={r} ry={r * 0.38} fill="#a97a4c" />
-            <ellipse cx={x} cy={y} rx={r} ry={r * 0.38} fill="#dcb98c" />
-            <ellipse cx={x - r * 0.3} cy={y - 1} rx={r * 0.28} ry={r * 0.12} fill="#f6efe4" />
-            <ellipse cx={x - r * 0.3} cy={y - 1.6} rx={r * 0.18} ry={r * 0.07} fill="#e8b86e" />
-            <circle cx={x + r * 0.4} cy={y - 1} r={r * 0.12} fill="#7c9a6e" />
+            <ellipse cx={x} cy={y + (far ? 18 : 24)} rx={r * 0.9} ry={3} fill={INK} opacity=".14" />
+            <rect x={x - 2} y={y} width="4" height={far ? 16 : 22} fill="#7b4f2e" {...ink} />
+            <ellipse
+              cx={x}
+              cy={y + (far ? 17 : 23)}
+              rx={far ? 7 : 9}
+              ry="2.5"
+              fill="#7b4f2e"
+              {...ink}
+            />
+            <ellipse cx={x} cy={y + 2.5} rx={r} ry={r * 0.38} fill="#a1764a" {...ink} />
+            <ellipse cx={x} cy={y} rx={r} ry={r * 0.38} fill="#d8ad78" {...ink} />
+            <ellipse
+              cx={x - r * 0.3}
+              cy={y - 1}
+              rx={r * 0.28}
+              ry={r * 0.12}
+              fill="#f6efe4"
+              {...ink}
+            />
+            <ellipse cx={x - r * 0.3} cy={y - 1.6} rx={r * 0.18} ry={r * 0.07} fill="#e3b96b" />
+            <circle cx={x + r * 0.4} cy={y - 1} r={r * 0.12} fill="#7c9a6e" {...ink} />
           </g>
         );
       })}
@@ -274,13 +234,13 @@ function ItemPreview({ item }: { item: DecorItem }) {
   if (cat === 'floor')
     return (
       <div className={`prev swatch floor ${id}`}>
-        <div className="rest-floor-tex" />
+        <Floor kind={id} />
       </div>
     );
   if (cat === 'lamps')
     return (
-      <div className="prev">
-        <LampPreview id={id} />
+      <div className="prev lamps">
+        <Lamps kind={id} />
       </div>
     );
   if (cat === 'tables')
