@@ -1,7 +1,8 @@
-// Food rendering on Canvas 2D in the v3 "single line language" of ART_DIRECTION.md:
-// thin warm-ink outlines, flat fills, exactly one shadow tone and one small
-// highlight per shape. No multi-stop gradients, no blur haze, no noise.
-// Everything is procedural and cached.
+// Food rendering on Canvas 2D in a "Good Pizza, Great Pizza" spirit:
+// chunky, juicy, painterly 2D food. Every shape is a clean silhouette with soft
+// form shading (light from the top-left, one soft shadow side, one small
+// specular). No ink outlines, no noise, no muddy gradients. Everything is
+// procedural and cached.
 
 import { INGREDIENTS } from './data';
 import { BOWLS, DEFAULT_BOWL, type BowlStyle } from './bowls';
@@ -59,6 +60,7 @@ function hex2rgb(h: string) {
   const n = parseInt(h.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
+/** lighten (amt>0) or darken (amt<0) a hex colour, optionally with alpha */
 export function tint(h: string, amt: number, alpha = 1) {
   const [r, g, b] = hex2rgb(h);
   const f = (c: number) =>
@@ -72,50 +74,104 @@ function mixHex(a: string, b: string, t: number) {
   return '#' + m.map((v) => v.toString(16).padStart(2, '0')).join('');
 }
 
-/** warm white highlight / warm ink (never pure white or black) */
+/** warm white highlight / warm shadow (never pure white or black) */
 const hi = (a: number) => `rgba(255,246,232,${a})`;
-const ink = (a: number) => `rgba(43,36,32,${a})`;
-const INK = ink(0.85);
-/** the single shadow tone of a colour: same hue, 18% darker */
-const dark = (col: string) => tint(col, -0.18);
+const sh = (a: number) => `rgba(43,36,32,${a})`;
 
-/** ink outline */
-function line(c: Ctx, p: Path2D, w: number, a = 0.85) {
-  c.strokeStyle = ink(a);
-  c.lineWidth = w;
-  c.lineJoin = 'round';
-  c.lineCap = 'round';
-  c.stroke(p);
+function radial(
+  c: Ctx,
+  x: number,
+  y: number,
+  r1: number,
+  stops: [number, string][],
+  x1 = x,
+  y1 = y
+) {
+  const g = c.createRadialGradient(x, y, 0, x1, y1, r1);
+  for (const [t, col] of stops) g.addColorStop(t, col);
+  return g;
+}
+function linear(c: Ctx, x0: number, y0: number, x1: number, y1: number, stops: [number, string][]) {
+  const g = c.createLinearGradient(x0, y0, x1, y1);
+  for (const [t, col] of stops) g.addColorStop(t, col);
+  return g;
+}
+
+interface Shade {
+  /** highlight strength (0..1) */
+  light?: number;
+  /** shadow strength (0..1) */
+  dark?: number;
+  /** light direction, in units of rad */
+  lx?: number;
+  ly?: number;
+  /** soft dark band on the shadow side of the silhouette */
+  edge?: number;
+  spread?: number;
 }
 /**
- * flat fill with one shadow tone on the lower-right side.
- * The shadow is a hard crescent whose inner edge is slightly softened.
+ * The painterly fill: a clean silhouette with a soft three-tone radial
+ * (light → base → shadow) lit from the top-left, plus a soft dark band on
+ * the lower-right side of the silhouette so the form reads against anything.
  */
-function flat(c: Ctx, p: Path2D, col: string, off = 3, soft = 2, shadow = dark(col)) {
-  c.fillStyle = shadow;
+function paint(c: Ctx, p: Path2D, col: string, cx: number, cy: number, rad: number, o: Shade = {}) {
+  const { light = 0.22, dark = 0.3, lx = -0.38, ly = -0.42, edge = 0.25, spread = 1.5 } = o;
+  c.fillStyle = radial(
+    c,
+    cx + lx * rad,
+    cy + ly * rad,
+    rad * spread,
+    [
+      [0, tint(col, light)],
+      [0.5, col],
+      [1, tint(col, -dark)],
+    ],
+    cx + lx * rad * 0.25,
+    cy + ly * rad * 0.25
+  );
   c.fill(p);
-  c.save();
-  c.clip(p);
-  c.translate(-off, -off);
-  c.fillStyle = col;
-  if (soft > 0) {
-    c.shadowColor = col;
-    c.shadowBlur = soft;
+  if (edge > 0) {
+    c.save();
+    c.clip(p);
+    const d = tint(col, -0.5, edge);
+    c.strokeStyle = d;
+    c.lineWidth = rad * 0.14;
+    c.shadowColor = d;
+    c.shadowBlur = rad * 0.16;
+    c.translate(rad * 0.06, rad * 0.07);
+    c.stroke(p);
+    c.restore();
   }
-  c.fill(p);
-  c.restore();
 }
-/** flat fill + shadow + outline: the basic "sticker" */
-function sticker(c: Ctx, p: Path2D, col: string, lw: number, off = 3, soft = 2, shadow?: string) {
-  flat(c, p, col, off, soft, shadow);
-  line(c, p, lw);
-}
-/** the one small highlight: an ellipse of warm white */
-function shine(c: Ctx, x: number, y: number, rx: number, ry: number, rot = -0.7, a = 0.6) {
+/** one small soft specular */
+function spec(
+  c: Ctx,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  rot = -0.6,
+  a = 0.75,
+  blur = 1.2
+) {
+  c.save();
   c.fillStyle = hi(a);
+  c.shadowColor = hi(a);
+  c.shadowBlur = blur;
   c.beginPath();
   c.ellipse(x, y, rx, ry, rot, 0, TAU);
   c.fill();
+  c.restore();
+}
+/** soft contact shadow under a shape */
+function drop(c: Ctx, p: Path2D, a = 0.3, blur = 5, dx = 2, dy = 4) {
+  c.save();
+  c.fillStyle = sh(a);
+  c.shadowColor = sh(a);
+  c.shadowBlur = blur;
+  c.translate(dx, dy);
+  c.fill(p);
+  c.restore();
 }
 function ell(x: number, y: number, rx: number, ry: number, rot = 0) {
   const p = new Path2D();
@@ -126,16 +182,6 @@ function rrect(x: number, y: number, w: number, h: number, r: number) {
   const p = new Path2D();
   p.roundRect(x, y, w, h, r);
   return p;
-}
-/** smooth closed blob */
-function blob(r: () => number, cx: number, cy: number, rad: number, wob: number, n = 14) {
-  const pts: [number, number][] = [];
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    const rr = rad * (1 - wob / 2 + r() * wob);
-    pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
-  }
-  return smoothClosed(pts);
 }
 function smoothClosed(pts: [number, number][]) {
   const p = new Path2D();
@@ -168,9 +214,19 @@ function smoothOpen(pts: [number, number][]) {
   p.lineTo(l[0], l[1]);
   return p;
 }
+/** smooth organic disc */
+function blob(r: () => number, cx: number, cy: number, rad: number, wob: number, n = 16) {
+  const pts: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    const rr = rad * (1 - wob / 2 + r() * wob);
+    pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
+  }
+  return smoothClosed(pts);
+}
 function spiral(r0: number, step: number, turns: number, sx = 1, sy = 1) {
   const p = new Path2D();
-  for (let a = 0, rr = r0; a < TAU * turns; a += 0.1, rr += step * 0.1) {
+  for (let a = 0, rr = r0; a < TAU * turns; a += 0.08, rr += step * 0.08) {
     const x = Math.cos(a) * rr * sx;
     const y = Math.sin(a) * rr * sy;
     if (a === 0) p.moveTo(x, y);
@@ -178,42 +234,90 @@ function spiral(r0: number, step: number, turns: number, sx = 1, sy = 1) {
   }
   return p;
 }
-/** an outlined ribbon (ink under, colour over, thin light line on top) */
-function ribbon(c: Ctx, p: Path2D, col: string, w: number, lw: number, hiA = 0.55) {
+/**
+ * A rounded, shaded strand (noodle, ribbon, fat spiral, sauce drizzle):
+ * soft cast shadow, darker edge tone, lit body, thin satin highlight.
+ */
+function strand(c: Ctx, p: Path2D, col: string, w: number, hiA = 0.5, shadowA = 0.22) {
   c.lineCap = 'round';
   c.lineJoin = 'round';
-  c.strokeStyle = INK;
-  c.lineWidth = w + lw * 2;
-  c.stroke(p);
-  c.strokeStyle = col;
+  if (shadowA > 0) {
+    c.save();
+    c.strokeStyle = sh(shadowA);
+    c.lineWidth = w;
+    c.translate(w * 0.22, w * 0.34);
+    c.stroke(p);
+    c.restore();
+  }
+  c.strokeStyle = tint(col, -0.3);
   c.lineWidth = w;
   c.stroke(p);
+  c.save();
+  c.strokeStyle = col;
+  c.lineWidth = w * 0.7;
+  c.translate(-w * 0.07, -w * 0.1);
+  c.stroke(p);
+  c.restore();
   if (hiA > 0) {
     c.save();
-    c.translate(-w * 0.18, -w * 0.22);
     c.strokeStyle = hi(hiA);
-    c.lineWidth = Math.max(0.8, w * 0.22);
+    c.lineWidth = Math.max(0.7, w * 0.2);
+    c.translate(-w * 0.2, -w * 0.26);
     c.stroke(p);
     c.restore();
   }
 }
 
-// ---------- topping sprites (drawn in a 128x128 space, centred at 64,64) ----------
+// ---------- topping sprites (128×128 space, centred at 64,64, 2× supersampled) ----------
 const S = 128;
-const SS = 2; // sprite supersampling
-const LW = 2.3; // ≈1.3px once a sprite is scaled into the 300px bowl
+const SS = 2;
 type Draw = (c: Ctx, r: () => number) => void;
 
 const egg: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
-  c.rotate((r() - 0.5) * 0.5);
-  const w = ell(0, 0, 50, 40);
-  sticker(c, w, '#f8ecd8', LW, 4, 3);
-  const y = ell(2, 2, 27, 22);
-  sticker(c, y, '#f2a23a', LW * 0.8, 4, 3, '#d87a22');
-  shine(c, -8, -8, 7, 4.2, -0.6, 0.7);
-  shine(c, -30, -20, 7, 3, -0.5, 0.55);
+  c.rotate((r() - 0.5) * 0.4);
+  // egg-shaped white: narrower top, fuller bottom
+  const W = new Path2D();
+  W.moveTo(0, -50);
+  W.bezierCurveTo(30, -50, 50, -26, 50, 4);
+  W.bezierCurveTo(50, 34, 26, 52, 0, 52);
+  W.bezierCurveTo(-26, 52, -50, 34, -50, 4);
+  W.bezierCurveTo(-50, -26, -30, -50, 0, -50);
+  W.closePath();
+  drop(c, W, 0.25, 6, 2, 4);
+  paint(c, W, '#f6ecd8', 0, 0, 52, { light: 0.1, dark: 0.18, edge: 0.2 });
+  // soy-marinade tan rim of the white
+  c.save();
+  c.clip(W);
+  c.strokeStyle = 'rgba(176,122,62,.6)';
+  c.lineWidth = 7;
+  c.shadowColor = 'rgba(176,122,62,.6)';
+  c.shadowBlur = 5;
+  c.stroke(W);
+  c.restore();
+  // yolk: slightly low, with a soft socket shadow
+  const Y = ell(1, 8, 31, 27);
+  c.save();
+  c.clip(W);
+  c.fillStyle = sh(0.0001);
+  c.shadowColor = sh(0.35);
+  c.shadowBlur = 6;
+  c.shadowOffsetX = -2;
+  c.shadowOffsetY = -2;
+  c.fill(ell(1, 8, 32, 28));
+  c.restore();
+  paint(c, Y, '#f0962a', 1, 8, 29, { light: 0.3, dark: 0.36, edge: 0.3 });
+  // jammy, darker molten centre
+  c.fillStyle = radial(c, 5, 13, 20, [
+    [0, 'rgba(214,92,16,.8)'],
+    [0.6, 'rgba(214,92,16,.35)'],
+    [1, 'rgba(214,92,16,0)'],
+  ]);
+  c.fill(Y);
+  spec(c, -9, -2, 10, 5.5, -0.6, 0.85, 1.5);
+  spec(c, 9, -7, 3, 1.8, -0.4, 0.55, 1);
+  spec(c, -28, -28, 7, 3, -0.7, 0.6, 1.5);
   c.restore();
 };
 
@@ -221,40 +325,89 @@ const chashu: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  const outer = blob(r, 0, 0, 52, 0.06, 16);
-  sticker(c, outer, '#7b4f2e', LW, 3, 2);
-  const inner = blob(r, 0, 0, 44, 0.05, 16);
-  flat(c, inner, '#e8ad92', 3, 2);
-  line(c, inner, LW * 0.7, 0.6);
+  const outer = blob(r, 0, 0, 57, 0.05, 18);
+  drop(c, outer, 0.28, 6, 2, 4);
+  paint(c, outer, '#9a5a32', 0, 0, 57, { light: 0.28, dark: 0.4, edge: 0.35 });
+  // caramelised glaze spots on the rind
   c.save();
-  c.clip(inner);
-  ribbon(c, spiral(5, 4.9, 2.2, 1.04, 0.96), '#f7e8d9', 7.5, LW * 0.6, 0);
+  c.clip(outer);
+  c.fillStyle = 'rgba(80,36,14,.45)';
+  for (let i = 0; i < 7; i++) {
+    const a = r() * TAU;
+    c.beginPath();
+    c.ellipse(Math.cos(a) * 54, Math.sin(a) * 54, 6 + r() * 5, 2.4, a + Math.PI / 2, 0, TAU);
+    c.fill();
+  }
   c.restore();
-  shine(c, -16, -18, 9, 4, -0.7, 0.5);
+  const fat = blob(r, 0, 0, 52, 0.05, 18);
+  paint(c, fat, '#f4e6d3', 0, 0, 52, { light: 0.08, dark: 0.2, edge: 0.18 });
+  const meat = blob(r, 0, 0, 46, 0.06, 18);
+  paint(c, meat, '#dc8f7a', 0, 0, 46, { light: 0.22, dark: 0.3, edge: 0.26 });
+  c.save();
+  c.clip(meat);
+  // meat grain: fine arcs following the roll
+  c.strokeStyle = 'rgba(150,60,45,.28)';
+  c.lineWidth = 1.5;
+  c.lineCap = 'round';
+  for (let i = 0; i < 26; i++) {
+    const a = r() * TAU;
+    const d = 8 + r() * 36;
+    c.beginPath();
+    c.arc(0, 0, d, a, a + 0.35 + r() * 0.5);
+    c.stroke();
+  }
+  // soft rosy centre
+  c.fillStyle = radial(c, -4, -4, 30, [
+    [0, 'rgba(236,160,140,.55)'],
+    [1, 'rgba(236,160,140,0)'],
+  ]);
+  c.fill(meat);
+  // fat spiral
+  strand(c, spiral(5, 5.6, 2.05, 1.04, 0.96), '#f7ece0', 8, 0.35, 0.16);
+  c.restore();
+  spec(c, -18, -20, 11, 5, -0.7, 0.5, 2);
   c.restore();
 };
 
-function ring(c: Ctx, x: number, y: number, R: number, col: string, hole: string, lw = LW) {
-  const o = ell(x, y, R, R * 0.9);
-  sticker(c, o, col, lw, 2, 1.5);
-  const i = ell(x + 0.5, y + 0.5, R * 0.5, R * 0.45);
-  c.fillStyle = hole;
-  c.fill(i);
-  line(c, i, lw * 0.8, 0.7);
-  shine(c, x - R * 0.45, y - R * 0.4, R * 0.22, R * 0.12, -0.6, 0.6);
+function sring(c: Ctx, x: number, y: number, R: number, col: string) {
+  const o = ell(x, y, R, R * 0.92);
+  drop(c, o, 0.22, 3, 1, 2);
+  paint(c, o, col, x, y, R, { light: 0.28, dark: 0.32, edge: 0.32 });
+  // inner layer line
+  c.strokeStyle = tint(col, 0.4, 0.6);
+  c.lineWidth = 1.4;
+  c.beginPath();
+  c.ellipse(x, y, R * 0.7, R * 0.64, 0, 0, TAU);
+  c.stroke();
+  const h = ell(x + R * 0.04, y + R * 0.06, R * 0.44, R * 0.4);
+  c.fillStyle = radial(c, x - R * 0.1, y - R * 0.1, R * 0.6, [
+    [0, '#f4f8e6'],
+    [1, '#cddcb0'],
+  ]);
+  c.fill(h);
+  c.save();
+  c.clip(h);
+  c.strokeStyle = sh(0.4);
+  c.lineWidth = R * 0.22;
+  c.shadowColor = sh(0.4);
+  c.shadowBlur = R * 0.22;
+  c.translate(R * 0.1, R * 0.12);
+  c.stroke(h);
+  c.restore();
+  spec(c, x - R * 0.45, y - R * 0.5, R * 0.24, R * 0.12, -0.5, 0.75, 1);
 }
 const greenOnion: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
   const pos: [number, number, number][] = [
-    [-22, -12, 17],
-    [12, -20, 15],
-    [20, 16, 16],
-    [-14, 22, 14],
-    [-1, 1, 12],
+    [-26, -14, 21],
+    [14, -24, 19],
+    [26, 18, 20],
+    [-16, 26, 18],
+    [-2, 0, 16],
   ];
-  for (const [x, y, R] of pos) ring(c, x, y, R, r() < 0.4 ? '#9dbb79' : '#7c9a6e', '#eef3df');
+  for (const [x, y, R] of pos) sring(c, x, y, R, r() < 0.4 ? '#9cc06f' : '#6fa05a');
   c.restore();
 };
 
@@ -263,32 +416,42 @@ const nori: Draw = (c, r) => {
   c.translate(64, 64);
   c.rotate((r() - 0.5) * 0.3);
   const p = new Path2D();
-  p.moveTo(-40, -46);
-  p.lineTo(40, -44);
-  p.lineTo(42, 40);
-  p.quadraticCurveTo(14, 30, -22, 46);
-  p.lineTo(-42, 44);
+  p.moveTo(-46, -50);
+  p.quadraticCurveTo(0, -54, 46, -48);
+  p.lineTo(48, 44);
+  p.quadraticCurveTo(16, 34, -24, 50);
+  p.lineTo(-48, 48);
   p.closePath();
-  sticker(c, p, '#2f4a38', LW, 4, 3, '#1f3326');
+  drop(c, p, 0.3, 6, 2, 4);
+  paint(c, p, '#2f4b3a', 0, 0, 56, { light: 0.3, dark: 0.3, edge: 0.3 });
+  // satin sheen band
+  c.save();
+  c.clip(p);
+  c.fillStyle = linear(c, -50, -50, 30, 40, [
+    [0, 'rgba(255,246,232,0)'],
+    [0.32, 'rgba(255,246,232,.2)'],
+    [0.42, 'rgba(255,246,232,.06)'],
+    [1, 'rgba(255,246,232,0)'],
+  ]);
+  c.fillRect(-60, -60, 120, 120);
+  // fine fibre streaks
+  c.strokeStyle = 'rgba(255,246,232,.09)';
+  c.lineWidth = 1.2;
+  for (let i = 0; i < 7; i++) {
+    const y = -40 + i * 12 + r() * 5;
+    c.beginPath();
+    c.moveTo(-48, y);
+    c.lineTo(48, y - 2);
+    c.stroke();
+  }
+  c.restore();
   // curled corner: lighter underside
   const f = new Path2D();
-  f.moveTo(42, 40);
-  f.quadraticCurveTo(14, 30, -22, 46);
-  f.quadraticCurveTo(10, 44, 26, 52);
-  f.quadraticCurveTo(40, 54, 42, 40);
-  c.fillStyle = '#5c7d64';
-  c.fill(f);
-  line(c, f, LW * 0.8);
-  // two faint sheen lines
-  c.strokeStyle = hi(0.22);
-  c.lineWidth = 3;
-  c.lineCap = 'round';
-  c.beginPath();
-  c.moveTo(-28, -30);
-  c.lineTo(-2, -34);
-  c.moveTo(-28, -20);
-  c.lineTo(-12, -22);
-  c.stroke();
+  f.moveTo(48, 44);
+  f.quadraticCurveTo(16, 34, -24, 50);
+  f.quadraticCurveTo(12, 48, 30, 56);
+  f.quadraticCurveTo(44, 58, 48, 44);
+  paint(c, f, '#5b7e64', 20, 48, 30, { light: 0.2, dark: 0.25, edge: 0.2 });
   c.restore();
 };
 
@@ -298,13 +461,23 @@ function kernel(c: Ctx, x: number, y: number, rot: number, s = 1) {
   c.rotate(rot);
   c.scale(s, s);
   const p = new Path2D();
-  p.moveTo(-12, -11);
-  p.quadraticCurveTo(0, -16, 12, -11);
-  p.quadraticCurveTo(14, 2, 6, 11);
-  p.quadraticCurveTo(0, 15, -6, 11);
-  p.quadraticCurveTo(-14, 2, -12, -11);
-  sticker(c, p, '#f3c74a', LW, 2.5, 1.5, '#d9a441');
-  shine(c, -4, -5, 3.5, 2, -0.6, 0.7);
+  p.moveTo(-13, -12);
+  p.quadraticCurveTo(0, -18, 13, -12);
+  p.quadraticCurveTo(16, 3, 7, 13);
+  p.quadraticCurveTo(0, 17, -7, 13);
+  p.quadraticCurveTo(-16, 3, -13, -12);
+  drop(c, p, 0.22, 3, 1, 2);
+  paint(c, p, '#f6c643', 0, 0, 15, { light: 0.3, dark: 0.32, edge: 0.3 });
+  // dimple
+  c.fillStyle = 'rgba(190,120,20,.4)';
+  c.beginPath();
+  c.ellipse(0, -5, 5, 3.4, 0, 0, TAU);
+  c.fill();
+  c.fillStyle = hi(0.5);
+  c.beginPath();
+  c.ellipse(0, -2.6, 4, 1.6, 0, 0, TAU);
+  c.fill();
+  spec(c, -5, -8, 3, 1.8, -0.6, 0.7, 0.8);
   c.restore();
 }
 const corn: Draw = (c, r) => {
@@ -312,13 +485,14 @@ const corn: Draw = (c, r) => {
   c.translate(64, 64);
   c.rotate(r() * TAU);
   const pos: [number, number][] = [
-    [-20, -14],
-    [12, -20],
-    [22, 12],
-    [-12, 20],
-    [0, -1],
+    [-24, -16],
+    [14, -24],
+    [28, 12],
+    [-14, 26],
+    [0, 0],
+    [-30, 10],
   ];
-  for (const [x, y] of pos) kernel(c, x, y, r() * TAU, 1.05);
+  for (const [x, y] of pos) kernel(c, x, y, r() * TAU, 1.25);
   c.restore();
 };
 
@@ -326,19 +500,49 @@ const shiitake: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  const cap = blob(r, 0, 0, 46, 0.05, 14);
-  sticker(c, cap, '#8a5a3a', LW, 4, 3, '#5f3b25');
-  // the classic star cut: three cream grooves
-  const g = '#f0dfc5';
-  c.lineCap = 'round';
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI;
-    const p = new Path2D();
-    p.moveTo(Math.cos(a) * 26, Math.sin(a) * 26);
-    p.lineTo(-Math.cos(a) * 26, -Math.sin(a) * 26);
-    ribbon(c, p, g, 5, LW * 0.55, 0);
+  // gills peeking out below the cap
+  const g = ell(0, 5, 50, 47);
+  drop(c, g, 0.28, 6, 2, 4);
+  paint(c, g, '#d8b07a', 0, 5, 50, { light: 0.15, dark: 0.3, edge: 0.3 });
+  c.save();
+  c.clip(g);
+  c.strokeStyle = 'rgba(120,80,40,.4)';
+  c.lineWidth = 1.3;
+  for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * TAU;
+    c.beginPath();
+    c.moveTo(Math.cos(a) * 20, 5 + Math.sin(a) * 18);
+    c.lineTo(Math.cos(a) * 52, 5 + Math.sin(a) * 50);
+    c.stroke();
   }
-  shine(c, -18, -20, 8, 4, -0.7, 0.45);
+  c.restore();
+  const cap = blob(r, 0, -3, 49, 0.05, 16);
+  drop(c, cap, 0.3, 4, 1, 3);
+  paint(c, cap, '#8e5a36', 0, -3, 49, { light: 0.3, dark: 0.38, edge: 0.3 });
+  // cross score: three carved grooves
+  c.save();
+  c.clip(cap);
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI + 0.3;
+    const p = new Path2D();
+    p.moveTo(Math.cos(a) * 30, -4 + Math.sin(a) * 30);
+    p.lineTo(-Math.cos(a) * 30, -4 - Math.sin(a) * 30);
+    c.strokeStyle = 'rgba(70,40,20,.55)';
+    c.lineWidth = 9;
+    c.lineCap = 'round';
+    c.stroke(p);
+    c.strokeStyle = '#f0dfc0';
+    c.lineWidth = 6;
+    c.stroke(p);
+    c.strokeStyle = 'rgba(200,170,120,.6)';
+    c.lineWidth = 2;
+    c.save();
+    c.translate(1, 1.5);
+    c.stroke(p);
+    c.restore();
+  }
+  c.restore();
+  spec(c, -20, -24, 12, 5, -0.7, 0.4, 3);
   c.restore();
 };
 
@@ -346,107 +550,176 @@ const chiliOil: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  const big = blob(r, -4, 2, 34, 0.25, 12);
-  sticker(c, big, '#e0552c', LW, 3, 2, '#b83a1c');
-  const s1 = ell(36, -22, 9, 7);
-  sticker(c, s1, '#e0552c', LW * 0.8, 2, 1, '#b83a1c');
-  const s2 = ell(-34, 32, 6, 5);
-  sticker(c, s2, '#e0552c', LW * 0.8, 2, 1, '#b83a1c');
+  const pool = blob(r, -3, 2, 42, 0.16, 12);
+  const dropl = [ell(42, -26, 11, 9), ell(-40, 34, 8, 7), ell(30, 36, 5, 4.5)];
+  for (const p of [pool, ...dropl]) {
+    c.fillStyle = radial(c, -14, -10, 60, [
+      [0, 'rgba(240,110,48,.7)'],
+      [0.6, 'rgba(220,70,30,.8)'],
+      [1, 'rgba(176,44,20,.88)'],
+    ]);
+    c.fill(p);
+    c.save();
+    c.clip(p);
+    c.strokeStyle = 'rgba(120,20,8,.35)';
+    c.lineWidth = 5;
+    c.shadowColor = 'rgba(120,20,8,.4)';
+    c.shadowBlur = 5;
+    c.translate(2, 3);
+    c.stroke(p);
+    c.restore();
+  }
   // flakes
-  c.fillStyle = '#7a1e10';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 12; i++) {
     const a = r() * TAU;
-    const d = r() * 22;
+    const d = r() * 30;
+    c.fillStyle = i % 3 ? '#7e1d0f' : '#b8321a';
     c.beginPath();
-    c.ellipse(-4 + Math.cos(a) * d, 2 + Math.sin(a) * d, 2.6, 1.6, a, 0, TAU);
+    c.ellipse(-3 + Math.cos(a) * d, 2 + Math.sin(a) * d, 2.5 + r() * 2, 1.6, a, 0, TAU);
     c.fill();
   }
-  shine(c, -16, -12, 8, 4, -0.6, 0.6);
+  spec(c, -20, -14, 12, 5, -0.6, 0.55, 3);
+  spec(c, 10, 14, 5, 2.5, -0.6, 0.4, 2);
   c.restore();
 };
 
 const tofu: Draw = (c, r) => {
   c.save();
-  c.translate(64, 64);
-  c.rotate((r() - 0.5) * 0.4);
-  // two faces of a golden cube
-  const top = rrect(-36, -36, 72, 56, 9);
+  c.translate(64, 60);
+  c.rotate((r() - 0.5) * 0.35);
+  const top = rrect(-40, -36, 80, 54, 9);
   const front = new Path2D();
-  front.moveTo(-36, 10);
-  front.lineTo(36, 10);
-  front.lineTo(36, 26);
-  front.quadraticCurveTo(36, 36, 26, 36);
-  front.lineTo(-26, 36);
-  front.quadraticCurveTo(-36, 36, -36, 26);
+  front.moveTo(-40, 8);
+  front.lineTo(40, 8);
+  front.lineTo(40, 30);
+  front.quadraticCurveTo(40, 40, 30, 40);
+  front.lineTo(-30, 40);
+  front.quadraticCurveTo(-40, 40, -40, 30);
   front.closePath();
-  flat(c, front, '#d9a441', 0, 0, '#c38c2e');
-  line(c, front, LW);
-  sticker(c, top, '#f0d08a', LW, 4, 3, '#dfb866');
-  c.strokeStyle = INK;
-  c.lineWidth = LW;
-  c.beginPath();
-  c.moveTo(-36, 20);
-  c.lineTo(36, 20);
-  c.stroke();
-  // crisp fried crust speckles
-  c.fillStyle = '#c38c2e';
-  for (let i = 0; i < 7; i++) {
+  drop(c, front, 0.3, 6, 2, 5);
+  paint(c, front, '#c98f3a', 0, 24, 42, { light: 0.15, dark: 0.32, edge: 0.3, ly: -0.1 });
+  paint(c, top, '#f0d184', 0, -9, 44, { light: 0.22, dark: 0.22, edge: 0.25 });
+  // porous crust: soft darker pits + crisp light flecks
+  c.save();
+  c.clip(top);
+  for (let i = 0; i < 16; i++) {
+    const x = -34 + r() * 68;
+    const y = -30 + r() * 44;
+    c.fillStyle = 'rgba(180,120,40,.35)';
     c.beginPath();
-    c.arc(-26 + r() * 52, -28 + r() * 40, 1.6, 0, TAU);
+    c.ellipse(x, y, 2.4 + r() * 2.2, 1.6 + r() * 1.4, r() * TAU, 0, TAU);
+    c.fill();
+    c.fillStyle = hi(0.45);
+    c.beginPath();
+    c.ellipse(x - 1, y - 1.5, 1.4, 0.8, 0, 0, TAU);
     c.fill();
   }
-  shine(c, -16, -22, 10, 4, -0.2, 0.6);
+  c.restore();
+  c.save();
+  c.clip(front);
+  c.fillStyle = 'rgba(150,90,30,.35)';
+  for (let i = 0; i < 8; i++) {
+    c.beginPath();
+    c.ellipse(-34 + r() * 68, 12 + r() * 26, 2.4, 1.6, 0, 0, TAU);
+    c.fill();
+  }
+  c.restore();
+  spec(c, -18, -24, 12, 4.5, -0.15, 0.55, 2);
   c.restore();
 };
 
 const shrimp: Draw = (c, r) => {
   c.save();
-  c.translate(60, 66);
-  c.rotate(r() * TAU);
-  const Rb = 30;
-  const a0 = -1.3;
-  const a1 = 2.5;
-  const N = 20;
-  const outer: [number, number][] = [];
-  const inner: [number, number][] = [];
-  for (let k = 0; k <= N; k++) {
-    const t = k / N;
-    const a = a0 + (a1 - a0) * t;
-    const w = 13 * (1 - 0.6 * t) + 5;
-    outer.push([Math.cos(a) * (Rb + w), Math.sin(a) * (Rb + w)]);
-    inner.push([Math.cos(a) * (Rb - w), Math.sin(a) * (Rb - w)]);
-  }
+  c.translate(64, 64);
+  c.rotate((r() - 0.5) * 0.5);
+  c.scale(1.08, 1.08);
   const body = new Path2D();
-  body.moveTo(outer[0][0], outer[0][1]);
-  for (const [x, y] of outer) body.lineTo(x, y);
-  for (let k = N; k >= 0; k--) body.lineTo(inner[k][0], inner[k][1]);
-  body.closePath();
+  body.moveTo(-34, 24);
+  body.quadraticCurveTo(-4, -46, 44, 8);
   // tail fan
-  const da = a1 + Math.PI / 2;
-  const tx = Math.cos(a1) * Rb + Math.cos(da) * 6;
-  const ty = Math.sin(a1) * Rb + Math.sin(da) * 6;
-  const tail = new Path2D();
-  for (const s of [-1, 1]) {
-    tail.moveTo(tx - Math.cos(da) * 6, ty - Math.sin(da) * 6);
-    tail.lineTo(tx + Math.cos(da + s * 0.6) * 26, ty + Math.sin(da + s * 0.6) * 26);
-    tail.lineTo(tx + Math.cos(da + s * 0.12) * 22, ty + Math.sin(da + s * 0.12) * 22);
-    tail.closePath();
-  }
-  sticker(c, tail, '#d9603a', LW, 2, 1, '#b3482a');
-  sticker(c, body, '#f09a6a', LW, 4, 3, '#d9774a');
-  // segment lines
-  c.strokeStyle = ink(0.5);
-  c.lineWidth = LW * 0.8;
-  c.lineCap = 'round';
-  for (const t of [0.28, 0.46, 0.64, 0.8]) {
-    const a = a0 + (a1 - a0) * t;
-    const w = 13 * (1 - 0.6 * t) + 5;
+  c.save();
+  c.translate(-34, 24);
+  c.rotate(0.95);
+  for (const [a, len] of [
+    [-0.6, 40],
+    [0.1, 46],
+    [0.75, 38],
+  ]) {
+    const p = new Path2D();
+    p.moveTo(0, 0);
+    p.quadraticCurveTo(
+      Math.cos(a - 0.25) * len * 0.7,
+      Math.sin(a - 0.25) * len * 0.7,
+      Math.cos(a) * len,
+      Math.sin(a) * len
+    );
+    p.quadraticCurveTo(
+      Math.cos(a + 0.25) * len * 0.75,
+      Math.sin(a + 0.25) * len * 0.75,
+      Math.cos(a + 0.45) * len * 0.45,
+      Math.sin(a + 0.45) * len * 0.45
+    );
+    p.closePath();
+    drop(c, p, 0.25, 4, 1, 3);
+    paint(c, p, '#e2552f', Math.cos(a) * len * 0.5, Math.sin(a) * len * 0.5, len * 0.6, {
+      light: 0.3,
+      dark: 0.35,
+      edge: 0.3,
+    });
+    c.strokeStyle = 'rgba(255,205,180,.55)';
+    c.lineWidth = 2;
     c.beginPath();
-    c.moveTo(Math.cos(a) * (Rb + w - 3), Math.sin(a) * (Rb + w - 3));
-    c.lineTo(Math.cos(a) * (Rb - w + 3), Math.sin(a) * (Rb - w + 3));
+    c.moveTo(4, 0);
+    c.lineTo(Math.cos(a + 0.1) * len * 0.9, Math.sin(a + 0.1) * len * 0.9);
     c.stroke();
+    c.fillStyle = 'rgba(255,225,205,.45)';
+    c.beginPath();
+    c.ellipse(Math.cos(a + 0.05) * len * 0.4, Math.sin(a + 0.05) * len * 0.4, 6, 2.5, a, 0, TAU);
+    c.fill();
   }
-  shine(c, Math.cos(a0 + 0.5) * Rb - 4, Math.sin(a0 + 0.5) * Rb - 4, 7, 3.5, a0 + 0.5, 0.6);
+  c.restore();
+  // batter body: shadow, dark edge, lit body
+  c.lineCap = 'round';
+  c.save();
+  c.strokeStyle = sh(0.3);
+  c.shadowColor = sh(0.3);
+  c.shadowBlur = 6;
+  c.lineWidth = 34;
+  c.translate(2, 5);
+  c.stroke(body);
+  c.restore();
+  c.strokeStyle = '#c2862f';
+  c.lineWidth = 34;
+  c.stroke(body);
+  c.save();
+  c.translate(-2, -3);
+  c.strokeStyle = '#ecbd5e';
+  c.lineWidth = 26;
+  c.stroke(body);
+  c.restore();
+  // plump head end
+  const head = ell(40, 6, 20, 17, 0.5);
+  paint(c, head, '#e3b352', 40, 6, 19, { light: 0.25, dark: 0.35, edge: 0.3 });
+  // crispy batter bumps along the body
+  for (let i = 0; i < 26; i++) {
+    const t = r();
+    const x = (1 - t) * (1 - t) * -34 + 2 * (1 - t) * t * -4 + t * t * 44;
+    const y = (1 - t) * (1 - t) * 24 + 2 * (1 - t) * t * -46 + t * t * 8;
+    const dx = 2 * (1 - t) * (-4 + 34) + 2 * t * (44 + 4);
+    const dy = 2 * (1 - t) * (-46 - 24) + 2 * t * (8 + 46);
+    const n = Math.hypot(dx, dy);
+    const off = (r() - 0.5) * 30;
+    const bx = x + (-dy / n) * off;
+    const by = y + (dx / n) * off;
+    const R = 4 + r() * 5;
+    const p = ell(bx, by, R, R * 0.85, r() * TAU);
+    paint(c, p, r() < 0.3 ? '#d79a3c' : '#f0c766', bx, by, R, {
+      light: 0.3,
+      dark: 0.35,
+      edge: 0.3,
+    });
+  }
+  spec(c, -4, -22, 10, 4, 0.5, 0.55, 2);
   c.restore();
 };
 
@@ -454,21 +727,24 @@ const naruto: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  // scalloped edge
-  const pts: [number, number][] = [];
-  const n = 44;
-  for (let i = 0; i < n; i++) {
+  const p = new Path2D();
+  const n = 140;
+  for (let i = 0; i <= n; i++) {
     const a = (i / n) * TAU;
-    const rr = 44 + (i % 2 ? 3.5 : -1);
-    pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    const rr = 48 + 6 * Math.abs(Math.sin(a * 6));
+    const x = Math.cos(a) * rr;
+    const y = Math.sin(a) * rr;
+    if (i === 0) p.moveTo(x, y);
+    else p.lineTo(x, y);
   }
-  const p = smoothClosed(pts);
-  sticker(c, p, '#fbf5ec', LW, 3, 2, '#e3d6c4');
+  p.closePath();
+  drop(c, p, 0.26, 6, 2, 4);
+  paint(c, p, '#fbf5ea', 0, 0, 52, { light: 0.06, dark: 0.17, edge: 0.2 });
   c.save();
-  c.clip(ell(0, 0, 40, 40));
-  ribbon(c, spiral(3, 5.2, 2.1), '#e98aa0', 6.5, LW * 0.55, 0);
+  c.clip(p);
+  strand(c, spiral(3, 6.2, 2.1), '#ef7fa0', 9.5, 0.4, 0.14);
   c.restore();
-  shine(c, -18, -20, 8, 3.5, -0.7, 0.6);
+  spec(c, -18, -20, 11, 5, -0.7, 0.55, 2);
   c.restore();
 };
 
@@ -476,100 +752,115 @@ const bamboo: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  const strip = (x: number, y: number, rot: number, len: number) => {
+  const strips: [number, number, number][] = [
+    [-10, -26, -0.35],
+    [8, -10, -0.2],
+    [-6, 6, -0.05],
+    [10, 22, 0.1],
+    [-14, 34, 0.25],
+  ];
+  for (const [x, y, a] of strips) {
     c.save();
     c.translate(x, y);
-    c.rotate(rot);
-    const p = rrect(-len / 2, -9, len, 18, 5);
-    sticker(c, p, '#d9b56a', LW, 2.5, 1.5, '#b8924a');
-    c.strokeStyle = ink(0.4);
-    c.lineWidth = LW * 0.7;
+    c.rotate(a);
+    const w = 84;
+    const h = 17;
+    const p = rrect(-w / 2, -h / 2, w, h, 5);
+    drop(c, p, 0.26, 4, 1, 3);
+    paint(c, p, '#d6ab58', 0, 0, 40, { light: 0.25, dark: 0.3, edge: 0.3, spread: 2.2 });
+    c.save();
+    c.clip(p);
+    c.strokeStyle = hi(0.4);
+    c.lineWidth = 2;
     c.beginPath();
-    c.moveTo(-len / 2 + 8, -1.5);
-    c.lineTo(len / 2 - 8, -1.5);
-    c.moveTo(-len / 2 + 10, 4);
-    c.lineTo(len / 2 - 12, 4);
+    c.moveTo(-w / 2, -4);
+    c.lineTo(w / 2, -4);
     c.stroke();
-    shine(c, -len / 4, -4, 6, 2, 0, 0.55);
+    c.strokeStyle = 'rgba(140,90,30,.4)';
+    c.lineWidth = 1.8;
+    c.beginPath();
+    c.moveTo(-w / 2, 2);
+    c.lineTo(w / 2, 2);
+    c.moveTo(-w / 2, 6);
+    c.lineTo(w / 2, 6);
+    c.stroke();
     c.restore();
-  };
-  strip(-6, -18, -0.25, 72);
-  strip(6, 4, -0.1, 80);
-  strip(-2, 26, -0.3, 64);
+    c.restore();
+  }
   c.restore();
 };
 
 const sesame: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
-  for (let i = 0; i < 11; i++) {
+  for (let i = 0; i < 20; i++) {
     const a = r() * TAU;
-    const d = 8 + r() * 36;
+    const d = Math.sqrt(r()) * 42;
     const x = Math.cos(a) * d;
     const y = Math.sin(a) * d;
-    const rot = r() * Math.PI;
-    const p = ell(x, y, 8, 4.6, rot);
-    const black = i % 4 === 3;
-    sticker(c, p, black ? '#3b312c' : '#f3e6cc', LW * 0.8, 1.5, 1, black ? '#241d1a' : '#d9c7a3');
-    if (!black) {
-      c.strokeStyle = ink(0.35);
-      c.lineWidth = 1.2;
-      c.beginPath();
-      c.moveTo(x - Math.cos(rot) * 5, y - Math.sin(rot) * 5);
-      c.lineTo(x + Math.cos(rot) * 5, y + Math.sin(rot) * 5);
-      c.stroke();
-    }
+    const rot = r() * TAU;
+    const p = ell(x, y, 7.5, 4.6, rot);
+    drop(c, p, 0.22, 2, 1, 1.5);
+    const black = i % 5 === 0;
+    paint(c, p, black ? '#3b322c' : '#f4e7c9', x, y, 7, { light: 0.25, dark: 0.3, edge: 0.3 });
+    spec(c, x - 2, y - 1.5, 2, 1, rot, 0.7, 0.6);
   }
   c.restore();
 };
 
 const pakchoi: Draw = (c, r) => {
   c.save();
-  c.translate(64, 66);
-  c.rotate((r() - 0.5) * 0.4);
-  // white bulb stalk
-  const stalk = new Path2D();
-  stalk.moveTo(-2, 50);
-  stalk.quadraticCurveTo(-28, 48, -24, 18);
-  stalk.quadraticCurveTo(-20, -4, 0, -6);
-  stalk.quadraticCurveTo(20, -4, 24, 18);
-  stalk.quadraticCurveTo(28, 48, 2, 50);
-  stalk.closePath();
-  sticker(c, stalk, '#f4f0e2', LW, 3, 2, '#ddd5bf');
-  // leaf
-  const leaf = new Path2D();
-  leaf.moveTo(0, 4);
-  leaf.quadraticCurveTo(-42, -4, -36, -34);
-  leaf.quadraticCurveTo(-24, -56, 0, -54);
-  leaf.quadraticCurveTo(26, -56, 36, -34);
-  leaf.quadraticCurveTo(44, -4, 0, 4);
-  leaf.closePath();
-  sticker(c, leaf, '#6f9a62', LW, 4, 3, '#55804c');
-  // veins
-  c.strokeStyle = ink(0.5);
-  c.lineWidth = LW * 0.7;
-  c.lineCap = 'round';
-  c.beginPath();
-  c.moveTo(0, 2);
-  c.quadraticCurveTo(2, -24, 0, -46);
-  c.moveTo(0, -14);
-  c.lineTo(-16, -26);
-  c.moveTo(0, -14);
-  c.lineTo(16, -28);
-  c.moveTo(0, -30);
-  c.lineTo(-10, -40);
-  c.moveTo(0, -30);
-  c.lineTo(10, -40);
-  c.stroke();
-  // stalk ribs
-  c.strokeStyle = ink(0.3);
-  c.beginPath();
-  c.moveTo(-10, 12);
-  c.quadraticCurveTo(-14, 30, -8, 46);
-  c.moveTo(10, 12);
-  c.quadraticCurveTo(14, 30, 8, 46);
-  c.stroke();
-  shine(c, -16, -36, 7, 3, -0.5, 0.5);
+  c.translate(64, 64);
+  c.rotate((r() - 0.5) * 0.6);
+  const leaf = (dx: number, dy: number, a: number, s: number) => {
+    c.save();
+    c.translate(dx, dy);
+    c.rotate(a);
+    c.scale(s, s);
+    // white bulbous stem
+    const st = new Path2D();
+    st.moveTo(-6, 54);
+    st.quadraticCurveTo(-24, 40, -18, 10);
+    st.quadraticCurveTo(-10, -6, 0, -8);
+    st.quadraticCurveTo(10, -6, 18, 10);
+    st.quadraticCurveTo(24, 40, 6, 54);
+    st.closePath();
+    drop(c, st, 0.26, 5, 2, 4);
+    paint(c, st, '#eef3dc', 0, 26, 34, { light: 0.08, dark: 0.22, edge: 0.25 });
+    // green leaf
+    const lf = new Path2D();
+    lf.moveTo(-12, 4);
+    lf.quadraticCurveTo(-48, -14, -36, -42);
+    lf.quadraticCurveTo(-20, -62, 0, -58);
+    lf.quadraticCurveTo(22, -62, 36, -42);
+    lf.quadraticCurveTo(48, -14, 12, 4);
+    lf.closePath();
+    drop(c, lf, 0.22, 5, 2, 3);
+    paint(c, lf, '#5f9f52', 0, -30, 44, { light: 0.3, dark: 0.35, edge: 0.3 });
+    c.save();
+    c.clip(lf);
+    c.strokeStyle = 'rgba(230,240,200,.55)';
+    c.lineWidth = 2.2;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.moveTo(0, 4);
+    c.lineTo(0, -52);
+    for (const [y, k] of [
+      [-10, 1],
+      [-24, 0.85],
+      [-38, 0.6],
+    ]) {
+      c.moveTo(0, y);
+      c.quadraticCurveTo(-14 * k, y - 10 * k, -30 * k, y - 10 * k);
+      c.moveTo(0, y);
+      c.quadraticCurveTo(14 * k, y - 10 * k, 30 * k, y - 10 * k);
+    }
+    c.stroke();
+    c.restore();
+    c.restore();
+  };
+  leaf(-18, 2, -0.55, 0.85);
+  leaf(8, 0, 0.18, 1);
   c.restore();
 };
 
@@ -577,23 +868,43 @@ const sprouts: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * TAU + r() * 0.6;
-    const ox = (r() - 0.5) * 24;
-    const oy = (r() - 0.5) * 24;
-    const pts: [number, number][] = [];
-    for (let k = 0; k <= 5; k++) {
-      const t = k / 5;
-      const u = -36 + t * 72;
-      const v = Math.sin(t * 3 + i) * 7;
-      pts.push([ox + Math.cos(a) * u - Math.sin(a) * v, oy + Math.sin(a) * u + Math.cos(a) * v]);
-    }
-    const p = smoothOpen(pts);
-    ribbon(c, p, '#f6f1e2', 5.5, LW * 0.5, 0.5);
+  // a loose pile of plump sprouts, roughly parallel, heads at both ends
+  for (let i = 0; i < 9; i++) {
+    const a = (r() - 0.5) * 0.9 + (i % 2) * 0.5;
+    const off = -40 + i * 10 + (r() - 0.5) * 6;
+    const len = 44 + r() * 14;
+    const x0 = Math.cos(a) * -len + Math.sin(a) * off;
+    const y0 = Math.sin(a) * -len - Math.cos(a) * off;
+    const x1 = Math.cos(a) * len + Math.sin(a) * off;
+    const y1 = Math.sin(a) * len - Math.cos(a) * off;
+    const bend = (r() - 0.5) * 30;
+    const cxp = (x0 + x1) / 2 - Math.sin(a) * bend;
+    const cyp = (y0 + y1) / 2 + Math.cos(a) * bend;
+    const p = new Path2D();
+    p.moveTo(x0, y0);
+    p.quadraticCurveTo(cxp, cyp, x1, y1);
+    strand(c, p, '#f7f2e4', 9, 0.5, 0.26);
+    // thin root tail
+    const t = new Path2D();
+    t.moveTo(x1, y1);
+    t.quadraticCurveTo(
+      x1 + Math.cos(a + 0.7) * 9,
+      y1 + Math.sin(a + 0.7) * 9,
+      x1 + Math.cos(a + 0.2) * 14,
+      y1 + Math.sin(a + 0.2) * 14
+    );
+    strand(c, t, '#efe8d4', 2.4, 0.2, 0.15);
     // yellow bean head
-    const h = pts[0];
-    const head = ell(h[0], h[1], 6.5, 5, a);
-    sticker(c, head, '#e9cf6a', LW * 0.7, 1.5, 1, '#c9aa44');
+    const h = ell(x0, y0, 9, 6.5, a + 0.3);
+    drop(c, h, 0.2, 2, 1, 1.5);
+    paint(c, h, '#e9cf6e', x0, y0, 8, { light: 0.3, dark: 0.35, edge: 0.3 });
+    c.strokeStyle = 'rgba(170,130,40,.45)';
+    c.lineWidth = 1.2;
+    c.beginPath();
+    c.moveTo(x0 - Math.cos(a + 0.3) * 6, y0 - Math.sin(a + 0.3) * 6);
+    c.lineTo(x0 + Math.cos(a + 0.3) * 6, y0 + Math.sin(a + 0.3) * 6);
+    c.stroke();
+    spec(c, x0 - 2.5, y0 - 2.5, 2.4, 1.2, -0.6, 0.7, 0.6);
   }
   c.restore();
 };
@@ -603,26 +914,25 @@ const chili: Draw = (c, r) => {
   c.translate(64, 64);
   c.rotate(r() * TAU);
   const pos: [number, number, number][] = [
-    [-18, -14, 20],
-    [18, -8, 17],
-    [-4, 20, 18],
+    [-24, -18, 20],
+    [20, -20, 19],
+    [22, 22, 20],
+    [-20, 24, 18],
   ];
   for (const [x, y, R] of pos) {
     const o = ell(x, y, R, R * 0.9);
-    sticker(c, o, '#d14a3a', LW, 2.5, 1.5, '#a83426');
-    const i = ell(x + 0.5, y + 0.5, R * 0.62, R * 0.56);
-    c.fillStyle = '#f6e9d8';
-    c.fill(i);
-    line(c, i, LW * 0.8, 0.6);
-    // seeds
-    c.fillStyle = '#e9c66a';
-    for (let s = 0; s < 4; s++) {
-      const a = (s / 4) * TAU + r();
+    drop(c, o, 0.24, 3, 1, 2);
+    paint(c, o, '#d93c2b', x, y, R, { light: 0.3, dark: 0.35, edge: 0.32 });
+    const inn = ell(x + R * 0.03, y + R * 0.05, R * 0.62, R * 0.55);
+    paint(c, inn, '#f4dcc0', x, y, R * 0.6, { light: 0.05, dark: 0.22, edge: 0.3 });
+    c.fillStyle = '#efdca8';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * TAU + r();
       c.beginPath();
-      c.ellipse(x + Math.cos(a) * R * 0.32, y + Math.sin(a) * R * 0.3, 2.6, 1.8, a, 0, TAU);
+      c.ellipse(x + Math.cos(a) * R * 0.4, y + Math.sin(a) * R * 0.36, 2.6, 1.8, a, 0, TAU);
       c.fill();
     }
-    shine(c, x - R * 0.5, y - R * 0.45, R * 0.2, R * 0.1, -0.6, 0.6);
+    spec(c, x - R * 0.5, y - R * 0.5, R * 0.22, R * 0.11, -0.6, 0.75, 1);
   }
   c.restore();
 };
@@ -631,116 +941,126 @@ const kimchi: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
   c.rotate(r() * TAU);
-  const leaf = (x: number, y: number, rot: number, s: number) => {
+  const piece = (dx: number, dy: number, a: number, s: number) => {
     c.save();
-    c.translate(x, y);
-    c.rotate(rot);
+    c.translate(dx, dy);
+    c.rotate(a);
     c.scale(s, s);
     const p = new Path2D();
-    p.moveTo(-30, 10);
-    p.quadraticCurveTo(-34, -10, -16, -16);
-    p.quadraticCurveTo(-6, -24, 6, -16);
-    p.quadraticCurveTo(20, -24, 30, -8);
-    p.quadraticCurveTo(36, 8, 22, 16);
-    p.quadraticCurveTo(10, 22, -4, 14);
-    p.quadraticCurveTo(-18, 22, -30, 10);
+    p.moveTo(-44, 6);
+    p.quadraticCurveTo(-40, -20, -14, -22);
+    p.quadraticCurveTo(10, -30, 34, -18);
+    p.quadraticCurveTo(50, -6, 40, 12);
+    p.quadraticCurveTo(20, 28, -10, 22);
+    p.quadraticCurveTo(-36, 24, -44, 6);
     p.closePath();
-    sticker(c, p, '#e56f3a', LW, 3, 2, '#c2502a');
-    // pale stem vein
-    c.strokeStyle = '#f6d9b8';
-    c.lineWidth = 4;
+    drop(c, p, 0.26, 5, 2, 4);
+    paint(c, p, '#e2592f', 0, 0, 46, { light: 0.28, dark: 0.36, edge: 0.3, spread: 1.8 });
+    c.save();
+    c.clip(p);
+    // pale stem end
+    c.fillStyle = linear(c, -44, 0, 4, 0, [
+      [0, 'rgba(246,222,190,.9)'],
+      [1, 'rgba(246,222,190,0)'],
+    ]);
+    c.fillRect(-50, -40, 60, 80);
+    // wrinkles
+    c.strokeStyle = 'rgba(150,40,20,.4)';
+    c.lineWidth = 2;
     c.lineCap = 'round';
-    c.beginPath();
-    c.moveTo(-24, 6);
-    c.quadraticCurveTo(0, -4, 24, 2);
-    c.stroke();
-    line(
-      c,
-      (() => {
-        const q = new Path2D();
-        q.moveTo(-24, 6);
-        q.quadraticCurveTo(0, -4, 24, 2);
-        return q;
-      })(),
-      LW * 0.6,
-      0.4
-    );
-    // chilli flakes
-    c.fillStyle = '#8e2412';
     for (let i = 0; i < 5; i++) {
+      const y = -14 + i * 8;
       c.beginPath();
-      c.ellipse(-20 + r() * 40, -10 + r() * 20, 2.2, 1.4, r() * 3, 0, TAU);
+      c.moveTo(-30, y);
+      c.quadraticCurveTo(0, y + (r() - 0.5) * 10, 36, y - 4);
+      c.stroke();
+    }
+    c.fillStyle = '#8a1f10';
+    for (let i = 0; i < 10; i++) {
+      c.beginPath();
+      c.ellipse(-30 + r() * 70, -16 + r() * 30, 2.2, 1.4, r() * TAU, 0, TAU);
       c.fill();
     }
-    shine(c, -14, -8, 6, 2.6, -0.3, 0.5);
+    c.restore();
+    spec(c, -8, -12, 10, 4, -0.3, 0.45, 2);
     c.restore();
   };
-  leaf(-10, -14, -0.5, 1.05);
-  leaf(12, 12, 0.6, 1);
+  piece(-6, -16, -0.3, 1);
+  piece(8, 18, 0.35, 0.95);
   c.restore();
 };
 
 const lime: Draw = (c, r) => {
   c.save();
-  c.translate(64, 64);
-  c.rotate(r() * TAU);
-  // wedge: half disc with rind
-  const R = 46;
-  const wedge = new Path2D();
-  wedge.moveTo(-R, 0);
-  wedge.arc(0, 0, R, Math.PI, TAU);
-  wedge.closePath();
-  sticker(c, wedge, '#8bb35a', LW, 3, 2, '#6f9444');
+  c.translate(64, 70);
+  c.rotate((r() - 0.5) * 0.4);
+  const R = 56;
+  const cy0 = 14;
+  const a0 = Math.PI + 0.42;
+  const a1 = TAU - 0.42;
+  const w = new Path2D();
+  w.arc(0, cy0, R, a0, a1);
+  w.closePath();
+  drop(c, w, 0.26, 6, 2, 4);
+  paint(c, w, '#79a63d', 0, cy0 - 20, 56, { light: 0.25, dark: 0.3, edge: 0.3 });
   const pith = new Path2D();
-  pith.moveTo(-R + 7, -1);
-  pith.arc(0, -1, R - 7, Math.PI, TAU);
+  pith.arc(0, cy0, R - 6, a0 + 0.06, a1 - 0.06);
   pith.closePath();
-  c.fillStyle = '#eef3d6';
+  c.fillStyle = '#eef3cf';
   c.fill(pith);
   const flesh = new Path2D();
-  flesh.moveTo(-R + 11, -4);
-  flesh.arc(0, -4, R - 11, Math.PI, TAU);
+  flesh.arc(0, cy0, R - 11, a0 + 0.12, a1 - 0.12);
+  flesh.lineTo(0, cy0 - 2);
   flesh.closePath();
-  c.fillStyle = '#c8de7a';
-  c.fill(flesh);
-  line(c, flesh, LW * 0.7, 0.55);
-  // segment lines
-  c.strokeStyle = '#eef3d6';
-  c.lineWidth = 3;
+  paint(c, flesh, '#c3dc62', 0, cy0 - 20, 48, { light: 0.2, dark: 0.22, edge: 0.15 });
+  c.save();
+  c.clip(flesh);
+  // segments + juicy vesicles
+  c.strokeStyle = 'rgba(240,246,210,.9)';
+  c.lineWidth = 2.6;
   c.lineCap = 'round';
-  c.beginPath();
-  for (let i = 1; i < 5; i++) {
-    const a = Math.PI + (i / 5) * Math.PI;
-    c.moveTo(0, -4);
-    c.lineTo(Math.cos(a) * (R - 13), -4 + Math.sin(a) * (R - 13));
+  for (let i = 1; i < 4; i++) {
+    const a = a0 + ((a1 - a0) * i) / 4;
+    c.beginPath();
+    c.moveTo(0, cy0);
+    c.lineTo(Math.cos(a) * R, cy0 + Math.sin(a) * R);
+    c.stroke();
   }
-  c.stroke();
-  c.strokeStyle = ink(0.4);
-  c.lineWidth = LW * 0.6;
-  c.stroke();
-  shine(c, -14, -24, 6, 3, -0.6, 0.55);
+  c.strokeStyle = 'rgba(255,250,220,.45)';
+  c.lineWidth = 1.3;
+  for (let i = 0; i < 40; i++) {
+    const a = a0 + 0.1 + r() * (a1 - a0 - 0.2);
+    const d0 = 10 + r() * 24;
+    c.beginPath();
+    c.moveTo(Math.cos(a) * d0, cy0 + Math.sin(a) * d0);
+    c.lineTo(Math.cos(a) * (d0 + 8), cy0 + Math.sin(a) * (d0 + 8));
+    c.stroke();
+  }
+  c.restore();
+  spec(c, -20, cy0 - 26, 7, 3, -0.5, 0.6, 1.5);
   c.restore();
 };
 
 const shallot: Draw = (c, r) => {
   c.save();
   c.translate(64, 64);
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 14; i++) {
     const a = r() * TAU;
-    const d = r() * 34;
+    const d = Math.sqrt(r()) * 38;
     const x = Math.cos(a) * d;
     const y = Math.sin(a) * d;
-    const rot = r() * TAU;
-    const pts: [number, number][] = [];
-    for (let k = 0; k <= 4; k++) {
-      const t = k / 4 - 0.5;
-      pts.push([
-        x + Math.cos(rot) * t * 22 - Math.sin(rot) * Math.sin(t * 5) * 5,
-        y + Math.sin(rot) * t * 22 + Math.cos(rot) * Math.sin(t * 5) * 5,
-      ]);
-    }
-    const p = smoothOpen(pts);
-    ribbon(c, p, i % 3 ? '#c48a46' : '#9a622c', 5.5, LW * 0.55, 0.35);
+    const R = 8 + r() * 7;
+    const s0 = r() * TAU;
+    const p = new Path2D();
+    p.arc(x, y, R, s0, s0 + 2.6 + r() * 1.5);
+    strand(c, p, r() < 0.4 ? '#c98a3c' : '#a86526', 5 + r() * 2, 0.45, 0.26);
+  }
+  // crumbs
+  for (let i = 0; i < 10; i++) {
+    const a = r() * TAU;
+    const d = Math.sqrt(r()) * 46;
+    const p = ell(Math.cos(a) * d, Math.sin(a) * d, 2.4, 1.8, a);
+    paint(c, p, '#b4732c', Math.cos(a) * d, Math.sin(a) * d, 2.4, { edge: 0.2 });
   }
   c.restore();
 };
@@ -779,82 +1099,83 @@ export function sprite(id: string, variant = 0): HTMLCanvasElement {
   return cv;
 }
 
+/** size of a piece (sprite box) in the 300×300 bowl space */
 export const PIECE_SIZE: Record<string, number> = {
-  yumurta: 80,
-  chashu: 86,
-  yesil: 78,
-  nori: 76,
-  misir: 56,
-  mantar: 64,
-  aciyag: 58,
-  tofu: 50,
-  karides: 96,
-  naruto: 66,
-  bambu: 64,
-  susam: 56,
-  pakchoi: 88,
-  filiz: 74,
-  biber: 58,
-  kimchi: 66,
-  lime: 58,
-  citir: 56,
+  yumurta: 120,
+  chashu: 125,
+  yesil: 86,
+  nori: 110,
+  misir: 80,
+  mantar: 100,
+  aciyag: 88,
+  tofu: 80,
+  karides: 135,
+  naruto: 95,
+  bambu: 96,
+  susam: 76,
+  pakchoi: 120,
+  filiz: 104,
+  biber: 84,
+  kimchi: 100,
+  lime: 92,
+  citir: 84,
 };
 
 export function drawPiece(c: Ctx, p: PieceLike) {
   const img = sprite(p.id, p.k);
-  const size = (PIECE_SIZE[p.id] ?? 60) * p.s;
+  const size = (PIECE_SIZE[p.id] ?? 80) * p.s;
   c.save();
   c.translate(p.x, p.y);
   c.rotate((p.r * Math.PI) / 180);
-  c.shadowColor = ink(0.28);
-  c.shadowBlur = 2;
+  c.shadowColor = sh(0.3);
+  c.shadowBlur = 5;
   c.shadowOffsetX = 1;
-  c.shadowOffsetY = 2;
+  c.shadowOffsetY = 3;
   c.drawImage(img, -size / 2, -size / 2, size, size);
   c.restore();
 }
 
 // ---------- noodles ----------
 const NOODLE_COL: Record<string, string> = {
-  ramen: '#f3d47f',
-  udon: '#f8f1e2',
-  soba: '#a8835c',
-  pirinc: '#faf6ee',
+  ramen: '#f0c75c',
+  udon: '#f6eedd',
+  soba: '#9a7a52',
+  pirinc: '#f9f3e8',
 };
-const NOODLE_WMUL: Record<string, number> = { ramen: 1, udon: 1.35, soba: 0.9, pirinc: 0.85 };
+const NOODLE_WMUL: Record<string, number> = { ramen: 1, udon: 1.4, soba: 0.9, pirinc: 0.85 };
 
 interface StrandStyle {
   col: string;
   w: number;
   hiA: number;
-  lw: number;
+  alpha: number;
 }
 
 function strandStyle(noodle: string, thick: Thick, cook: string, sauce?: string): StrandStyle {
   let col = NOODLE_COL[noodle] ?? NOODLE_COL.ramen;
-  if (sauce) col = mixHex(col, INGREDIENTS[sauce].color, 0.35);
-  let w = THICK_W[thick] * (NOODLE_WMUL[noodle] ?? 1) * 1.55;
-  let hiA = noodle === 'soba' ? 0.35 : 0.55;
-  let lw = 1.3;
+  if (sauce) col = mixHex(col, INGREDIENTS[sauce].color, 0.38);
+  let w = THICK_W[thick] * (NOODLE_WMUL[noodle] ?? 1) * 1.6;
+  let hiA = noodle === 'soba' ? 0.3 : 0.5;
+  const alpha = noodle === 'pirinc' ? 0.82 : 1;
   if (cook === 'raw') {
-    col = mixHex(col, '#fff6e8', 0.35);
-    hiA *= 0.4;
+    col = mixHex(col, '#fff6e8', 0.3);
+    hiA *= 0.3;
+    w *= 0.92;
   }
   if (cook === 'soft') {
-    w *= 1.15;
-    hiA *= 0.6;
-    lw = 1.1;
+    w *= 1.18;
+    hiA *= 0.5;
   }
   if (cook === 'burnt') {
-    col = mixHex(col, '#9b7a4a', 0.7);
-    w *= 1.2;
-    hiA = 0.1;
+    col = mixHex(col, '#7a5a30', 0.72);
+    w *= 1.15;
+    hiA = 0.12;
   }
-  return { col, w, hiA, lw };
+  return { col, w, hiA, alpha };
 }
 
 const nests = new Map<string, HTMLCanvasElement>();
-/** a tidy nest of 10–14 wavy outlined strands in the 300×300 bowl space */
+/** a dense, tidy nest of 20–30 glossy strands in the 300×300 bowl space */
 function nest(
   noodle: string,
   thick: Thick,
@@ -871,27 +1192,36 @@ function nest(
   c.scale(R, R);
   const r = rng(hash(noodle + thick + (dry ? 'd' : 's')));
   const st = strandStyle(noodle, thick, cook, sauce);
-  const radius = dry ? 104 : 94;
-  const count = thick === 'ince' ? 17 : thick === 'orta' ? 14 : 11;
-  const wave = cook === 'raw' ? 0.3 : cook === 'soft' ? 0.8 : 1;
+  const radius = dry ? 106 : 96;
+  const count = thick === 'ince' ? 32 : thick === 'orta' ? 28 : 22;
+  const wave = cook === 'raw' ? 0.35 : cook === 'soft' ? 1.15 : 1;
   const cx = 150;
   const cy = 150;
+  c.globalAlpha = st.alpha;
+  // dense base: a soft dark disc so no gaps show between strands
+  c.fillStyle = radial(c, cx, cy, radius, [
+    [0, tint(st.col, -0.26, 0.85)],
+    [0.85, tint(st.col, -0.34, 0.75)],
+    [1, tint(st.col, -0.34, 0)],
+  ]);
+  c.beginPath();
+  c.ellipse(cx, cy, radius * 0.97, radius * 0.95, 0, 0, TAU);
+  c.fill();
   const strands: Path2D[] = [];
-  // the nest: overlapping, slightly off-centre loops, each a gently wobbling ring
   for (let i = 0; i < count; i++) {
     const pts: [number, number][] = [];
     const t0 = (i + 0.5) / count;
-    const base = radius * (0.26 + 0.68 * t0);
-    const ox = (r() - 0.5) * radius * 0.28 * (1 - t0);
-    const oy = (r() - 0.5) * radius * 0.28 * (1 - t0);
-    const ex = 0.88 + r() * 0.24;
-    const turns = 0.7 + r() * 0.45;
+    const base = radius * (0.2 + 0.74 * t0);
+    const ox = (r() - 0.5) * radius * 0.3 * (1 - t0);
+    const oy = (r() - 0.5) * radius * 0.3 * (1 - t0);
+    const ex = 0.9 + r() * 0.2;
+    const turns = 0.75 + r() * 0.5;
     const a0 = r() * TAU;
-    const dir = i % 4 === 1 ? -1 : 1;
-    const amp = (3 + r() * 4) * wave;
+    const dir = i % 3 === 1 ? -1 : 1;
+    const amp = (2.5 + r() * 4) * wave;
     const freq = 2 + Math.floor(r() * 3);
     const ph = r() * TAU;
-    const segs = Math.round(30 * turns);
+    const segs = Math.round(34 * turns);
     for (let k = 0; k <= segs; k++) {
       const t = k / segs;
       const a = a0 + dir * t * TAU * turns;
@@ -905,16 +1235,17 @@ function nest(
     }
     strands.push(smoothOpen(pts));
   }
-  // two strands draped across the top
-  for (let i = 0; i < 2; i++) {
+  // draped top strands catch the satin light
+  const tops: Path2D[] = [];
+  for (let i = 0; i < 4; i++) {
     const a = r() * TAU;
-    const off = (r() - 0.5) * radius * 0.5;
-    const len = Math.sqrt(Math.max(0, radius * radius - off * off)) * 1.3;
-    const amp = (9 + r() * 7) * wave;
+    const off = (r() - 0.5) * radius * 0.6;
+    const len = Math.sqrt(Math.max(0, radius * radius - off * off)) * 1.4;
+    const amp = (8 + r() * 8) * wave;
     const ph = r() * TAU;
     const pts: [number, number][] = [];
-    for (let k = 0; k <= 16; k++) {
-      const t = k / 16 - 0.5;
+    for (let k = 0; k <= 18; k++) {
+      const t = k / 18 - 0.5;
       const u = t * len;
       const v = off + Math.sin(t * 5 + ph) * amp + Math.cos(t * 2.2) * amp * 0.5;
       const x = Math.cos(a) * u - Math.sin(a) * v;
@@ -924,17 +1255,33 @@ function nest(
       const k2 = d > lim ? lim / d : 1;
       pts.push([cx + x * k2, cy + y * k2]);
     }
-    strands.push(smoothOpen(pts));
+    tops.push(smoothOpen(pts));
   }
-  for (const p of strands) ribbon(c, p, st.col, st.w, st.lw, st.hiA);
+  for (const p of strands) strand(c, p, st.col, st.w, st.hiA * 0.8, 0.2);
+  for (const p of tops) strand(c, p, st.col, st.w, st.hiA * 1.4, 0.3);
+  c.globalAlpha = 1;
   if (cook === 'burnt') {
-    // scorch spots
-    c.fillStyle = ink(0.45);
-    for (let i = 0; i < 22; i++) {
+    c.fillStyle = 'rgba(60,30,12,.55)';
+    for (let i = 0; i < 24; i++) {
       const a = r() * TAU;
       const d = r() * radius * 0.85;
+      c.save();
+      c.shadowColor = 'rgba(60,30,12,.5)';
+      c.shadowBlur = 3;
       c.beginPath();
-      c.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 3 + r() * 3, 2, a, 0, TAU);
+      c.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 4 + r() * 4, 2.4, a, 0, TAU);
+      c.fill();
+      c.restore();
+    }
+  }
+  if (cook === 'raw') {
+    // dusting of flour
+    c.fillStyle = hi(0.35);
+    for (let i = 0; i < 30; i++) {
+      const a = r() * TAU;
+      const d = r() * radius * 0.9;
+      c.beginPath();
+      c.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 1 + r() * 1.2, 0, TAU);
       c.fill();
     }
   }
@@ -942,37 +1289,54 @@ function nest(
   return cv;
 }
 
-/** a neat folded bundle of noodles (for trays) in a w×h box centred at 0,0 */
-function bundle(c: Ctx, noodle: string, thick: Thick, w: number, h: number, seed: number) {
+/** a coiled round bundle of noodles (for containers), radius R centred at 0,0 */
+function coil(c: Ctx, noodle: string, thick: Thick, R: number, seed: number) {
   const r = rng(seed);
   const st = strandStyle(noodle, thick, 'perfect');
-  const sw = st.w * 0.8;
-  const box = rrect(-w / 2, -h / 2, w, h, h * 0.4);
+  const w = st.w * 0.95;
   c.save();
-  c.clip(box);
-  c.fillStyle = dark(st.col);
-  c.fillRect(-w / 2, -h / 2, w, h);
-  const gap = sw * 1.05;
-  const n = Math.ceil(h / gap) + 2;
+  c.globalAlpha = st.alpha;
+  const base = ell(0, 0, R, R * 0.94);
+  drop(c, base, 0.35, 8, 2, 5);
+  c.fillStyle = tint(st.col, -0.4, 0.9);
+  c.fill(base);
+  const n = Math.max(7, Math.round(R / (w * 0.75)));
   for (let i = 0; i < n; i++) {
-    const y0 = -h / 2 + i * gap + gap * 0.3;
-    const ph = r() * TAU;
-    const amp = 1.5 + r() * 1.5;
+    const t = (i + 0.5) / n;
+    const rad = R * (0.12 + 0.86 * t) - w / 2;
+    const a0 = r() * TAU;
+    const turns = 0.8 + r() * 0.35;
     const pts: [number, number][] = [];
-    for (let k = 0; k <= 10; k++) {
-      const x = -w / 2 - 6 + (k / 10) * (w + 12);
-      pts.push([x, y0 + Math.sin(k * 0.9 + ph) * amp]);
+    const segs = 30;
+    const ph = r() * TAU;
+    for (let k = 0; k <= segs; k++) {
+      const u = k / segs;
+      const a = a0 + u * TAU * turns;
+      const rr = rad + Math.sin(u * 7 + ph) * 1.5 - u * w * 0.6;
+      pts.push([Math.cos(a) * rr, Math.sin(a) * rr * 0.94]);
     }
-    ribbon(c, smoothOpen(pts), st.col, sw, 1, st.hiA * 0.6);
+    strand(c, smoothOpen(pts), st.col, w, st.hiA * 0.9, 0.18);
   }
+  // one strand draped across the top
+  const pts: [number, number][] = [];
+  const a = r() * TAU;
+  for (let k = 0; k <= 12; k++) {
+    const u = k / 12 - 0.5;
+    const x = u * R * 1.5;
+    const y = Math.sin(u * 6) * R * 0.18 + (r() - 0.5) * 2;
+    const d = Math.hypot(x, y);
+    const lim = R - w;
+    const k2 = d > lim ? lim / d : 1;
+    pts.push([(Math.cos(a) * x - Math.sin(a) * y) * k2, (Math.sin(a) * x + Math.cos(a) * y) * k2]);
+  }
+  strand(c, smoothOpen(pts), st.col, w, st.hiA * 1.4, 0.3);
   c.restore();
-  line(c, box, 1.3);
 }
 
 // ---------- bowl ----------
 export const BOWL_R = 122;
 
-/** glaze patterns drawn as clean line motifs on the rim band (r 131..146) */
+/** glaze patterns drawn as clean motifs on the rim band (r 131..146) */
 function drawRimPattern(c: Ctx, st: BowlStyle) {
   if (st.pattern === 'none') return;
   const cx = 150;
@@ -980,7 +1344,7 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
   const col = st.patternColor;
   c.save();
   const band = new Path2D();
-  band.arc(cx, cy, 145, 0, TAU);
+  band.arc(cx, cy, 145.5, 0, TAU);
   band.arc(cx, cy, 133, 0, TAU, true);
   c.clip(band, 'evenodd');
   c.strokeStyle = col;
@@ -990,8 +1354,7 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
   const rm = 139;
   switch (st.pattern) {
     case 'wave': {
-      // seigaiha: overlapping scallop arcs
-      c.lineWidth = 1.4;
+      c.lineWidth = 1.5;
       for (let row = 0; row < 3; row++) {
         const rr = 146 - row * 4.5;
         const n = 34;
@@ -1007,13 +1370,13 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
       break;
     }
     case 'gold': {
-      c.lineWidth = 1.6;
+      c.lineWidth = 1.8;
       for (const rr of [143.5, 135.5]) {
         c.beginPath();
         c.arc(cx, cy, rr, 0, TAU);
         c.stroke();
       }
-      c.lineWidth = 1.2;
+      c.lineWidth = 1.3;
       const n = 48;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU;
@@ -1032,31 +1395,27 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
         const y = cy + Math.sin(a) * rm;
         for (let p = 0; p < 5; p++) {
           const pa = a + (p / 5) * TAU;
-          const px = x + Math.cos(pa) * 3.2;
-          const py = y + Math.sin(pa) * 3.2;
           c.beginPath();
-          c.ellipse(px, py, 2.4, 1.8, pa, 0, TAU);
+          c.ellipse(x + Math.cos(pa) * 3.2, y + Math.sin(pa) * 3.2, 2.5, 1.9, pa, 0, TAU);
           c.fill();
         }
         c.fillStyle = hi(0.9);
         c.beginPath();
-        c.arc(x, y, 1.3, 0, TAU);
+        c.arc(x, y, 1.4, 0, TAU);
         c.fill();
         c.fillStyle = col;
-        // small dot between flowers
         const a2 = a + Math.PI / n;
         c.beginPath();
-        c.arc(cx + Math.cos(a2) * rm, cy + Math.sin(a2) * rm, 1.2, 0, TAU);
+        c.arc(cx + Math.cos(a2) * rm, cy + Math.sin(a2) * rm, 1.3, 0, TAU);
         c.fill();
       }
       break;
     }
     case 'tenmoku': {
-      // hare's fur: radiating fine strokes
       const n = 90;
       const r = rng(7);
-      c.lineWidth = 1.1;
-      c.globalAlpha = 0.85;
+      c.lineWidth = 1.2;
+      c.globalAlpha = 0.8;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU + r() * 0.03;
         const r0 = 133 + r() * 4;
@@ -1071,7 +1430,7 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
     case 'crackle': {
       const r = rng(11);
       c.lineWidth = 1;
-      c.globalAlpha = 0.7;
+      c.globalAlpha = 0.6;
       const n = 26;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU + r() * 0.2;
@@ -1091,7 +1450,7 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
     }
     case 'stripes': {
       const n = 36;
-      c.lineWidth = 2.2;
+      c.lineWidth = 2.4;
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU;
         c.beginPath();
@@ -1099,7 +1458,7 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
         c.lineTo(cx + Math.cos(a) * 146, cy + Math.sin(a) * 146);
         c.stroke();
       }
-      c.lineWidth = 1.2;
+      c.lineWidth = 1.3;
       c.beginPath();
       c.arc(cx, cy, 135.5, 0, TAU);
       c.stroke();
@@ -1110,11 +1469,8 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
       for (let i = 0; i < n; i++) {
         const a = (i / n) * TAU;
         c.beginPath();
-        c.arc(cx + Math.cos(a) * rm, cy + Math.sin(a) * rm, 2.6, 0, TAU);
+        c.arc(cx + Math.cos(a) * rm, cy + Math.sin(a) * rm, 2.8, 0, TAU);
         c.fill();
-        c.strokeStyle = ink(0.5);
-        c.lineWidth = 1;
-        c.stroke();
       }
       break;
     }
@@ -1122,21 +1478,55 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
   c.restore();
 }
 
-/** 3–5 big outlined fat rings floating on the broth */
+/** big soft oil rings floating on the broth */
 function fatRings(c: Ctx, r: () => number, cx: number, cy: number, rad: number, col: string) {
-  const n = 3 + Math.floor(r() * 3);
+  const n = 4 + Math.floor(r() * 3);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * TAU + r() * 0.9;
-    const d = rad * (0.3 + r() * 0.55);
+    const d = rad * (0.25 + r() * 0.6);
     const x = cx + Math.cos(a) * d;
     const y = cy + Math.sin(a) * d;
-    const rr = 7 + r() * 8;
-    const p = ell(x, y, rr, rr * 0.86);
-    c.fillStyle = tint(col, 0.3, 0.32);
+    const rr = 9 + r() * 11;
+    const p = ell(x, y, rr, rr * 0.88);
+    c.fillStyle = radial(c, x, y, rr, [
+      [0, tint(col, 0.35, 0.04)],
+      [0.7, tint(col, 0.4, 0.14)],
+      [1, tint(col, 0.6, 0.42)],
+    ]);
     c.fill(p);
-    line(c, p, 1, 0.35);
-    shine(c, x - rr * 0.4, y - rr * 0.35, rr * 0.3, rr * 0.16, -0.6, 0.45);
+    c.strokeStyle = tint(col, -0.25, 0.14);
+    c.lineWidth = 0.8;
+    c.stroke(p);
+    spec(c, x - rr * 0.4, y - rr * 0.38, rr * 0.3, rr * 0.14, -0.6, 0.32, 1.5);
   }
+}
+
+/** glossy pool of broth or sauce, radius rad, centred at cx,cy */
+function pool(c: Ctx, p: Path2D, col: string, cx: number, cy: number, rad: number) {
+  c.fillStyle = radial(
+    c,
+    cx - rad * 0.2,
+    cy - rad * 0.25,
+    rad * 1.25,
+    [
+      [0, tint(col, 0.14)],
+      [0.55, col],
+      [1, tint(col, -0.22)],
+    ],
+    cx,
+    cy
+  );
+  c.fill(p);
+  // wall shadow on the top-left of the surface
+  c.save();
+  c.clip(p);
+  c.strokeStyle = sh(0.32);
+  c.lineWidth = rad * 0.14;
+  c.shadowColor = sh(0.35);
+  c.shadowBlur = rad * 0.14;
+  c.translate(rad * 0.07, rad * 0.08);
+  c.stroke(p);
+  c.restore();
 }
 
 export function drawBowl(c: Ctx, b: BowlDraw) {
@@ -1144,23 +1534,32 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
   const cy = 150;
   c.clearRect(0, 0, 300, 300);
   const st: BowlStyle = BOWLS[b.style ?? DEFAULT_BOWL] ?? BOWLS[DEFAULT_BOWL];
-  const glaze = b.takeaway ? '#d2b58a' : st.glaze[1];
-  const glazeDark = b.takeaway ? '#a8895e' : st.glaze[2];
-  const lip = b.takeaway ? '#efe2c8' : st.lip;
+  const glaze: [string, string, string] = b.takeaway ? ['#e6cfa6', '#cfae80', '#a3825a'] : st.glaze;
+  const lip = b.takeaway ? '#f2e6cf' : st.lip;
   const ic = b.takeaway ? BOWLS[DEFAULT_BOWL].inner : st.inner;
-  // cast shadow: one flat offset disc
-  c.fillStyle = ink(0.16);
-  c.beginPath();
-  c.ellipse(cx + 3, cy + 9, 146, 144, 0, 0, TAU);
-  c.fill();
-  // outer glaze: flat + one shadow tone + outline
+
+  // cast shadow
   const rim = ell(cx, cy, 146, 146);
-  flat(c, rim, glaze, 6, 4, glazeDark);
+  drop(c, rim, 0.3, 12, 3, 9);
+  // outer glaze: soft three-tone ceramic
+  c.fillStyle = radial(
+    c,
+    cx - 60,
+    cy - 70,
+    215,
+    [
+      [0, glaze[0]],
+      [0.5, glaze[1]],
+      [1, glaze[2]],
+    ],
+    cx - 20,
+    cy - 20
+  );
+  c.fill(rim);
   if (!b.takeaway) drawRimPattern(c, st);
   else {
-    // kraft ridges
-    c.strokeStyle = ink(0.18);
-    c.lineWidth = 1.2;
+    c.strokeStyle = sh(0.14);
+    c.lineWidth = 1.6;
     for (let i = 0; i < 60; i++) {
       const a = (i / 60) * TAU;
       c.beginPath();
@@ -1169,45 +1568,72 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
       c.stroke();
     }
   }
-  line(c, rim, 1.5);
-  // one highlight arc on the glaze
-  c.strokeStyle = hi(0.6);
-  c.lineWidth = 3;
+  // glaze specular + rim-light
+  c.save();
   c.lineCap = 'round';
+  c.strokeStyle = hi(0.55);
+  c.shadowColor = hi(0.6);
+  c.shadowBlur = 4;
+  c.lineWidth = 4;
   c.beginPath();
-  c.arc(cx, cy, 140, Math.PI * 1.1, Math.PI * 1.32);
+  c.arc(cx, cy, 140, Math.PI * 1.08, Math.PI * 1.36);
   c.stroke();
+  c.strokeStyle = hi(0.22);
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.arc(cx, cy, 141, Math.PI * 0.12, Math.PI * 0.36);
+  c.stroke();
+  c.restore();
   // lip band
   c.beginPath();
   c.arc(cx, cy, 130.5, 0, TAU);
-  c.lineWidth = 5;
+  c.lineWidth = 6;
   c.strokeStyle = lip;
   c.stroke();
-  c.lineWidth = 1.2;
-  c.strokeStyle = ink(0.7);
+  c.save();
+  c.lineWidth = 6;
+  c.strokeStyle = sh(0.16);
   c.beginPath();
-  c.arc(cx, cy, 133, 0, TAU);
+  c.arc(cx, cy, 130.5, Math.PI * 1.7, Math.PI * 2.75);
   c.stroke();
-  // interior: flat cream + darker inner ring near the wall + outline
-  const inner = ell(cx, cy, 128, 128);
-  c.fillStyle = ic[2];
+  c.restore();
+  // interior: gentle depth, lit far wall (bottom-right), shaded near wall (top-left)
+  const inner = ell(cx, cy, 127.5, 127.5);
+  c.fillStyle = radial(
+    c,
+    cx + 28,
+    cy + 34,
+    190,
+    [
+      [0, ic[0]],
+      [0.45, ic[1]],
+      [0.8, ic[2]],
+      [1, ic[3]],
+    ],
+    cx + 10,
+    cy + 12
+  );
   c.fill(inner);
   c.save();
   c.clip(inner);
-  c.fillStyle = ic[1];
-  c.shadowColor = ic[1];
-  c.shadowBlur = 6;
-  c.beginPath();
-  c.ellipse(cx - 3, cy - 4, 115, 114, 0, 0, TAU);
-  c.fill();
+  c.strokeStyle = sh(0.3);
+  c.lineWidth = 20;
+  c.shadowColor = sh(0.3);
+  c.shadowBlur = 16;
+  c.translate(8, 10);
+  c.stroke(inner);
   c.restore();
-  line(c, inner, 1.3);
-  // one highlight arc on the inner wall
-  c.strokeStyle = hi(0.65);
-  c.lineWidth = 3.5;
+  // inner wall highlight
+  c.save();
+  c.strokeStyle = hi(0.5);
+  c.shadowColor = hi(0.5);
+  c.shadowBlur = 3;
+  c.lineWidth = 3;
+  c.lineCap = 'round';
   c.beginPath();
-  c.arc(cx, cy, 120, Math.PI * 1.12, Math.PI * 1.38);
+  c.arc(cx, cy, 121, Math.PI * 1.1, Math.PI * 1.4);
   c.stroke();
+  c.restore();
 
   const liq = b.liquid ? INGREDIENTS[b.liquid] : null;
   const isSauce = liq?.cat === 'sauce';
@@ -1215,23 +1641,12 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
   c.save();
   c.clip(inner);
 
-  let pool: Path2D | null = null;
+  let pl: Path2D | null = null;
+  let rad = 0;
   if (liq && !isSauce && f > 0) {
-    // broth: single-tone pool with a darker rim tone
-    const rad = 64 + 66 * f;
-    pool = ell(cx, cy, rad, rad);
-    c.fillStyle = dark(liq.color);
-    c.fill(pool);
-    c.save();
-    c.clip(pool);
-    c.fillStyle = liq.color;
-    c.shadowColor = liq.color;
-    c.shadowBlur = 5;
-    c.beginPath();
-    c.ellipse(cx - 2, cy - 3, rad - 7, rad - 7, 0, 0, TAU);
-    c.fill();
-    c.restore();
-    line(c, pool, 1.3, 0.7);
+    rad = 64 + 66 * f;
+    pl = ell(cx, cy, rad, rad);
+    pool(c, pl, liq.color, cx, cy, rad);
   }
   if (b.noodle) {
     const dry = isSauce || !liq;
@@ -1244,28 +1659,32 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
     );
     c.drawImage(img, 0, 0, 300, 300);
   }
-  if (liq && pool) {
-    // submerge the outer strands under a flat wash of broth, then fat rings
-    const rad = 64 + 66 * f;
+  if (liq && pl) {
+    // submerge the outer strands under the broth, then oil rings and sheen
     c.save();
-    c.clip(pool);
-    const wash = new Path2D();
-    wash.arc(cx, cy, rad, 0, TAU);
-    wash.arc(cx, cy, rad * 0.62, 0, TAU, true);
-    c.fillStyle = tint(liq.color, 0, 0.62 * f);
-    c.fill(wash, 'evenodd');
+    c.clip(pl);
+    c.fillStyle = radial(c, cx, cy, rad, [
+      [0, tint(liq.color, 0, 0)],
+      [0.6, tint(liq.color, 0, 0.08 * f)],
+      [0.8, tint(liq.color, 0, 0.5 * f)],
+      [1, tint(liq.color, -0.12, 0.8 * f)],
+    ]);
+    c.fill(pl);
     c.restore();
     fatRings(c, rng(hash(b.liquid!)), cx, cy, rad, liq.color);
-    // one highlight on the surface
-    c.strokeStyle = hi(0.5);
-    c.lineWidth = 2.5;
+    c.save();
+    c.strokeStyle = hi(0.35);
+    c.shadowColor = hi(0.4);
+    c.shadowBlur = 6;
+    c.lineWidth = 4;
     c.lineCap = 'round';
     c.beginPath();
-    c.arc(cx, cy, rad - 9, Math.PI * 1.15, Math.PI * 1.35);
+    c.arc(cx, cy, rad - 11, Math.PI * 1.14, Math.PI * 1.36);
     c.stroke();
+    c.restore();
   }
   if (liq && isSauce && f > 0) {
-    // glossy outlined drizzle ribbons over the noodles
+    // glossy satin drizzle ribbons over the noodles
     const r = rng(hash(b.liquid! + 'z'));
     const ribbons = Math.round(2 + f * 2);
     for (let i = 0; i < ribbons; i++) {
@@ -1281,15 +1700,15 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
         const v = off + Math.sin(t * 2.4 * TAU + ph) * amp;
         pts.push([cx + Math.cos(a) * u - Math.sin(a) * v, cy + Math.sin(a) * u + Math.cos(a) * v]);
       }
-      c.globalAlpha = 0.92;
-      ribbon(c, smoothOpen(pts), liq.color, 4.5 + r() * 1.5, 1.1, 0.5);
+      c.globalAlpha = 0.9;
+      strand(c, smoothOpen(pts), mixHex(liq.color, '#ffffff', 0.1), 4.2 + r() * 1.2, 0.7, 0.2);
       c.globalAlpha = 1;
     }
     if (b.liquid === 'tatliaci') {
       c.fillStyle = '#8e1e12';
       for (let i = 0; i < 20; i++) {
         c.beginPath();
-        c.roundRect(cx - 90 + r() * 180, cy - 90 + r() * 180, 2.6, 1.8, 0.8);
+        c.roundRect(cx - 90 + r() * 180, cy - 90 + r() * 180, 2.8, 2, 0.8);
         c.fill();
       }
     }
@@ -1302,46 +1721,43 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
     const r = rng(9);
     for (let i = 0; i < 6; i++) {
       const a = r() * TAU;
-      const p = ell(
-        cx + Math.cos(a) * 140,
-        cy + Math.sin(a) * 140,
-        16 + r() * 10,
-        8,
-        a + Math.PI / 2
-      );
-      sticker(c, p, liq.color, 1.2, 2, 1);
+      const x = cx + Math.cos(a) * 140;
+      const y = cy + Math.sin(a) * 140;
+      const p = ell(x, y, 16 + r() * 10, 8, a + Math.PI / 2);
+      paint(c, p, liq.color, x, y, 14, { light: 0.2, dark: 0.25, edge: 0.3 });
+      spec(c, x - 4, y - 3, 4, 2, -0.5, 0.5, 1);
     }
     c.restore();
   }
   for (const p of b.pieces) drawPiece(c, p);
 }
 
-// ---------- trays (ingredient bins) ----------
-const TRAY_W = 240;
-const TRAY_H = 170;
+// ---------- ingredient containers (round inserts, GPGP style) ----------
+export const TRAY_W = 200;
+export const TRAY_H = 200;
 const TRAY_SS = 2;
 
-/** how a topping is laid out in its tub: sprite size and a row/col grid */
+/** how a topping is heaped in its container: sprite size and ring counts */
 const TRAY_LAYOUT: Record<string, [number, number, number]> = {
-  // id: [size, cols, rows]
-  yumurta: [92, 3, 2],
-  chashu: [96, 3, 2],
-  yesil: [86, 3, 2],
-  nori: [84, 3, 2],
-  misir: [70, 4, 2],
-  mantar: [76, 3, 2],
-  aciyag: [78, 3, 2],
-  tofu: [64, 4, 2],
-  karides: [104, 3, 2],
-  naruto: [78, 3, 2],
-  bambu: [80, 3, 2],
-  susam: [78, 3, 2],
-  pakchoi: [100, 3, 2],
-  filiz: [86, 3, 2],
-  biber: [72, 3, 2],
-  kimchi: [80, 3, 2],
-  lime: [72, 3, 2],
-  citir: [76, 3, 2],
+  // id: [size, inner ring count, outer ring count]
+  yumurta: [84, 5, 8],
+  chashu: [88, 5, 8],
+  yesil: [78, 5, 8],
+  nori: [86, 4, 7],
+  misir: [66, 6, 10],
+  mantar: [78, 5, 8],
+  aciyag: [84, 4, 7],
+  tofu: [68, 6, 9],
+  karides: [92, 5, 8],
+  naruto: [78, 5, 8],
+  bambu: [80, 5, 8],
+  susam: [96, 6, 9],
+  pakchoi: [90, 5, 8],
+  filiz: [86, 5, 7],
+  biber: [70, 6, 9],
+  kimchi: [82, 5, 8],
+  lime: [78, 5, 8],
+  citir: [76, 5, 8],
 };
 
 const trays = new Map<string, HTMLCanvasElement>();
@@ -1350,109 +1766,171 @@ export function trayImage(id: string, thick: Thick = 'orta'): HTMLCanvasElement 
   let cv = trays.get(key);
   if (cv) return cv;
   const W = TRAY_W;
-  const H = TRAY_H;
-  cv = mk(W * TRAY_SS, H * TRAY_SS);
+  cv = mk(W * TRAY_SS, W * TRAY_SS);
   const c = cv.getContext('2d')!;
   c.scale(TRAY_SS, TRAY_SS);
   const ing = INGREDIENTS[id];
   const r = rng(hash(key));
   const liquid = ing.cat === 'broth' || ing.cat === 'sauce';
+  const cx = 100;
+  const cy = 102;
+  const RO = 93;
+  const RI = 80;
 
-  // stainless tub: outer flange + inner well, seen from above
-  const M = 8;
-  const outer = rrect(M, M + 2, W - M * 2, H - M * 2 - 2, 20);
-  c.fillStyle = ink(0.16);
-  c.fill(rrect(M + 2, M + 8, W - M * 2, H - M * 2 - 2, 20));
-  flat(
-    c,
-    outer,
-    liquid && ing.cat === 'sauce' ? '#efe6d4' : '#d4d9dd',
-    5,
-    3,
-    liquid && ing.cat === 'sauce' ? '#cdbfa5' : '#a9b1b8'
-  );
-  line(c, outer, 1.5);
-  const IM = M + 13;
-  const well = rrect(IM, IM + 1, W - IM * 2, H - IM * 2 - 1, 12);
-  c.fillStyle = liquid && ing.cat === 'sauce' ? '#d9ccb4' : '#9aa3aa';
-  c.fill(well);
-  line(c, well, 1.3);
-  // one highlight on the flange
-  c.strokeStyle = hi(0.7);
-  c.lineWidth = 2.5;
+  const outer = ell(cx, cy, RO, RO);
+  drop(c, outer, 0.32, 10, 2, 6);
+  if (liquid) {
+    // ceramic bowl
+    const glaze = ing.cat === 'sauce' ? '#f0e6d4' : '#f3ebdc';
+    c.fillStyle = radial(
+      c,
+      cx - 40,
+      cy - 46,
+      150,
+      [
+        [0, tint(glaze, 0.5)],
+        [0.5, glaze],
+        [1, tint(glaze, -0.28)],
+      ],
+      cx - 10,
+      cy - 10
+    );
+    c.fill(outer);
+    // lip line
+    c.strokeStyle = ing.cat === 'sauce' ? '#8a5a3a' : '#3b4a6b';
+    c.lineWidth = 2.2;
+    c.beginPath();
+    c.arc(cx, cy, RI + 6, 0, TAU);
+    c.stroke();
+  } else {
+    // stainless-steel insert: flange with a soft sheen
+    c.fillStyle = radial(
+      c,
+      cx - 50,
+      cy - 60,
+      170,
+      [
+        [0, '#f4f6f7'],
+        [0.45, '#cfd5d9'],
+        [0.8, '#a4adb4'],
+        [1, '#7e878e'],
+      ],
+      cx - 10,
+      cy - 10
+    );
+    c.fill(outer);
+    // brushed rings on the flange
+    c.strokeStyle = hi(0.18);
+    c.lineWidth = 1;
+    for (const rr of [RI + 4, RI + 8, RI + 11]) {
+      c.beginPath();
+      c.arc(cx, cy, rr, 0, TAU);
+      c.stroke();
+    }
+  }
+  // flange specular
+  c.save();
+  c.strokeStyle = hi(0.75);
+  c.shadowColor = hi(0.7);
+  c.shadowBlur = 3;
+  c.lineWidth = 3;
   c.lineCap = 'round';
   c.beginPath();
-  c.moveTo(M + 26, M + 8);
-  c.lineTo(W * 0.46, M + 8);
+  c.arc(cx, cy, RO - 5, Math.PI * 1.1, Math.PI * 1.38);
   c.stroke();
+  c.restore();
 
+  // the well
+  const well = ell(cx, cy, RI, RI);
+  const wellCol = liquid ? (ing.cat === 'sauce' ? '#d8c9ae' : '#dccdb2') : '#6c757c';
+  c.fillStyle = radial(c, cx + 10, cy + 12, RI * 1.2, [
+    [0, tint(wellCol, 0.1)],
+    [0.7, wellCol],
+    [1, tint(wellCol, -0.4)],
+  ]);
+  c.fill(well);
   c.save();
   c.clip(well);
+  // inner wall shadow (top-left)
+  c.strokeStyle = sh(0.45);
+  c.lineWidth = 16;
+  c.shadowColor = sh(0.45);
+  c.shadowBlur = 14;
+  c.save();
+  c.translate(6, 8);
+  c.stroke(well);
+  c.restore();
+  c.shadowBlur = 0;
+
   if (liquid) {
-    // liquid filling the well with a darker rim tone, fat rings and a ladle
     const col = ing.color;
-    c.fillStyle = dark(col);
-    c.fill(well);
-    c.fillStyle = col;
-    c.shadowColor = col;
-    c.shadowBlur = 5;
-    c.fill(rrect(IM + 5, IM + 5, W - IM * 2 - 10, H - IM * 2 - 12, 10));
-    c.shadowBlur = 0;
-    fatRings(c, r, W / 2, H / 2, 70, col);
-    c.strokeStyle = hi(0.5);
-    c.lineWidth = 2.5;
-    c.beginPath();
-    c.moveTo(IM + 16, IM + 12);
-    c.lineTo(IM + 60, IM + 12);
-    c.stroke();
-    // ladle
+    const p = ell(cx, cy, RI - 3, RI - 3);
+    pool(c, p, col, cx, cy, RI - 3);
+    fatRings(c, r, cx, cy, RI - 10, col);
     c.save();
-    c.translate(W / 2 + 34, H / 2 + 6);
-    c.rotate(-0.5);
-    const handle = rrect(-5, -92, 10, 92, 5);
-    sticker(c, handle, '#c9ced3', 1.4, 2, 1, '#8f989f');
-    const cup = ell(0, 0, 24, 22);
-    sticker(c, cup, '#d4d9dd', 1.5, 3, 2, '#9aa3aa');
-    const inside = ell(0, 1, 18, 16);
-    c.fillStyle = col;
-    c.fill(inside);
-    line(c, inside, 1.1, 0.6);
-    shine(c, -8, -8, 5, 2.4, -0.6, 0.7);
+    c.strokeStyle = hi(0.4);
+    c.shadowColor = hi(0.4);
+    c.shadowBlur = 5;
+    c.lineWidth = 4;
+    c.lineCap = 'round';
+    c.beginPath();
+    c.arc(cx, cy, RI - 14, Math.PI * 1.12, Math.PI * 1.36);
+    c.stroke();
+    c.restore();
+    // ladle resting in the pool
+    c.save();
+    c.translate(cx + 8, cy + 10);
+    c.rotate(-0.55);
+    const handle = rrect(-6, -118, 12, 118, 6);
+    drop(c, handle, 0.3, 5, 2, 3);
+    paint(c, handle, '#c9ced3', 0, -60, 60, { light: 0.3, dark: 0.35, edge: 0.3, spread: 2.5 });
+    const cup = ell(0, 0, 27, 25);
+    drop(c, cup, 0.3, 5, 2, 3);
+    paint(c, cup, '#d6dbdf', 0, 0, 27, { light: 0.3, dark: 0.35, edge: 0.3 });
+    const inside = ell(0, 1, 21, 19);
+    pool(c, inside, col, 0, 1, 21);
+    spec(c, -9, -9, 6, 2.8, -0.6, 0.8, 1);
     c.restore();
   } else if (ing.cat === 'noodle') {
-    // three neat bundles side by side, slightly fanned
-    const bw = 58;
-    const bh = H - IM * 2 - 16;
-    for (let i = 0; i < 3; i++) {
+    // coiled bundles heaped in the insert
+    const spots: [number, number, number][] = [
+      [-30, -28, 36],
+      [34, -24, 36],
+      [-34, 30, 36],
+      [32, 32, 36],
+      [0, 2, 40],
+    ];
+    spots.forEach(([dx, dy, R], i) => {
       c.save();
-      c.translate(W / 2 + (i - 1) * 64, H / 2 + (i === 1 ? -2 : 2));
-      c.rotate((i - 1) * 0.08);
-      bundle(c, id, thick, bw, bh, hash(key) + i);
+      c.translate(cx + dx, cy + dy);
+      coil(c, id, thick, R, hash(key) + i * 7);
       c.restore();
-    }
+    });
   } else {
-    // toppings: neat overlapping grid of sprites
-    const [size, cols, rows] = TRAY_LAYOUT[id] ?? [80, 3, 2];
-    const img = (k: number) => sprite(id, k);
-    const x0 = IM + 6;
-    const y0 = IM + 4;
-    const gx = (W - IM * 2 - 12) / cols;
-    const gy = (H - IM * 2 - 8) / rows;
+    // toppings: heaped rings of overlapping pieces, outer first, centre on top
+    const [size, nIn, nOut] = TRAY_LAYOUT[id] ?? [80, 5, 8];
     let k = 0;
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        const x = x0 + gx * (col + 0.5) + (row % 2 ? gx * 0.18 : -gx * 0.12) + (r() - 0.5) * 6;
-        const y = y0 + gy * (row + 0.5) + (r() - 0.5) * 6;
-        c.save();
-        c.translate(x, y);
-        c.rotate((r() - 0.5) * 0.7);
-        c.shadowColor = ink(0.22);
-        c.shadowBlur = 2;
-        c.shadowOffsetY = 2;
-        c.drawImage(img(k++), -size / 2, -size / 2, size, size);
-        c.restore();
-      }
+    const place = (x: number, y: number, s: number) => {
+      c.save();
+      c.translate(x, y);
+      c.rotate(r() * TAU);
+      c.shadowColor = sh(0.32);
+      c.shadowBlur = 5;
+      c.shadowOffsetY = 3;
+      c.drawImage(sprite(id, k++), (-size * s) / 2, (-size * s) / 2, size * s, size * s);
+      c.restore();
+    };
+    const a0 = r() * TAU;
+    for (let i = 0; i < nOut; i++) {
+      const a = a0 + (i / nOut) * TAU;
+      place(cx + Math.cos(a) * 62, cy + Math.sin(a) * 62, 0.9);
     }
+    const a1 = r() * TAU;
+    for (let i = 0; i < nIn; i++) {
+      const a = a1 + (i / nIn) * TAU;
+      place(cx + Math.cos(a) * 32, cy + Math.sin(a) * 32 - 2, 0.95);
+    }
+    place(cx, cy - 4, 1);
   }
   c.restore();
   trays.set(key, cv);

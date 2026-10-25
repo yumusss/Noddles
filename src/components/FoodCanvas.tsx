@@ -94,7 +94,7 @@ export function Tray({ id, thick, width = 100 }: { id: string; thick?: Thick; wi
   const ref = useRef<HTMLCanvasElement>(null);
   const dpr = useDpr();
   const pw = Math.round(width * dpr);
-  const ph = Math.round(((width * 170) / 240) * dpr);
+  const ph = pw;
   useEffect(() => {
     const cv = ref.current;
     if (!cv) return;
@@ -103,12 +103,6 @@ export function Tray({ id, thick, width = 100 }: { id: string; thick?: Thick; wi
     c.drawImage(trayImage(id, thick), 0, 0, cv.width, cv.height);
   }, [id, thick, pw, ph]);
   return (
-    <canvas
-      ref={ref}
-      width={pw}
-      height={ph}
-      style={{ width, height: (width * 170) / 240 }}
-      className="tray-cv"
-    />
+    <canvas ref={ref} width={pw} height={ph} style={{ width, height: width }} className="tray-cv" />
   );
 }
