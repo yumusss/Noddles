@@ -9,6 +9,8 @@ import Play, { type DayResult } from './components/Play';
 import Results from './components/Results';
 import { net } from './money';
 import Ending from './components/Ending';
+import Shop from './components/Shop';
+import { DEFAULT_DECOR, applyDecor, type Decor } from './decor';
 
 export interface Save {
   reached: number;
@@ -17,6 +19,10 @@ export interface Save {
   best: number[];
   sfx: boolean;
   music: boolean;
+  /** Equipped decoration per category. */
+  decor: Decor;
+  /** Ids of purchased decoration items. */
+  owned: string[];
 }
 
 const KEY = 'noddles-save-v1';
@@ -27,12 +33,22 @@ const fresh: Save = {
   best: Array(10).fill(0),
   sfx: true,
   music: true,
+  decor: DEFAULT_DECOR,
+  owned: [],
 };
 
 function load(): Save {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...fresh, ...JSON.parse(raw) };
+    if (raw) {
+      const p = JSON.parse(raw) as Partial<Save>;
+      return {
+        ...fresh,
+        ...p,
+        decor: applyDecor(p.decor),
+        owned: Array.isArray(p.owned) ? p.owned : [],
+      };
+    }
   } catch {
     /* storage unavailable */
   }
@@ -47,7 +63,8 @@ type Screen =
   | { s: 'play'; level: number; key: number }
   | { s: 'results'; level: number; result: DayResult }
   | { s: 'outro'; level: number }
-  | { s: 'ending' };
+  | { s: 'ending' }
+  | { s: 'shop' };
 
 export default function App() {
   const [save, setSave] = useState<Save>(load);
@@ -121,7 +138,11 @@ export default function App() {
           onBack={() => setScreen({ s: 'title' })}
           onToggle={toggle}
           onEnding={() => setScreen({ s: 'ending' })}
+          onShop={() => setScreen({ s: 'shop' })}
         />
+      )}
+      {screen.s === 'shop' && (
+        <Shop save={save} setSave={setSave} onBack={() => setScreen({ s: 'map' })} />
       )}
       {screen.s === 'intro' && (
         <Story

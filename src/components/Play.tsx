@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { INGREDIENTS, LEVELS, unlockedUpTo } from '../data';
 import { CatArt, Coin, Scooter, type Mood } from '../art';
 import { Avatar } from '../avatar';
 import type { Piece } from '../bowl';
-import Stove from './Stove';
+import Oven from './Oven';
+import { BOWLS, bowlsUpTo } from '../bowls';
 import { ChangePanel, RegisterDecor, TipJar } from './Cash';
 import {
   RENT,
@@ -29,7 +31,8 @@ import {
   type Verdict,
 } from '../orders';
 import { buzz, sfx } from '../audio';
-import { ShopWall } from './Scenery';
+import { Restaurant } from './Scenery';
+import { decorTipBonus } from '../decor';
 import Establishing from './Establishing';
 import type { Save } from '../App';
 
@@ -47,12 +50,19 @@ export interface DayResult {
 
 type Phase = 'walkin' | 'talk' | 'waiting' | 'eating' | 'react' | 'pay' | 'leave';
 type Tool = { kind: 'noodle' | 'broth' | 'topping'; id: string } | null;
-type Tab = 'noodle' | 'broth' | 'topping';
+type Tab = 'bowl' | 'noodle' | 'broth' | 'topping';
 type Stage = 'prep' | 'pot' | 'ready';
 
 const SCATTER = new Set(['yesil', 'susam', 'citir', 'filiz', 'misir', 'aciyag', 'biber']);
 const COOK_SPEED = 100 / 7.5; // progress units per second
-const STATIONS = ['Salon', 'Hazırlık', 'Ocak'];
+const STATIONS = ['Salon', 'Hazırlık', 'Fırın'];
+const MAX_PIECES = 600;
+const CAT_SPOTS = [
+  { left: '6%', bottom: '44%' },
+  { left: '72%', bottom: '21%' },
+  { left: '38%', bottom: '58%' },
+  { left: '14%', bottom: '20%' },
+];
 
 const emptyBowl = (): Bowl => ({ fill: 0, pieces: [] });
 
@@ -82,7 +92,7 @@ export default function Play({
   const [paused, setPaused] = useState(false);
   const [closing, setClosing] = useState(false);
   const [typed, setTyped] = useState(0);
-  const [tab, setTab] = useState<Tab>('noodle');
+  const [tab, setTab] = useState<Tab>('bowl');
   const [tool, setTool] = useState<Tool>(null);
   const [thick, setThick] = useState<Thick>('orta');
   const [bowl, setBowl] = useState<Bowl>(emptyBowl);
@@ -118,6 +128,8 @@ export default function Play({
   const [nudge, setNudge] = useState<string | null>(null);
   const [orderAt, setOrderAt] = useState(0);
   const [bowlSize, setBowlSize] = useState(300);
+  const [drag, setDrag] = useState<{ x: number; y: number; over: boolean } | null>(null);
+  const [catSpot, setCatSpot] = useState(0);
 
   const pouring = useRef(false);
   const lastPiece = useRef<{ x: number; y: number } | null>(null);
@@ -125,6 +137,8 @@ export default function Play({
   const boardRef = useRef<HTMLDivElement>(null);
   const seq = useRef(1);
   const cooking = stage === 'pot';
+  const dragRef = useRef<{ sx: number; sy: number; on: boolean } | null>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
 
   const c = custs[idx];
   if (typeof window !== 'undefined' && window.location.search.includes('bot'))
@@ -135,6 +149,13 @@ export default function Play({
   const broths = unlocked.filter((i) => INGREDIENTS[i].cat === 'broth');
   const sauces = unlocked.filter((i) => INGREDIENTS[i].cat === 'sauce');
   const toppings = unlocked.filter((i) => INGREDIENTS[i].cat === 'topping');
+  const bowlStyles = bowlsUpTo(levelId);
+
+  // Miso wanders around the salon
+  useEffect(() => {
+    const t = window.setInterval(() => setCatSpot((n) => (n + 1) % CAT_SPOTS.length), 14000);
+    return () => window.clearInterval(t);
+  }, []);
 
   // size the bowl to the space the prep board actually has
   useEffect(() => {
@@ -280,7 +301,7 @@ export default function Play({
     setBowl(emptyBowl());
     setStage('prep');
     setCookP(0);
-    setTab('noodle');
+    setTab('bowl');
     setTool(null);
     sfx('ding');
     window.setTimeout(() => go(1), 350);
@@ -301,7 +322,7 @@ export default function Play({
     }
     const id = tool.id;
     setBowl((b) => {
-      if (b.pieces.filter((p) => p.id === id).length >= 16 || b.pieces.length >= 90) return b;
+      if (b.pieces.length >= MAX_PIECES) return b;
       const p: Piece = {
         id,
         x,
@@ -322,7 +343,11 @@ export default function Play({
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const { x, y } = toBowlCoords(e);
     if (Math.hypot(x - 150, y - 150) > 146) return;
-    if (!tool) return flash('Önce aşağıdaki küvetlerden birini seç');
+    if (!bowl.style) return flash('Önce bir kase seç');
+    if (!tool) {
+      if (bowl.noodle) return startDrag(e);
+      return flash('Önce aşağıdaki küvetlerden birini seç');
+    }
     if (tool.kind === 'noodle') {
       setBowl((b) => ({ ...b, noodle: tool.id, thick }));
       sfx('drop');
@@ -339,12 +364,14 @@ export default function Play({
   };
 
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (dragRef.current) return moveDrag(e);
     if (!tool || tool.kind !== 'topping' || !lastPiece.current) return;
     const { x, y } = toBowlCoords(e);
     if (Math.hypot(x - lastPiece.current.x, y - lastPiece.current.y) > 30) addPiece(x, y);
   };
 
   const onUp = () => {
+    if (dragRef.current) return endDrag();
     lastPiece.current = null;
     if (pouring.current) {
       pouring.current = false;
@@ -355,6 +382,39 @@ export default function Play({
     }
   };
 
+  // ---- drag the finished bowl to the oven ----
+  const startDrag = (e: React.PointerEvent) => {
+    if (stage !== 'prep') return;
+    if (!bowl.noodle) return flash('Kasede erişte yok!');
+    (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+    dragRef.current = { sx: e.clientX, sy: e.clientY, on: false };
+    setDrag({ x: e.clientX, y: e.clientY, over: false });
+    sfx('tap');
+    buzz(10);
+  };
+  const moveDrag = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const r = dropRef.current?.getBoundingClientRect();
+    const over =
+      !!r &&
+      e.clientX >= r.left - 20 &&
+      e.clientX <= r.right + 20 &&
+      e.clientY >= r.top - 20 &&
+      e.clientY <= r.bottom + 20;
+    if (over !== d.on) {
+      d.on = over;
+      if (over) buzz(12);
+    }
+    setDrag({ x: e.clientX, y: e.clientY, over });
+  };
+  const endDrag = () => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDrag(null);
+    if (d?.on) toPot();
+  };
+
   const undo = () => {
     setBowl((b) => ({ ...b, pieces: b.pieces.slice(0, -1) }));
     sfx('tap');
@@ -363,7 +423,7 @@ export default function Play({
     const wasted = costCents(bowl);
     if (wasted > 0) setLedger((l) => ({ ...l, waste: l.waste + wasted }));
     setBowl(emptyBowl());
-    setTab('noodle');
+    setTab('bowl');
     setTool(null);
     sfx('trash');
   };
@@ -399,7 +459,7 @@ export default function Play({
     setScores((s) => [...s, v.score]);
     const due = priceCents(c.order);
     const paid = v.score >= 30;
-    const tip = paid ? tipCents(v.score, due) : 0;
+    const tip = paid ? tipCents(v.score, due, decorTipBonus(save.decor)) : 0;
     const bonus = paid ? v.bonus * 10 : 0;
     setBill({ due, given: c.phone ? due : cashGiven(due, levelId), tip, bonus, paid });
     const cost = costCents(bowl);
@@ -468,7 +528,7 @@ export default function Play({
         : 'happy';
   const cookNow = cookStateAt(cookP);
   const hint = tutorial();
-  const drawBowl = { ...bowl, liquid: bowl.broth, takeaway: c.phone };
+  const drawBowl = { ...bowl, liquid: bowl.broth, takeaway: c.phone, style: bowl.style };
   const closeUp = station === 0 && (phase === 'talk' || phase === 'react');
   const liquidIsSauce = bowl.broth ? INGREDIENTS[bowl.broth].cat === 'sauce' : false;
 
@@ -479,15 +539,16 @@ export default function Play({
     if (phase !== 'waiting') return null;
     if (station === 0) return '➡ Hazırlık istasyonuna geç.';
     if (station === 1) {
-      if (stage !== 'prep') return '➡ Kase ocakta! Ocak istasyonuna geç.';
+      if (stage !== 'prep') return '➡ Kase fırında! Fırın istasyonuna geç.';
+      if (!bowl.style) return '🥣 Önce bir kase seç.';
       if (!bowl.noodle) return '1️⃣ Kalınlığı seç, erişte küvetine dokun, sonra kaseye dokun.';
       if (!bowl.broth || bowl.fill < 0.72)
         return '2️⃣ Suyu ya da sosu seç, kaseye BASILI TUT, çizgiye kadar doldur.';
       if (!bowl.pieces.length)
         return '3️⃣ Malzeme küvetini seç, kaseye dokun ya da parmağını sürükle.';
-      return '4️⃣ Sipariş tamamsa “Ocağa koy”a bas.';
+      return '4️⃣ Sipariş tamamsa kaseyi tutup 🔥 fırına sürükle.';
     }
-    if (stage === 'pot') return '🔥 İbre yeşil “Tam kıvam”a gelince Çıkar!';
+    if (stage === 'pot') return '🔥 Kadran yeşil “Tam”a gelince Çıkar!';
     if (stage === 'ready') return '🛎 Servis et!';
     return null;
   }
@@ -539,11 +600,14 @@ export default function Play({
           {/* SALON */}
           <section className="station salon2">
             <div className="salon-cam">
-              <ShopWall
+              <Restaurant
+                decor={save.decor}
                 rain={L.id === 5}
                 menu={noodles.map((n) => INGREDIENTS[n].name).join(' • ')}
-                cat={<CatArt size={58} sleepy={phase === 'waiting'} />}
               />
+              <div className="miso-roam" style={CAT_SPOTS[catSpot]}>
+                <CatArt size={58} sleepy={phase === 'waiting'} />
+              </div>
               <div className="light-cone a" />
               <div className="light-cone b" />
               {custs.length - idx - 1 > 0 && (
@@ -738,16 +802,34 @@ export default function Play({
                     </button>
                     <button
                       className={`tool-btn go ${bowl.noodle && bowl.fill >= 0.5 ? 'ready' : ''}`}
-                      onClick={toPot}>
-                      Ocağa koy 🔥
+                      onPointerDown={startDrag}
+                      onPointerMove={moveDrag}
+                      onPointerUp={endDrag}
+                      onPointerCancel={endDrag}>
+                      ✋ Fırına sürükle
                     </button>
                   </div>
+                  <div
+                    ref={dropRef}
+                    className={`oven-drop ${drag ? 'show' : ''} ${drag?.over ? 'hot' : ''}`}>
+                    <span>🔥</span>
+                    <b>Fırın</b>
+                  </div>
+                  {drag &&
+                    createPortal(
+                      <div className="drag-ghost" style={{ left: drag.x, top: drag.y }}>
+                        <BowlCanvas bowl={drawBowl} size={Math.round(bowlSize * 0.6)} />
+                      </div>,
+                      document.body
+                    )}
                 </>
               ) : (
                 <div className="prep-empty">
-                  <p>{stage === 'pot' ? 'Kase ocakta pişiyor!' : 'Kase hazır, servis bekliyor.'}</p>
+                  <p>
+                    {stage === 'pot' ? 'Kase fırında pişiyor!' : 'Kase hazır, servis bekliyor.'}
+                  </p>
                   <button className="btn primary" onClick={() => go(2)}>
-                    Ocağa git →
+                    Fırına git →
                   </button>
                 </div>
               )}
@@ -755,7 +837,7 @@ export default function Play({
             {stage === 'prep' && (
               <div className="pantry2">
                 <div className="tabs">
-                  {(['noodle', 'broth', 'topping'] as Tab[]).map((t) => (
+                  {(['bowl', 'noodle', 'broth', 'topping'] as Tab[]).map((t) => (
                     <button
                       key={t}
                       className={`tab ${tab === t ? 'on' : ''}`}
@@ -763,11 +845,13 @@ export default function Play({
                         setTab(t);
                         sfx('tap');
                       }}>
-                      {t === 'noodle'
-                        ? 'Erişte'
-                        : t === 'broth'
-                          ? 'Su & Sos'
-                          : `Malzemeler (${toppings.length})`}
+                      {t === 'bowl'
+                        ? 'Kase'
+                        : t === 'noodle'
+                          ? 'Erişte'
+                          : t === 'broth'
+                            ? 'Su & Sos'
+                            : `Malzemeler (${toppings.length})`}
                     </button>
                   ))}
                 </div>
@@ -788,9 +872,34 @@ export default function Play({
                     ))}
                   </div>
                 )}
+                {tab === 'bowl' && (
+                  <div className="bowl-picker">
+                    {bowlStyles.map((id) => (
+                      <button
+                        key={id}
+                        className={`bowl-opt ${bowl.style === id ? 'on' : ''}`}
+                        onClick={() => {
+                          setBowl((b) => ({ ...b, style: id }));
+                          setTab('noodle');
+                          sfx('drop');
+                          buzz(10);
+                        }}>
+                        <BowlCanvas bowl={{ fill: 0, pieces: [], style: id }} size={84} />
+                        <span>{BOWLS[id].name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div className={`bins bins-${tab}`}>
                   {tab === 'broth' && <div className="bin-group">Çorba (su)</div>}
-                  {(tab === 'noodle' ? noodles : tab === 'broth' ? broths : toppings).map((id) => (
+                  {(tab === 'noodle'
+                    ? noodles
+                    : tab === 'broth'
+                      ? broths
+                      : tab === 'bowl'
+                        ? []
+                        : toppings
+                  ).map((id) => (
                     <BinButton
                       key={id}
                       id={id}
@@ -798,7 +907,7 @@ export default function Play({
                       bowl={bowl}
                       tool={tool}
                       thick={thick}
-                      onPick={(kind) => setTool({ kind, id })}
+                      onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
                     />
                   ))}
                   {tab === 'broth' && sauces.length > 0 && (
@@ -813,7 +922,7 @@ export default function Play({
                         bowl={bowl}
                         tool={tool}
                         thick={thick}
-                        onPick={(kind) => setTool({ kind, id })}
+                        onPick={(kind) => kind !== 'bowl' && setTool({ kind, id })}
                       />
                     ))}
                 </div>
@@ -824,10 +933,9 @@ export default function Play({
           {/* STOVE */}
           <section className="station stove2">
             <div className="donabe-wrap">
-              <Stove
-                mode={lifting ? 'lift' : stage === 'pot' ? 'boil' : 'idle'}
-                noodle={stage === 'ready' ? undefined : bowl.noodle}
-                thick={bowl.thick}
+              <Oven
+                mode={lifting ? 'lift' : stage === 'pot' ? 'cook' : 'idle'}
+                bowl={stage === 'pot' || lifting ? drawBowl : null}
                 heat={Math.min(1.3, cookP / 100)}
               />
               {stage === 'ready' && (
@@ -876,8 +984,8 @@ export default function Play({
               <div className="cook-panel idle">
                 <p>
                   {phase === 'waiting'
-                    ? 'Kaseyi hazırlıkta hazırla, sonra ocağa koy.'
-                    : 'Ocak boşta.'}
+                    ? 'Kaseyi hazırlıkta hazırla, sonra fırına sürükle.'
+                    : 'Fırın boşta.'}
                 </p>
                 {phase === 'waiting' && (
                   <button className="btn ghost" onClick={() => go(1)}>

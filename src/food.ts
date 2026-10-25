@@ -2,6 +2,7 @@
 // specular highlights and grain textures. Everything is procedural and cached.
 
 import { INGREDIENTS } from './data';
+import { BOWLS, DEFAULT_BOWL, type BowlStyle } from './bowls';
 
 type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
@@ -27,6 +28,7 @@ export interface BowlDraw {
   pieces: PieceLike[];
   cook?: 'raw' | 'dente' | 'perfect' | 'soft' | 'burnt';
   takeaway?: boolean;
+  style?: string;
 }
 
 // ---------- helpers ----------
@@ -887,6 +889,133 @@ function mixHex(a: string, b: string, t: number) {
 // ---------- bowl ----------
 export const BOWL_R = 122;
 
+function drawRimPattern(c: Ctx, st: BowlStyle) {
+  if (st.pattern === 'none') return;
+  const cx = 150;
+  const cy = 150;
+  c.save();
+  const band = new Path2D();
+  band.arc(cx, cy, 146, 0, TAU);
+  band.arc(cx, cy, 133, 0, TAU, true);
+  c.clip(band, 'evenodd');
+  const r = rng(hash(st.id));
+  c.strokeStyle = st.patternColor;
+  c.fillStyle = st.patternColor;
+  c.lineCap = 'round';
+  if (st.pattern === 'wave') {
+    // seigaiha: overlapping scallops around the ring
+    for (let i = 0; i < 48; i++) {
+      const a = (i / 48) * TAU;
+      const x = cx + Math.cos(a) * 139;
+      const y = cy + Math.sin(a) * 139;
+      for (let k = 0; k < 3; k++) {
+        c.beginPath();
+        c.arc(x, y, 9 - k * 2.6, a + Math.PI * 0.5, a + Math.PI * 1.5);
+        c.lineWidth = 1.3;
+        c.globalAlpha = 0.85 - k * 0.15;
+        c.stroke();
+      }
+    }
+    c.globalAlpha = 1;
+    c.beginPath();
+    c.arc(cx, cy, 145, 0, TAU);
+    c.lineWidth = 2.4;
+    c.stroke();
+  } else if (st.pattern === 'gold') {
+    c.lineWidth = 2.2;
+    c.beginPath();
+    c.arc(cx, cy, 141, 0, TAU);
+    c.stroke();
+    c.lineWidth = 1;
+    c.beginPath();
+    c.arc(cx, cy, 136, 0, TAU);
+    c.stroke();
+    for (let i = 0; i < 70; i++) {
+      const a = r() * TAU;
+      const d = 134 + r() * 12;
+      c.globalAlpha = 0.35 + r() * 0.5;
+      c.beginPath();
+      c.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 0.6 + r() * 1.4, 0, TAU);
+      c.fill();
+    }
+  } else if (st.pattern === 'sakura') {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU + 0.2;
+      const x = cx + Math.cos(a) * 139.5;
+      const y = cy + Math.sin(a) * 139.5;
+      for (let p = 0; p < 5; p++) {
+        const pa = (p / 5) * TAU + a;
+        c.globalAlpha = 0.9;
+        c.beginPath();
+        c.ellipse(x + Math.cos(pa) * 3.2, y + Math.sin(pa) * 3.2, 2.6, 1.7, pa, 0, TAU);
+        c.fill();
+      }
+      c.fillStyle = '#fff6c2';
+      c.beginPath();
+      c.arc(x, y, 1.3, 0, TAU);
+      c.fill();
+      c.fillStyle = st.patternColor;
+      // tiny leaf
+      c.globalAlpha = 0.55;
+      c.fillStyle = '#7fb069';
+      c.beginPath();
+      c.ellipse(x + Math.cos(a + 1.3) * 6, y + Math.sin(a + 1.3) * 6, 3, 1.3, a + 1.3, 0, TAU);
+      c.fill();
+      c.fillStyle = st.patternColor;
+    }
+  } else if (st.pattern === 'tenmoku') {
+    // hare's-fur streaks radiating outward
+    c.lineWidth = 0.9;
+    for (let i = 0; i < 160; i++) {
+      const a = r() * TAU;
+      const d0 = 133 + r() * 4;
+      const d1 = d0 + 5 + r() * 9;
+      c.globalAlpha = 0.18 + r() * 0.45;
+      c.beginPath();
+      c.moveTo(cx + Math.cos(a) * d0, cy + Math.sin(a) * d0);
+      c.lineTo(cx + Math.cos(a + 0.01) * d1, cy + Math.sin(a + 0.01) * d1);
+      c.stroke();
+    }
+  } else if (st.pattern === 'crackle') {
+    c.lineWidth = 0.7;
+    c.globalAlpha = 0.5;
+    for (let i = 0; i < 90; i++) {
+      const a = r() * TAU;
+      let x = cx + Math.cos(a) * (134 + r() * 11);
+      let y = cy + Math.sin(a) * (134 + r() * 11);
+      c.beginPath();
+      c.moveTo(x, y);
+      let dir = r() * TAU;
+      for (let k = 0; k < 3; k++) {
+        dir += (r() - 0.5) * 2.2;
+        x += Math.cos(dir) * (3 + r() * 5);
+        y += Math.sin(dir) * (3 + r() * 5);
+        c.lineTo(x, y);
+      }
+      c.stroke();
+    }
+  } else if (st.pattern === 'stripes') {
+    c.lineWidth = 2.6;
+    for (let i = 0; i < 44; i++) {
+      const a = (i / 44) * TAU;
+      c.globalAlpha = i % 2 ? 0.95 : 0.55;
+      c.beginPath();
+      c.moveTo(cx + Math.cos(a) * 133, cy + Math.sin(a) * 133);
+      c.lineTo(cx + Math.cos(a) * 146, cy + Math.sin(a) * 146);
+      c.stroke();
+    }
+  } else if (st.pattern === 'dots') {
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * TAU;
+      c.globalAlpha = 0.9;
+      c.beginPath();
+      c.arc(cx + Math.cos(a) * 139.5, cy + Math.sin(a) * 139.5, 3, 0, TAU);
+      c.fill();
+    }
+  }
+  c.restore();
+}
+
 export function drawBowl(c: Ctx, b: BowlDraw) {
   const cx = 150;
   const cy = 150;
@@ -898,10 +1027,13 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
   c.shadowOffsetY = 10;
   c.beginPath();
   c.arc(cx, cy, 146, 0, TAU);
-  c.fillStyle = b.takeaway ? '#cdb48a' : '#7a1c12';
+  c.fillStyle = b.takeaway
+    ? '#cdb48a'
+    : (BOWLS[b.style ?? DEFAULT_BOWL] ?? BOWLS[DEFAULT_BOWL]).glaze[2];
   c.fill();
   c.restore();
   // rim (outer glaze)
+  const st: BowlStyle = BOWLS[b.style ?? DEFAULT_BOWL] ?? BOWLS[DEFAULT_BOWL];
   const rim = new Path2D();
   rim.arc(cx, cy, 146, 0, TAU);
   const rg = c.createRadialGradient(cx - 50, cy - 60, 20, cx, cy, 150);
@@ -909,36 +1041,29 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
     rg.addColorStop(0, '#efe2c8');
     rg.addColorStop(1, '#b8996a');
   } else {
-    rg.addColorStop(0, '#e2553d');
-    rg.addColorStop(0.7, '#a8301f');
-    rg.addColorStop(1, '#6e1a10');
+    rg.addColorStop(0, st.glaze[0]);
+    rg.addColorStop(0.7, st.glaze[1]);
+    rg.addColorStop(1, st.glaze[2]);
   }
   c.fillStyle = rg;
   c.fill(rim);
   grain(c, rim, b.takeaway ? 0.35 : 0.12);
+  if (!b.takeaway) drawRimPattern(c, st);
   // lip ring
   c.beginPath();
-  c.arc(cx, cy, 136, 0, TAU);
-  c.lineWidth = 8;
-  c.strokeStyle = b.takeaway ? '#f6ecd8' : '#f4ebdd';
+  c.arc(cx, cy, 131, 0, TAU);
+  c.lineWidth = 5;
+  c.strokeStyle = b.takeaway ? '#f6ecd8' : st.lip;
   c.stroke();
-  if (!b.takeaway) {
-    c.strokeStyle = 'rgba(30,40,70,.55)';
-    c.lineWidth = 1.4;
-    c.setLineDash([6, 5]);
-    c.beginPath();
-    c.arc(cx, cy, 142, 0, TAU);
-    c.stroke();
-    c.setLineDash([]);
-  }
   // interior with depth
   const inner = new Path2D();
-  inner.arc(cx, cy, 132, 0, TAU);
-  const ig = c.createRadialGradient(cx + 10, cy + 14, 10, cx, cy, 134);
-  ig.addColorStop(0, '#fbf7f0');
-  ig.addColorStop(0.75, '#e9e0d2');
-  ig.addColorStop(0.93, '#c6b9a6');
-  ig.addColorStop(1, '#a39380');
+  inner.arc(cx, cy, 128, 0, TAU);
+  const ig = c.createRadialGradient(cx + 10, cy + 14, 10, cx, cy, 130);
+  const ic = b.takeaway ? BOWLS[DEFAULT_BOWL].inner : st.inner;
+  ig.addColorStop(0, ic[0]);
+  ig.addColorStop(0.75, ic[1]);
+  ig.addColorStop(0.93, ic[2]);
+  ig.addColorStop(1, ic[3]);
   c.fillStyle = ig;
   c.fill(inner);
   gloss(c, cx - 70, cy - 78, 40, 14, -0.7, 0.55);

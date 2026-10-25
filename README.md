@@ -9,9 +9,13 @@ Fener Sokağı’ndaki kırk yıllık noodle dükkânını Hana Nine’den devra
 ## Özellikler
 
 - 10 bölümlük hikaye: her bölümde giriş ve kapanış diyalogları, tarif defterinden yeni bir sayfa
-- Kamera geçişli üç istasyon: Salon, Hazırlık, Ocak
+- Kamera geçişli üç istasyon: Salon, Hazırlık, Fırın
+- 8 Japon kasesi (kırmızı lake, mavi dalga, siyah-altın, seladon, sakura, tenmoku, indigo, hurma); bazı müşteriler kase stili ister
+- Hazır kase parmakla tutulup fırına sürüklenir; camlı kapaklı, alevli, kadranlı sinematik fırın
+- Dekorasyon dükkânı: duvar, zemin, tablolar, lambalar, masalar, bitkiler, neon, tezgâh süsü, akvaryum/pikap — her eşya bahşiş bonusu verir
+- Tablette yatay geniş düzen: kase ile malzeme küvetleri yan yana; Miso salonda dolaşır
 - Konuşarak sipariş veren müşteriler: adet (“3 dilim chashu”), bol/biraz, “olmasın”, acılı, vejetaryen, pişirme tercihi
-- 26 malzeme: 4 erişte, 4 su, 18 garnitür; her parça kaseye tek tek yerleşir
+- 32 malzeme: 4 erişte (ince/orta/kalın), 6 su, 4 kuru sos, 18 garnitür; her parça kaseye tek tek yerleşir, sınırsız parça
 - Ocakta pişirme göstergesi: çiğ, diri, tam kıvam, yumuşak, lapa
 - Tezgâhta kasa: müşteri parayla öder, para üstünü sen çekmeceden verirsin; bahşişler kavanoza
 - Gün sonu hesap defteri: satış, bahşiş, malzeme gideri, kira, faturalar, net kâr ve kasadaki para

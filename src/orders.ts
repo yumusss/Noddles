@@ -44,6 +44,7 @@ const MALE = [
 ];
 import type { CookState, Piece } from './bowl';
 import { THICK_LABEL, type Thick } from './food';
+import { BOWLS, bowlsUpTo } from './bowls';
 
 // ---------- order model ----------
 
@@ -65,6 +66,7 @@ export interface Order {
   noodle: string | null;
   broth: string | null; // a broth (soup) or a sauce (dry noodles)
   thick?: Thick | null;
+  bowl?: string | null; // requested bowl style
   reqs: Req[];
   rules: Rule[];
   cook: CookPref;
@@ -142,6 +144,7 @@ export function orderText(o: Order): string {
   let s = parts[0][0].toLocaleUpperCase('tr') + parts[0].slice(1);
   if (o.reqs.length) s += `. Üstüne ${joinTr(o.reqs.map(reqText))}`;
   s += '.';
+  if (o.bowl) s += ` ${BOWLS[o.bowl].name} kasede olsun.`;
   for (const r of o.rules) {
     if (r.t === 'no') s += ` Ama ${lower(r.id)} olmasın!`;
     if (r.t === 'spicy') s += ' Acı olsun, gözümden yaş gelsin!';
@@ -176,6 +179,10 @@ export function randomOrder(levelId: number): Order {
           ? favour(sauces)
           : favour(broths),
     thick: levelId >= 2 && Math.random() < 0.35 ? pick<Thick>(['ince', 'kalin']) : null,
+    bowl:
+      levelId >= 4 && Math.random() < 0.3
+        ? pick(bowlsUpTo(levelId).filter((b) => b !== 'kirmizi'))
+        : null,
     reqs: [],
     rules: [],
     cook: 'perfect',
@@ -288,10 +295,11 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'lezzetova',
       name: 'Madam Lezzetova',
       greet: 'Not defterim hazır, şekerim.',
-      text: 'Miso suyuyla bir soba. Tam 4 parça tofu, 3 shiitake ve biraz yeşil soğan. Erişte diri kalsın. Kusursuz olsun.',
+      text: 'Miso suyuyla bir soba. Tam 4 parça tofu, 3 shiitake ve biraz yeşil soğan. Seladon kasede. Erişte diri kalsın. Kusursuz olsun.',
       order: {
         noodle: 'soba',
         broth: 'miso',
+        bowl: 'seladon',
         reqs: [
           { id: 'tofu', mode: 'exact', n: 4 },
           { id: 'mantar', mode: 'exact', n: 3 },
@@ -341,10 +349,11 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       look: 'lezzetova',
       name: 'Madam Lezzetova',
       greet: 'Jüri başkanı olarak buradayım.',
-      text: 'Kemik suyuyla bir udon. Tam 2 tempura karides, 3 dilim naruto ve 2 yaprak nori. Şaşırt beni.',
+      text: 'Kemik suyuyla bir udon. Tam 2 tempura karides, 3 dilim naruto ve 2 yaprak nori. Siyah & Altın kasede olsun. Şaşırt beni.',
       order: {
         noodle: 'udon',
         broth: 'tonkotsu',
+        bowl: 'siyahaltin',
         reqs: [
           { id: 'karides', mode: 'exact', n: 2 },
           { id: 'naruto', mode: 'exact', n: 3 },
@@ -434,6 +443,7 @@ export function dayCustomers(levelId: number): Customer[] {
 // ---------- judging ----------
 
 export interface Bowl {
+  style?: string;
   noodle?: string;
   thick?: Thick;
   broth?: string;
@@ -485,6 +495,13 @@ export function judge(o: Order, b: Bowl, waitSec: number, bonus: number): Verdic
   if (b.noodle && o.thick && b.thick !== o.thick) {
     score -= 8;
     notes.push(`${THICK_LABEL[o.thick]} erişte istemiştim`);
+  }
+  if (o.bowl) {
+    if (b.style === o.bowl) praise.push(`${BOWLS[o.bowl].name} kase, tam istediğim gibi`);
+    else {
+      score -= 8;
+      notes.push(`${BOWLS[o.bowl].name} kasede istemiştim`);
+    }
   }
   // broth 15 + fill 10
   const wantCat = o.broth ? INGREDIENTS[o.broth].cat : 'broth';

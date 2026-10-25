@@ -36,11 +36,18 @@ export function costCents(b: Bowl): number {
   return c;
 }
 
-export function tipCents(score: number, price: number): number {
+/**
+ * Tip for a bowl. `bonus` is an optional multiplier on the rate coming from
+ * shop decorations (0.03 = +3% → rate * 1.03).
+ */
+export function tipCents(score: number, price: number, bonus = 0): number {
   const rate =
     score >= 95 ? 0.35 : score >= 85 ? 0.25 : score >= 70 ? 0.15 : score >= 55 ? 0.05 : 0;
-  return round25(price * rate);
+  return round25(price * rate * (1 + bonus));
 }
+
+export const tipCentsWithBonus = (score: number, price: number, bonus: number) =>
+  tipCents(score, price, bonus);
 
 /** How a customer pays: a realistic bill (or bill + coins) for the amount due. */
 export function cashGiven(due: number, level: number): number {

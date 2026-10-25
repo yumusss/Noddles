@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { drawBowl, trayImage, type BowlDraw, type Thick } from '../food';
+import { BOWLS, DEFAULT_BOWL } from '../bowls';
 
 function useDpr() {
   return Math.min(3, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1);
@@ -60,10 +61,19 @@ export function BowlSide({
   width: number;
   steam?: boolean;
 }) {
+  const st = BOWLS[bowl.style ?? DEFAULT_BOWL] ?? BOWLS[DEFAULT_BOWL];
   return (
     <div
       className={`bowl-side ${bowl.takeaway ? 'kraft' : ''}`}
-      style={{ width, height: width * 0.78 }}>
+      style={
+        {
+          width,
+          height: width * 0.78,
+          '--g0': st.glaze[0],
+          '--g1': st.glaze[1],
+          '--g2': st.glaze[2],
+        } as React.CSSProperties
+      }>
       <div className="bs-shadow" />
       <div className="bs-body" />
       <div className="bs-top">
