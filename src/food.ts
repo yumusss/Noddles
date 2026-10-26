@@ -1474,6 +1474,85 @@ function drawRimPattern(c: Ctx, st: BowlStyle) {
       }
       break;
     }
+    case 'kikko': {
+      // hexagonal tortoise-shell lattice
+      const n = 30;
+      c.lineWidth = 1.4;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        const x = cx + Math.cos(a) * rm;
+        const y = cy + Math.sin(a) * rm;
+        c.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const b = a + (k / 6) * TAU;
+          const px = x + Math.cos(b) * 6.2;
+          const py = y + Math.sin(b) * 6.2;
+          if (k === 0) c.moveTo(px, py);
+          else c.lineTo(px, py);
+        }
+        c.closePath();
+        c.stroke();
+      }
+      break;
+    }
+    case 'ume': {
+      // plum blossoms: five round petals + centre
+      const n = 12;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU + 0.26;
+        const x = cx + Math.cos(a) * rm;
+        const y = cy + Math.sin(a) * rm;
+        for (let k = 0; k < 5; k++) {
+          const b = (k / 5) * TAU + a;
+          c.beginPath();
+          c.arc(x + Math.cos(b) * 3.6, y + Math.sin(b) * 3.6, 2.6, 0, TAU);
+          c.fill();
+        }
+        c.save();
+        c.fillStyle = '#fff6e8';
+        c.beginPath();
+        c.arc(x, y, 1.4, 0, TAU);
+        c.fill();
+        c.restore();
+      }
+      break;
+    }
+    case 'brush': {
+      // loose sumi brush dashes
+      const n = 20;
+      c.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        const a2 = a + 0.17;
+        c.lineWidth = 3.2;
+        c.beginPath();
+        c.arc(cx, cy, rm + (i % 2 ? 2.5 : -2.5), a, a2);
+        c.stroke();
+        c.lineWidth = 1.2;
+        c.beginPath();
+        c.arc(cx, cy, rm + (i % 2 ? -3 : 3), a + 0.05, a2 - 0.03);
+        c.stroke();
+      }
+      break;
+    }
+    case 'asanoha': {
+      // hemp-leaf stars
+      const n = 18;
+      c.lineWidth = 1.2;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * TAU;
+        const x = cx + Math.cos(a) * rm;
+        const y = cy + Math.sin(a) * rm;
+        for (let k = 0; k < 6; k++) {
+          const b = (k / 6) * TAU + a;
+          c.beginPath();
+          c.moveTo(x, y);
+          c.lineTo(x + Math.cos(b) * 6.5, y + Math.sin(b) * 6.5);
+          c.stroke();
+        }
+      }
+      break;
+    }
   }
   c.restore();
 }

@@ -7,8 +7,10 @@
 }
 .kitchen {
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: 20% minmax(0, 1fr) auto;
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: 17% minmax(0, 1fr) auto;
   grid-template-areas:
     'pot'
     'prep'
@@ -17,12 +19,14 @@
 }
 .pot-area {
   grid-area: pot;
+  min-width: 0;
   position: relative;
   overflow: hidden;
   border-bottom: 3px solid #2b2420;
 }
 .prep-area {
   grid-area: prep;
+  min-width: 0;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -37,9 +41,13 @@
   top: auto;
   left: auto;
   right: auto;
-  margin: 8px 10px 0;
+  margin: 6px 10px 0;
   z-index: 5;
   font-size: 12px;
+  padding: 4px 10px 6px;
+}
+.prep-area .slip-head {
+  font-size: 11px;
 }
 .prep-area .slip-text {
   font-size: 12.5px;
@@ -61,6 +69,9 @@
 }
 .panel {
   grid-area: rail;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -79,10 +90,19 @@
   gap: 6px;
 }
 .style-row {
-  flex: 1;
+  flex: 1 1 100%;
   display: flex;
   gap: 3px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.style-row::-webkit-scrollbar {
+  display: none;
+}
+.style-row .bowl-opt {
+  flex: none;
 }
 .panel .bowl-opt {
   padding: 2px;
@@ -102,6 +122,12 @@
 .panel .thick-row {
   display: flex;
   gap: 3px;
+}
+.panel-top {
+  flex-wrap: nowrap;
+}
+.panel .thick-row {
+  flex: none;
 }
 .panel .thick {
   padding: 3px 7px;
@@ -138,8 +164,10 @@
 }
 .panel .bin .tray-cv {
   width: 100% !important;
-  height: 100% !important;
-  object-fit: contain;
+  height: auto !important;
+  aspect-ratio: 1;
+  max-width: 100%;
+  display: block;
 }
 .panel .bin.sel {
   outline: 3px solid var(--gold2);
@@ -319,12 +347,6 @@
     border-left: 3px solid #2b2420;
     padding-top: 10px;
   }
-  .tubs.base {
-    grid-template-columns: repeat(5, 1fr);
-  }
-  .tubs.tops {
-    grid-template-columns: repeat(5, 1fr);
-  }
   .panel .bowl-opt canvas {
     width: 40px !important;
     height: 40px !important;
@@ -384,9 +406,13 @@
   grid-template-columns: repeat(7, 1fr);
 }
 .tubs.tops {
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.tubs.base {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
 }
 .panel .bin {
+  min-width: 0;
   border-radius: 8px;
   background: #3b3f45;
   overflow: hidden;
@@ -414,9 +440,25 @@
 }
 @media (min-width: 760px) and (orientation: landscape) {
   .tubs.base {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
   .tubs.tops {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* phone: keep the register + tip box left of the customer's face */
+@media (max-width: 759px), (orientation: portrait) {
+  .register {
+    left: 2%;
+    --reg-w: 128px;
+    width: 128px;
+  }
+  .tipjar {
+    left: calc(2% + 128px + 4px);
+    width: 42px;
+  }
+  .play2 .guest {
+    left: 60%;
   }
 }

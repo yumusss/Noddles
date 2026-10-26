@@ -1,7 +1,18 @@
 // Japanese bowl styles the player picks before building an order.
 
 export type Pattern =
-  'none' | 'wave' | 'gold' | 'sakura' | 'tenmoku' | 'crackle' | 'stripes' | 'dots';
+  | 'none'
+  | 'wave'
+  | 'gold'
+  | 'sakura'
+  | 'tenmoku'
+  | 'crackle'
+  | 'stripes'
+  | 'dots'
+  | 'kikko'
+  | 'ume'
+  | 'brush'
+  | 'asanoha';
 
 export interface BowlStyle {
   id: string;
@@ -96,6 +107,86 @@ export const BOWLS: Record<string, BowlStyle> = {
     pattern: 'dots',
     patternColor: '#fff1dc',
     level: 8,
+  },
+  kobalt: {
+    id: 'kobalt',
+    name: 'Kobalt',
+    glaze: ['#4a6fb5', '#24407a', '#13254d'],
+    lip: '#e9c15a',
+    inner: ['#fbf7f0', '#e9e0d2', '#c6b9a6', '#a39380'],
+    pattern: 'gold',
+    patternColor: '#e9c15a',
+    level: 2,
+  },
+  yesim: {
+    id: 'yesim',
+    name: 'Yeşim',
+    glaze: ['#b9e0c8', '#6fb28f', '#3c7a5c'],
+    lip: '#f1f8f2',
+    inner: ['#f4faf5', '#e2efe5', '#bdd3c3', '#93ab9a'],
+    pattern: 'kikko',
+    patternColor: '#2f5d47',
+    level: 3,
+  },
+  nar: {
+    id: 'nar',
+    name: 'Nar Kırmızısı',
+    glaze: ['#e4746d', '#b8322f', '#6e1a18'],
+    lip: '#f6ecd8',
+    inner: ['#fbf7f0', '#e9e0d2', '#c6b9a6', '#a39380'],
+    pattern: 'ume',
+    patternColor: '#fff0e8',
+    level: 4,
+  },
+  sumi: {
+    id: 'sumi',
+    name: 'Sumi Fırça',
+    glaze: ['#f4efe6', '#e2dacc', '#b9ae9c'],
+    lip: '#2b2420',
+    inner: ['#fbf7f0', '#e9e0d2', '#c6b9a6', '#a39380'],
+    pattern: 'brush',
+    patternColor: '#2b2420',
+    level: 5,
+  },
+  kul: {
+    id: 'kul',
+    name: 'Kül Grisi',
+    glaze: ['#c9c4bb', '#8f8a80', '#5a5650'],
+    lip: '#efe9df',
+    inner: ['#f5f2ec', '#e3ded5', '#bfb8ab', '#948c7f'],
+    pattern: 'crackle',
+    patternColor: '#4a453f',
+    level: 6,
+  },
+  gece: {
+    id: 'gece',
+    name: 'Gece Mavisi',
+    glaze: ['#3b4a6b', '#1f2a45', '#10172a'],
+    lip: '#f6ecd8',
+    inner: ['#fbf7f0', '#e9e0d2', '#c6b9a6', '#a39380'],
+    pattern: 'asanoha',
+    patternColor: '#d9c4a3',
+    level: 7,
+  },
+  cay: {
+    id: 'cay',
+    name: 'Matcha',
+    glaze: ['#a9c48e', '#7c9a6e', '#4b6442'],
+    lip: '#f1f3e8',
+    inner: ['#f6f8f1', '#e6ead9', '#c2c9b1', '#98a089'],
+    pattern: 'dots',
+    patternColor: '#f1f3e8',
+    level: 8,
+  },
+  altin: {
+    id: 'altin',
+    name: 'Altın Kintsugi',
+    glaze: ['#fbf3e3', '#e6d9c2', '#bfae92'],
+    lip: '#d9a441',
+    inner: ['#fbf7f0', '#e9e0d2', '#c6b9a6', '#a39380'],
+    pattern: 'crackle',
+    patternColor: '#d9a441',
+    level: 9,
   },
 };
 
