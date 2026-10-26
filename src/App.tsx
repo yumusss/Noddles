@@ -26,7 +26,7 @@ export interface Save {
   lang: Lang;
 }
 
-const KEY = 'noddles-save-v2';
+const KEY = 'noddles-save-v2'; // keep the old key so saved progress survives the rename
 const fresh: Save = {
   reached: 1,
   cash: 600,

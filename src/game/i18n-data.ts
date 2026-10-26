@@ -100,8 +100,8 @@ export const DATA_EN: Record<string, string> = {
     'You finally made it, dear! Lantern Street has missed you.',
   'Kırk yıl bu tezgâhın arkasında durdum. Artık dizlerim eskisi gibi değil.':
     'Forty years I stood behind this counter. My knees aren’t what they used to be.',
-  'Nine… Noddles’ı gerçekten bana mı bırakıyorsun?':
-    'Grandma… are you really leaving Noddles to me?',
+  'Nine… Noodles’ı gerçekten bana mı bırakıyorsun?':
+    'Grandma… are you really leaving Noodles to me?',
   'Sana ve Mochi’ye. O kedi bu dükkânın asıl patronudur, unutma.':
     'To you and Mochi. Don’t forget, that cat is the real boss of this shop.',
   'Miyav. (Tezgâhın üstüne kurulur ve seni süzer.)':
@@ -227,19 +227,19 @@ export const DATA_EN: Record<string, string> = {
     'I make every bowl one at a time, for one person. See you tomorrow, Baron.',
 
   // ---------- story: day 10 ----------
-  'Meydan fenerlerle dolu. Bir yanda MegaNoodle’ın dev standı, bir yanda küçük Noddles tezgâhı.':
-    'The square is full of lanterns. On one side, MegaNoodle’s giant stand; on the other, the little Noddles counter.',
+  'Meydan fenerlerle dolu. Bir yanda MegaNoodle’ın dev standı, bir yanda küçük Noodles tezgâhı.':
+    'The square is full of lanterns. On one side, MegaNoodle’s giant stand; on the other, the little Noodles counter.',
   'Son hediyem: incecik pirinç eriştesi ve kavrulmuş susam. Artık bütün defter sende.':
     'My last gift: delicate rice noodles and toasted sesame. The whole book is yours now.',
   'Paket sipariş rekoru kırılacak! Motoru ısıttım!':
     'We’re going to break the delivery record! The scooter’s warmed up!',
-  'Hadi Noddles. Mahalle için!': 'Come on, Noddles. For the neighbourhood!',
+  'Hadi Noodles. Mahalle için!': 'Come on, Noodles. For the neighbourhood!',
   '(Kaseyi bitirir, uzun süre susar.) Annem… böyle yapardı.':
     '(Finishes the bowl, silent for a long while.) My mother… used to make it like this.',
   'Fabrikayı başka yere kuracağım. Meydan çocuklarındır. Ve… pazar günleri buraya gelebilir miyim?':
     'I’ll build the factory somewhere else. The square belongs to the children. And… may I come here on Sundays?',
-  'Jüri kararı oybirliğiyle: Meydan, Noddles ve Fener Sokağı’nındır!':
-    'The jury’s decision is unanimous: the square belongs to Noddles and Lantern Street!',
+  'Jüri kararı oybirliğiyle: Meydan, Noodles ve Fener Sokağı’nındır!':
+    'The jury’s decision is unanimous: the square belongs to Noodles and Lantern Street!',
   'Kırk yıl önce bu dükkânı tek bir kaseyle açmıştım. Sen onu bir mahalleye çevirdin.':
     'Forty years ago I opened this shop with a single bowl. You turned it into a neighbourhood.',
   'Mrrrr. (Kucağına kıvrılır. Bu, Mochi’nin en büyük ödülüdür.)':
@@ -305,7 +305,7 @@ export const DATA_EN: Record<string, string> = {
   'Annem burayı anlata anlata bitiremedi.': 'My mum wouldn’t stop talking about this place.',
   'Yağmurda en iyisi sıcak bir kase!': 'Nothing beats a hot bowl in the rain!',
   'Sırılsıklam oldum, ısınmam lazım.': 'I’m soaked through, I need to warm up.',
-  'Alo, Noddles mı?': 'Hello, is this Noddles?',
+  'Alo, Noodles mı?': 'Hello, is this Noodles?',
   'Alo! Paket servis var mı?': 'Hello! Do you do delivery?',
   'Merhaba, sipariş vermek istiyorum.': 'Hi, I’d like to place an order.',
   'Selam şef! Arkadaşlarımla geldik, hepimiz açız.':

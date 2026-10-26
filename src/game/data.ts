@@ -254,7 +254,7 @@ export const LEVELS: Level[] = [
         who: 'hana',
         text: 'Kırk yıl bu tezgâhın arkasında durdum. Artık dizlerim eskisi gibi değil.',
       },
-      { who: 'sef', text: 'Nine… Noddles’ı gerçekten bana mı bırakıyorsun?' },
+      { who: 'sef', text: 'Nine… Noodles’ı gerçekten bana mı bırakıyorsun?' },
       { who: 'hana', text: 'Sana ve Mochi’ye. O kedi bu dükkânın asıl patronudur, unutma.' },
       { who: 'mochi', text: 'Miyav. (Tezgâhın üstüne kurulur ve seni süzer.)' },
       {
@@ -506,14 +506,14 @@ export const LEVELS: Level[] = [
     intro: [
       {
         who: 'mahalle',
-        text: 'Meydan fenerlerle dolu. Bir yanda MegaNoodle’ın dev standı, bir yanda küçük Noddles tezgâhı.',
+        text: 'Meydan fenerlerle dolu. Bir yanda MegaNoodle’ın dev standı, bir yanda küçük Noodles tezgâhı.',
       },
       {
         who: 'hana',
         text: 'Son hediyem: incecik pirinç eriştesi ve kavrulmuş susam. Artık bütün defter sende.',
       },
       { who: 'ruzgar', text: 'Paket sipariş rekoru kırılacak! Motoru ısıttım!' },
-      { who: 'sef', text: 'Hadi Noddles. Mahalle için!' },
+      { who: 'sef', text: 'Hadi Noodles. Mahalle için!' },
     ],
     outro: [
       { who: 'baron', text: '(Kaseyi bitirir, uzun süre susar.) Annem… böyle yapardı.' },
@@ -523,7 +523,7 @@ export const LEVELS: Level[] = [
       },
       {
         who: 'lezzetova',
-        text: 'Jüri kararı oybirliğiyle: Meydan, Noddles ve Fener Sokağı’nındır!',
+        text: 'Jüri kararı oybirliğiyle: Meydan, Noodles ve Fener Sokağı’nındır!',
       },
       {
         who: 'hana',

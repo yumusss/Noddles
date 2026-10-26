@@ -2784,9 +2784,9 @@ function paintRegister(c: Ctx, r: Rect) {
   c.font = `800 ${Math.round(h * 0.13)}px "Baloo 2", system-ui, sans-serif`;
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText('NODDLES', x + w / 2, y + h * 0.17);
+  c.fillText('NOODLES', x + w / 2, y + h * 0.17);
   c.fillStyle = 'rgba(159,240,176,0.25)';
-  c.fillText('NODDLES', x + w / 2, y + h * 0.17);
+  c.fillText('NOODLES', x + w / 2, y + h * 0.17);
   c.save();
   roundRect(c, x + w * 0.18, y + h * 0.06, w * 0.64, h * 0.22, 4);
   c.clip();
@@ -2955,7 +2955,7 @@ function drawTablet(c: Ctx, p: Rect, ringing: boolean, t: number) {
   c.font = `800 ${Math.round(sh * 0.17)}px "Baloo 2", system-ui, sans-serif`;
   c.textAlign = 'left';
   c.textBaseline = 'middle';
-  c.fillText('Noddles', sx + sw * 0.08, sy + sh * 0.135);
+  c.fillText('Noodles', sx + sw * 0.08, sy + sh * 0.135);
   // tiny bowl icon right of the bar
   c.fillStyle = '#fff6e9';
   ellipse(c, sx + sw * 0.88, sy + sh * 0.14, sw * 0.055, sh * 0.06);
@@ -3099,7 +3099,7 @@ function paintDeliveryBox(c: Ctx, b: Rect, open: boolean) {
   c.font = `800 ${Math.round(h * 0.13)}px "Baloo 2", system-ui, sans-serif`;
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText('NODDLES', 0, 0.5);
+  c.fillText('NOODLES', 0, 0.5);
   c.restore();
   if (open) {
     c.fillStyle = '#efdcc0';

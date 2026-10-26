@@ -54,7 +54,7 @@ export default function Title({
       </button>
       <div className="title-body">
         <h1 className="logo">
-          Noddles
+          Noodles
           <span className="logo-sub">{T('title.sub')}</span>
         </h1>
         <div className="hero-bowl">

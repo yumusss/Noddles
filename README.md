@@ -1,4 +1,4 @@
-# Noddles 🍜
+# Noodles 🍜
 
 Çocuklar (10–14) için, tarayıcıda ve tablette çalışan hikâyeli bir Japon noodle dükkânı oyunu. Fener Sokağı’ndaki son noodle dükkânını Hana Nine’den devralıyorsun; mahalleyi ve meydanı Baron Kraker’in MegaNoodle fabrikasından kurtarmak için on gün boyunca tezgâhın arkasındasın.
 

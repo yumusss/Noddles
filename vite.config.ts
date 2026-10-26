@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Noddles — Noodle Dükkânı',
-        short_name: 'Noddles',
+        name: 'Noodles — Noodle Dükkânı',
+        short_name: 'Noodles',
         description:
           'Hikâyeli noodle dükkânı oyunu. Siparişleri al, kaseyi hazırla, mahalleyi kurtar.',
         lang: 'tr',

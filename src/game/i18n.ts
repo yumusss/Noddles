@@ -149,7 +149,7 @@ export const UI = {
   'decor.tipItem': ['bahşiş +%{n}', 'tips +{n}%'],
   // ending
   'end.chip': ['Meydan kurtarıldı!', 'The square is saved!'],
-  'end.title': ['Noddles yaşıyor', 'Noddles lives on'],
+  'end.title': ['Noodles yaşıyor', 'Noodles lives on'],
   'end.text': [
     'Fener Sokağı’nın son noodle dükkânı, mahallenin kalbi oldu. Mochi tezgâhın üstünde mırlıyor, Hana Nine pencerede gülümsüyor.',
     'The last noodle shop on Lantern Street became the heart of the neighbourhood. Mochi purrs on the counter, Grandma Hana smiles at the window.',

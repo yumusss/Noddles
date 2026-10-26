@@ -350,7 +350,7 @@ const GREETS = [
 ];
 const RAIN_GREETS = ['Yağmurda en iyisi sıcak bir kase!', 'Sırılsıklam oldum, ısınmam lazım.'];
 const PHONE_GREETS = [
-  'Alo, Noddles mı?',
+  'Alo, Noodles mı?',
   'Alo! Paket servis var mı?',
   'Merhaba, sipariş vermek istiyorum.',
 ];
