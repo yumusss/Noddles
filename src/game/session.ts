@@ -464,30 +464,33 @@ export class DaySession {
   }
 
   // ---------- customers ----------
+  private calls: Customer[] = [];
+
   private spawn() {
     const cu = makeCustomer(this.level.id, this.nextId++);
     for (const m of cu.members)
       preloadAvatar(m.look, ['neutral', 'happy', 'love', 'angry', 'worried']);
     if (cu.phone) {
-      // the tablet only rings while nobody is at the counter and no bowl is being judged/paid
-      if (
-        this.ringing ||
-        this.open.length >= MAX_OPEN ||
-        this.counter ||
-        this.pick ||
-        this.delivery
-      )
-        return;
-      const m = cu.members[0];
-      this.ringing = { id: this.slotId++, cu, mi: 0, waitT: 0, lines: orderLines(m.order) };
-      this.ringT = 0;
-      sfx('phone');
-      this.notify();
+      // calls wait in a line of their own and ring as soon as the counter is free
+      if (this.calls.length < 2) this.calls.push(cu);
       return;
     }
     if (this.queue.length >= QUEUE_MAX) return;
     this.queue.push(cu);
     sfx('door');
+    this.notify();
+  }
+
+  /** ring the tablet for a waiting call when nobody is at the counter */
+  private tryRing() {
+    if (!this.calls.length || this.dayOver) return;
+    if (this.ringing || this.open.length >= MAX_OPEN || this.counter || this.pick || this.delivery)
+      return;
+    const cu = this.calls.shift()!;
+    const m = cu.members[0];
+    this.ringing = { id: this.slotId++, cu, mi: 0, waitT: 0, lines: orderLines(m.order) };
+    this.ringT = 0;
+    sfx('phone');
     this.notify();
   }
 
@@ -1288,7 +1291,7 @@ export class DaySession {
 
   // ---------- hints (days 1–2) ----------
   private currentHint(): Hint | null {
-    if (this.level.id > 2) return null;
+    if (this.level.id > 1) return null; // guidance only on day 1
     const v = this.engine.view;
     if (this.ringing)
       return {
@@ -1315,7 +1318,7 @@ export class DaySession {
           }),
         };
       }
-      if (o.thick && this.bowl.thick !== o.thick && this.level.id === 1)
+      if (o.thick && this.bowl.thick !== o.thick)
         return {
           station: 1,
           x: v.W + Lp.thickChips.x + Lp.thickChips.w / 2,
@@ -1530,6 +1533,7 @@ export class DaySession {
     }
     for (const q of this.queue) q.patience -= dt * 0.35; // waiting in line eats a little patience
     if (tick) this.notify();
+    this.tryRing();
     // counter flow
     this.updateCounter(dt);
     // pickup flow
@@ -1565,6 +1569,8 @@ export class DaySession {
           (!this.pick || this.pick.phase === 'delivering') &&
           this.queue.length &&
           !this.open.some((o) => !o.cu.phone) &&
+          !this.ringing &&
+          !(this.calls.length && this.phaseT < 2.5) &&
           this.phaseT > 0.8
         ) {
           this.counter = this.queue.shift()!;

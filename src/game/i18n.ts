@@ -106,6 +106,7 @@ export const UI = {
   'play.goTo': ['{s} bölümüne geç', 'Go to {s}'],
   'play.closing': ['Kepenk kapanıyor…', 'Closing up…'],
   'play.pct': ['%{n}', '{n}%'],
+  'play.howto': ['❓ Nasıl oynanır?', '❓ How to play'],
   'play.apologize': ['🙏 Özür dile', '🙏 Apologize'],
   'play.serveTo': ['Kime: {n}', 'For: {n}'],
   // cash

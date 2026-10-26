@@ -14,7 +14,7 @@ import Ending from './ui/Ending';
 import { T, setLang, type Lang } from './game/i18n';
 
 export interface Save {
-  reached: number; // highest unlocked level (1..11)
+  reached: number; // highest unlocked level (1..LEVELS.length+1)
   cash: number;
   decor: DecorState;
   owned: string[];
@@ -33,8 +33,8 @@ const fresh: Save = {
   cash: 600,
   decor: DEFAULT_DECOR,
   owned: DEFAULT_OWNED,
-  stars: Array(10).fill(0),
-  best: Array(10).fill(0),
+  stars: Array(LEVELS.length).fill(0),
+  best: Array(LEVELS.length).fill(0),
   tipCoins: 0,
   sfx: true,
   music: true,
@@ -48,6 +48,11 @@ function load(): Save {
     if (raw) {
       const s = { ...fresh, ...JSON.parse(raw) } as Save;
       s.decor = withDefaults(s.decor);
+      // older saves had 10 days — pad to the current number of levels
+      const pad = (a: number[] | undefined) =>
+        Array.from({ length: LEVELS.length }, (_, i) => a?.[i] ?? 0);
+      s.stars = pad(s.stars);
+      s.best = pad(s.best);
       return s;
     }
   } catch {
@@ -117,7 +122,7 @@ export default function App() {
       stars[level - 1] = Math.max(stars[level - 1], result.stars);
       best[level - 1] = Math.max(best[level - 1], Math.round(result.avg));
       let reached = s.reached;
-      if (result.stars > 0) reached = Math.max(reached, Math.min(11, level + 1));
+      if (result.stars > 0) reached = Math.max(reached, Math.min(LEVELS.length + 1, level + 1));
       const reviews = [...(s.reviews ?? []), ...result.reviews].slice(-40);
       return { ...s, cash: result.cashAfter, stars, best, reached, tipCoins, reviews };
     });
@@ -211,7 +216,7 @@ export default function App() {
           decor={save.decor}
           tod="gunbatimi"
           onDone={() => {
-            if (screen.level === 10) setScreen({ s: 'ending' });
+            if (screen.level === LEVELS.length) setScreen({ s: 'ending' });
             else setScreen({ s: 'map' });
           }}
         />

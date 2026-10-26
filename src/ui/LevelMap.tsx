@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LEVELS } from '../game/data';
 import type { Save } from '../App';
 import SceneCanvas from './SceneCanvas';
@@ -31,6 +31,11 @@ export default function LevelMap({
   const [confirm, setConfirm] = useState(false);
   const scene = useMemo(() => salonScene(save.decor, 'ogle', false), [save.decor]);
   const total = save.stars.reduce((a, b) => a + b, 0);
+  const curRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    // 50 days is a long path — start scrolled to today
+    curRef.current?.scrollIntoView({ block: 'center' });
+  }, []);
   return (
     <div className="screen map">
       <SceneCanvas draw={scene} className="bg" animate={false} />
@@ -40,7 +45,7 @@ export default function LevelMap({
           {T('map.back')}
         </button>
         <div className="bar-mid">
-          <span className="chip gold">★ {total}/30</span>
+          <span className="chip gold">★ {total}/{LEVELS.length * 3}</span>
           <span className="chip">{fmt(save.cash)}</span>
         </div>
         <div className="bar-right">
@@ -63,6 +68,7 @@ export default function LevelMap({
             return (
               <button
                 key={l.id}
+                ref={l.id === Math.min(save.reached, LEVELS.length) ? curRef : undefined}
                 className={`node ${locked ? 'locked' : ''} ${l.id === save.reached ? 'current' : ''} ${i % 2 ? 'right' : 'left'}`}
                 disabled={locked}
                 onClick={() => {
@@ -92,7 +98,7 @@ export default function LevelMap({
           <button className="btn primary" onClick={onDecor}>
             {T('map.decor')}
           </button>
-          {save.reached > 10 && (
+          {save.reached > LEVELS.length && (
             <button className="btn" onClick={onEnding}>
               {T('map.ending')}
             </button>

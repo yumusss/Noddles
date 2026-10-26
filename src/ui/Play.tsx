@@ -6,6 +6,7 @@ import { DENOMS, fmt, sum } from '../game/money';
 import { COOK_LABEL } from '../game/bowl';
 import { sfx } from '../game/audio';
 import Tablet from './Tablet';
+import HowTo from './HowTo';
 import { L, T } from '../game/i18n';
 
 export default function Play({
@@ -30,6 +31,7 @@ export default function Play({
   const [session, setSession] = useState<DaySession | null>(null);
   const [paused, setPaused] = useState(false);
   const [tablet, setTablet] = useState(false);
+  const [howto, setHowto] = useState(levelId === 1);
   const level = LEVELS[levelId - 1];
 
   useEffect(() => {
@@ -54,14 +56,15 @@ export default function Play({
 
   useEffect(() => {
     if (!session) return;
-    if (paused || tablet) session.engine.stop();
+    if (paused || tablet || howto) session.engine.stop();
     else session.engine.start();
-  }, [paused, tablet, session]);
+  }, [paused, tablet, howto, session]);
 
   return (
     <div className="screen play">
       <canvas ref={canvasRef} className="game-canvas" />
       {session && <Overlays s={session} worldRef={worldRef} onPause={() => setPaused(true)} />}
+      {howto && <HowTo onClose={() => setHowto(false)} />}
       {tablet && session && (
         <Tablet
           levelId={levelId}
@@ -92,6 +95,16 @@ export default function Play({
                 {T('map.lang')}
               </button>
             </div>
+            {levelId === 1 && (
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setPaused(false);
+                  setHowto(true);
+                }}>
+                {T('play.howto')}
+              </button>
+            )}
             <button className="btn big primary" onClick={() => setPaused(false)}>
               {T('play.resume')}
             </button>
@@ -203,44 +216,50 @@ function Overlays({
         </nav>
       </header>
       {ui.tickets.length > 0 && (
-        <div className="tickets">
-          {ui.tickets.map((tk) => {
-            const isOpen = open === tk.id;
+        <div className={`ticket-rail ${ui.station === 0 && b ? 'tucked' : ''}`}>
+          <div className="rail-bar" />
+          {ui.tickets.map((tk, idx) => {
+            const isOpen = open !== tk.id; // tickets are open by default; tap folds one up
             const isTarget = ui.target === tk.id;
             return (
               <div
                 key={tk.id}
-                className={`ticket ${isOpen ? 'open' : ''} ${isTarget ? 'target' : ''}`}
-                onClick={() => setOpen(isOpen ? null : tk.id)}>
-                <div
-                  className="patience"
-                  style={{ ['--p' as string]: `${Math.round(tk.patience * 100)}%` }}>
-                  <i className={tk.patience > 0.5 ? 'ok' : tk.patience > 0.25 ? 'warn' : 'bad'} />
-                </div>
-                <div className="ticket-head">
-                  <span className="ticket-title">
-                    {tk.phone ? '📱' : '📝'} {tk.who}
+                className={`chit ${isOpen ? 'open' : ''} ${isTarget ? 'target' : ''}`}
+                style={{ ['--tilt' as string]: `${idx % 2 ? 1.2 : -1.4}deg` }}
+                onClick={() => setOpen(isOpen ? tk.id : null)}>
+                <i className="chit-clip" />
+                <div className="chit-head">
+                  <span>
+                    {tk.phone ? '🛵' : '#'}
+                    {String(tk.id).padStart(2, '0')}
                   </span>
-                  {!isOpen && (
-                    <span className="ticket-sum">{tk.lines.slice(0, 4).join(' · ')}</span>
+                  <strong>{tk.who}</strong>
+                  {ui.tickets.length > 1 && (
+                    <button
+                      className={`ticket-pin ${isTarget ? 'on' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        s.setTarget(tk.id);
+                      }}
+                      aria-label={T('play.serveTo', { n: tk.who })}>
+                      {isTarget ? '📌' : '○'}
+                    </button>
                   )}
-                  <button
-                    className={`ticket-pin ${isTarget ? 'on' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      s.setTarget(tk.id);
-                    }}
-                    aria-label={T('play.serveTo', { n: tk.who })}>
-                    {isTarget ? '📌' : '○'}
-                  </button>
                 </div>
-                {isOpen && (
+                {isOpen ? (
                   <ul>
                     {tk.lines.map((l, i) => (
                       <li key={i}>{l}</li>
                     ))}
                   </ul>
+                ) : (
+                  <div className="chit-sum">{tk.lines.slice(0, 2).join(' · ')}…</div>
                 )}
+                <div
+                  className="patience"
+                  style={{ ['--p' as string]: `${Math.round(tk.patience * 100)}%` }}>
+                  <i className={tk.patience > 0.5 ? 'ok' : tk.patience > 0.25 ? 'warn' : 'bad'} />
+                </div>
               </div>
             );
           })}

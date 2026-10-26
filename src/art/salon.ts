@@ -2716,177 +2716,761 @@ export function drawSalonBack(
 }
 
 // ---------- counter items ----------
+/** Closed path through `pts` with every corner rounded by `r`. */
+function roundPoly(c: Ctx, pts: [number, number][], r: number) {
+  const n = pts.length;
+  c.beginPath();
+  const [lx, ly] = pts[n - 1];
+  const [fx, fy] = pts[0];
+  c.moveTo((lx + fx) / 2, (ly + fy) / 2);
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = pts[i];
+    const [bx, by] = pts[(i + 1) % n];
+    c.arcTo(ax, ay, bx, by, r);
+  }
+  c.closePath();
+}
+
+/** Brass gradient (vertical): bright top, warm mid, deep bottom. */
+function brass(c: Ctx, y0: number, y1: number) {
+  const g = c.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, '#fbe6ad');
+  g.addColorStop(0.35, '#e2b866');
+  g.addColorStop(0.7, '#c08f3e');
+  g.addColorStop(1, '#8e6427');
+  return g;
+}
+
+/**
+ * Hand-lettered label text: Baloo 2 with a slight slant, per-letter jitter and dry-brush streaks,
+ * rendered through a small offscreen canvas (only ever called inside cached sprites).
+ */
+function brushText(
+  c: Ctx,
+  text: string,
+  cx: number,
+  cy: number,
+  size: number,
+  maxW: number,
+  col: string,
+  seed: number
+) {
+  const R = 6; // offscreen resolution multiplier
+  const font = (s: number) => `800 ${s}px "Baloo 2", "Nunito", system-ui, sans-serif`;
+  const mc = document.createElement('canvas').getContext('2d')!;
+  mc.font = font(size);
+  const tw = mc.measureText(text).width;
+  const s = tw > maxW ? (size * maxW) / tw : size;
+  mc.font = font(s);
+  const chars = [...text];
+  const widths = chars.map((ch) => mc.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0);
+  const bw = Math.ceil(total + s);
+  const bh = Math.ceil(s * 1.6);
+  const cv = document.createElement('canvas');
+  cv.width = bw * R;
+  cv.height = bh * R;
+  const o = cv.getContext('2d')!;
+  o.scale(R, R);
+  o.font = font(s);
+  o.textBaseline = 'middle';
+  o.textAlign = 'left';
+  o.fillStyle = col;
+  o.strokeStyle = col;
+  o.lineJoin = 'round';
+  const r = rng(seed);
+  let px = s * 0.5;
+  chars.forEach((ch, i) => {
+    o.save();
+    o.translate(px + widths[i] / 2, bh / 2 + (r() - 0.5) * s * 0.08);
+    o.rotate((r() - 0.5) * 0.14);
+    o.transform(1, 0, -0.1, 1, 0, 0);
+    o.lineWidth = s * (0.03 + r() * 0.05);
+    o.fillText(ch, -widths[i] / 2, 0);
+    o.strokeText(ch, -widths[i] / 2, 0);
+    o.restore();
+    px += widths[i];
+  });
+  // dry-brush: thin horizontal streaks wiped out of the ink
+  o.globalCompositeOperation = 'destination-out';
+  o.lineCap = 'round';
+  for (let i = 0; i < 6; i++) {
+    const yy = bh * (0.36 + r() * 0.3);
+    const xx = r() * bw;
+    o.strokeStyle = `rgba(0,0,0,${0.12 + r() * 0.16})`;
+    o.lineWidth = 0.12 + r() * 0.12;
+    o.beginPath();
+    o.moveTo(xx, yy);
+    o.lineTo(xx + s * (0.5 + r() * 0.8), yy + (r() - 0.5) * 0.4);
+    o.stroke();
+  }
+  c.drawImage(cv, cx - bw / 2, cy - bh / 2, bw, bh);
+}
+
+/**
+ * Vintage café register: brass crown with an amber display, sage enamel body with a cream key deck,
+ * walnut cash drawer on little brass feet, pop-up price flags, a curled receipt and a side crank.
+ * Painted in a fixed 150×108 design box scaled to the rect.
+ */
 function paintRegister(c: Ctx, r: Rect) {
-  const { x, y, w, h } = r;
-  softShadow(c, x + w / 2, y + h, w * 0.62, h * 0.11, 0.3);
-  // cream enamel body: lit from the top-left, darker on the right and underneath
-  const body = c.createLinearGradient(x, y + h * 0.3, x + w, y + h);
-  body.addColorStop(0, '#f8f1e6');
-  body.addColorStop(0.5, '#efe4d3');
-  body.addColorStop(1, '#d2c2ab');
-  c.fillStyle = body;
-  roundRect(c, x, y + h * 0.32, w, h * 0.68, 10);
+  c.save();
+  c.translate(r.x, r.y);
+  c.scale(r.w / 150, r.h / 108);
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  // contact shadows: a wide soft one plus a tight dark one right under the feet
+  softShadow(c, 76, 107, 92, 10, 0.3);
+  c.fillStyle = 'rgba(45,28,18,0.28)';
+  ellipse(c, 75, 107.5, 70, 2.4);
   c.fill();
-  stroke(c);
-  hiLine(c, x + 10, y + h * 0.32 + 1, w - 20, 0.5, 2);
-  c.fillStyle = hGrad(c, x, x + 8, 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0)');
-  roundRect(c, x, y + h * 0.32, 8, h * 0.68, 10);
+
+  // --- side crank (behind the body, on the right) ---
+  c.strokeStyle = '#9a6e2c';
+  c.lineWidth = 3.4;
+  c.beginPath();
+  c.moveTo(140, 66);
+  c.quadraticCurveTo(152, 60, 153, 47);
+  c.stroke();
+  c.strokeStyle = '#f2d48c';
+  c.lineWidth = 1.1;
+  c.beginPath();
+  c.moveTo(141, 64.6);
+  c.quadraticCurveTo(150.6, 59.4, 151.8, 48);
+  c.stroke();
+  c.fillStyle = vGrad(c, 38, 50, '#a8754b', '#5b3f2c');
+  roundRect(c, 149.5, 38, 7, 12, 3.5);
   c.fill();
-  dropAO(c, x + 2, y + h - 10, w - 4, 10, 0.1);
-  // drawer line + a brass drawer pull
-  c.fillStyle = 'rgba(45,28,18,0.1)';
-  roundRect(c, x + 6, y + h * 0.82, w - 12, h * 0.1, 4);
+  stroke(c, OUT, 0.8);
+  c.fillStyle = 'rgba(255,240,220,0.45)';
+  roundRect(c, 150.6, 39.5, 1.8, 7, 1);
   c.fill();
-  c.fillStyle = hGrad(c, x + w * 0.4, x + w * 0.6, '#f0d496', '#b48434');
-  roundRect(c, x + w * 0.4, y + h * 0.84, w * 0.2, h * 0.06, 3);
+
+  // --- pop-up price flags (behind the crown, right side) ---
+  for (const [fx, fy, glyph, gc] of [
+    [97, -4, '¥', PAL.tomato],
+    [110, -1, '₺', INDIGO],
+  ] as [number, number, string, string][]) {
+    c.fillStyle = brass(c, fy + 8, fy + 22);
+    c.fillRect(fx + 4.9, fy + 9, 2.2, 14);
+    c.fillStyle = 'rgba(90,55,18,0.5)';
+    c.fillRect(fx + 6.5, fy + 9, 0.6, 14);
+    c.fillStyle = vGrad(c, fy, fy + 12, '#fffaf0', '#efe2cc');
+    roundRect(c, fx, fy, 12, 12, 2.5);
+    c.fill();
+    stroke(c, OUT, 0.8);
+    c.fillStyle = gc;
+    c.font = `800 9px ${'"Baloo 2", system-ui, sans-serif'}`;
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(glyph, fx + 6, fy + 6.8);
+    hiLine(c, fx + 2, fy + 1, 8, 0.7, 0.8);
+  }
+
+  // --- walnut cash drawer on brass feet ---
+  for (const fx of [10, 132]) {
+    c.fillStyle = brass(c, 102, 108);
+    roundRect(c, fx, 101, 8, 7, 2);
+    c.fill();
+    stroke(c, OUT, 0.7);
+  }
+  c.fillStyle = vGrad(c, 81, 104, '#8a6145', '#563a28');
+  roundRect(c, 3, 81, 144, 23, 5);
   c.fill();
-  // keys with a lit top edge and a shadow below each
-  const kx = x + w * 0.08;
-  const ky = y + h * 0.4;
-  const kw = (w * 0.56) / 4;
-  const kh = (h * 0.34) / 3;
-  for (let i = 0; i < 4; i++) {
-    for (let j = 0; j < 3; j++) {
-      const kxx = kx + i * kw + 2;
-      const kyy = ky + j * kh + 2;
-      c.fillStyle = 'rgba(45,28,18,0.14)';
-      roundRect(c, kxx, kyy + 2, kw - 4, kh - 4, 3);
+  stroke(c, 'rgba(50,30,18,0.45)', 1);
+  grainLines(c, 6, 84, 138, 18, 2719, 10, 'rgba(255,225,190,0.08)');
+  grainLines(c, 6, 84, 138, 18, 2720, 8, 'rgba(40,22,10,0.18)');
+  // recessed drawer panel
+  c.fillStyle = 'rgba(40,24,14,0.22)';
+  roundRect(c, 11, 86.5, 128, 14, 3);
+  c.fill();
+  innerAO(c, 11, 86.5, 128, 14, 3, 0.25);
+  c.fillStyle = 'rgba(255,230,200,0.14)';
+  c.fillRect(13, 99.6, 124, 0.9);
+  hiLine(c, 7, 81.6, 136, 0.28, 1);
+  // brass pull with a lit top
+  c.fillStyle = 'rgba(30,18,10,0.35)';
+  roundRect(c, 63, 92.6, 24, 6, 3);
+  c.fill();
+  c.fillStyle = brass(c, 90.5, 96.5);
+  roundRect(c, 63, 90.5, 24, 6, 3);
+  c.fill();
+  stroke(c, 'rgba(90,55,20,0.5)', 0.7);
+  hiLine(c, 66, 91.2, 18, 0.8, 0.9);
+  // keyhole escutcheon
+  c.fillStyle = brass(c, 89, 98);
+  ellipse(c, 122, 93.5, 3.6, 4.4);
+  c.fill();
+  c.fillStyle = '#3a2416';
+  circle(c, 122, 92.6, 1);
+  c.fill();
+  c.fillRect(121.6, 92.6, 0.8, 2.6);
+  // little sakura sticker on the drawer
+  c.save();
+  c.fillStyle = 'rgba(30,18,10,0.3)';
+  circle(c, 28.4, 94.4, 5.6);
+  c.fill();
+  c.fillStyle = '#fff6ee';
+  circle(c, 28, 93.6, 5.6);
+  c.fill();
+  blossom(c, 28, 93.6, 5.2, PINK, true, 0.2);
+  c.restore();
+  // rim light down the right edge of the drawer
+  c.fillStyle = hGrad(c, 143, 147, 'rgba(255,230,190,0)', 'rgba(255,230,190,0.35)');
+  roundRect(c, 143, 83, 4, 19, 2);
+  c.fill();
+
+  // --- sage enamel body (a sloped key deck) ---
+  const body: [number, number][] = [
+    [16, 44],
+    [134, 44],
+    [145, 84],
+    [5, 84],
+  ];
+  const bg = c.createLinearGradient(10, 44, 120, 96);
+  bg.addColorStop(0, '#cfe0c6');
+  bg.addColorStop(0.45, '#aec8a6');
+  bg.addColorStop(1, '#7f9c79');
+  c.fillStyle = bg;
+  roundPoly(c, body, 7);
+  c.fill();
+  stroke(c, 'rgba(50,40,25,0.4)', 1);
+  c.save();
+  roundPoly(c, body, 7);
+  c.clip();
+  // enamel gloss: a broad top glow + two soft window streaks + right rim light
+  c.fillStyle = vGrad(c, 44, 58, 'rgba(255,255,255,0.45)', 'rgba(255,255,255,0)');
+  c.fillRect(0, 44, 150, 14);
+  c.fillStyle = 'rgba(255,255,255,0.18)';
+  c.beginPath();
+  c.moveTo(14, 84);
+  c.lineTo(22, 44);
+  c.lineTo(30, 44);
+  c.lineTo(22, 84);
+  c.closePath();
+  c.fill();
+  c.fillStyle = hGrad(c, 136, 146, 'rgba(255,236,200,0)', 'rgba(255,236,200,0.5)');
+  c.fillRect(136, 44, 12, 40);
+  c.restore();
+  // cream key deck inset into the enamel
+  const deck: [number, number][] = [
+    [23, 49],
+    [127, 49],
+    [134, 80],
+    [16, 80],
+  ];
+  c.fillStyle = 'rgba(40,50,30,0.28)';
+  c.save();
+  c.translate(0, 0.8);
+  roundPoly(c, deck, 4);
+  c.fill();
+  c.restore();
+  c.fillStyle = vGrad(c, 49, 80, '#fbf3e4', '#e8dac2');
+  roundPoly(c, deck, 4);
+  c.fill();
+  c.save();
+  roundPoly(c, deck, 4);
+  c.clip();
+  dropAO(c, 10, 49, 130, 4, 0.2);
+  c.restore();
+  stroke(c, 'rgba(120,85,40,0.35)', 0.8);
+  // brass trim bands top and bottom of the body
+  c.fillStyle = brass(c, 81, 85);
+  roundRect(c, 4, 81, 142, 3.6, 1.8);
+  c.fill();
+  hiLine(c, 6, 81.3, 138, 0.6, 0.7);
+  c.fillStyle = brass(c, 42.5, 46);
+  roundRect(c, 15, 42.5, 120, 3.4, 1.7);
+  c.fill();
+  hiLine(c, 17, 42.8, 116, 0.7, 0.7);
+
+  // rounded typewriter keys with brass rings and tiny glyphs
+  const glyphs = ['7', '8', '9', '+', '4', '5', '6', '−', '1', '2', '3', '0'];
+  for (let row = 0; row < 3; row++) {
+    const ky = 55 + row * 9.4;
+    const kr = 3.5 + row * 0.25;
+    const spread = 19.5 + row * 0.6;
+    const left = 31 - row * 2;
+    for (let col = 0; col < 4; col++) {
+      const kx = left + col * spread;
+      c.fillStyle = 'rgba(70,45,20,0.28)';
+      ellipse(c, kx + 0.4, ky + 1.9, kr + 0.9, kr * 0.75);
       c.fill();
-      c.fillStyle = vGrad(c, kyy, kyy + kh - 4, '#fffaf2', (i + j) % 2 ? '#efe5d6' : '#e9d6ba');
-      roundRect(c, kxx, kyy, kw - 4, kh - 4, 3);
+      c.fillStyle = brass(c, ky - kr - 1, ky + kr + 1);
+      circle(c, kx, ky, kr + 1);
       c.fill();
-      stroke(c, 'rgba(60,35,20,0.12)');
+      const kg = c.createRadialGradient(kx - kr * 0.4, ky - kr * 0.5, 0, kx, ky, kr);
+      kg.addColorStop(0, '#ffffff');
+      kg.addColorStop(0.6, '#fbf2e2');
+      kg.addColorStop(1, '#e4d3b6');
+      c.fillStyle = kg;
+      circle(c, kx, ky, kr);
+      c.fill();
+      c.fillStyle = 'rgba(58,42,34,0.82)';
+      c.font = `800 ${(kr * 1.45).toFixed(2)}px "Baloo 2", system-ui, sans-serif`;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillText(glyphs[row * 4 + col], kx, ky + 0.35);
     }
   }
-  for (const [ky2, col] of [
-    [ky + 2, PAL.coral],
-    [ky + kh * 1.5 + 2, PAL.matcha],
-  ] as [number, string][]) {
-    c.fillStyle = 'rgba(45,28,18,0.14)';
-    roundRect(c, x + w * 0.68, ky2 + 2, w * 0.24, kh * 1.5 - 4, 4);
+  // the two big function keys: matcha (top) and coral "total" bar
+  for (const [kx, ky, kw, kh, col] of [
+    [108, 51.5, 17, 7, PAL.matcha],
+    [109, 61.5, 19, 15.5, PAL.coral],
+  ] as [number, number, number, number, string][]) {
+    c.fillStyle = 'rgba(70,45,20,0.28)';
+    roundRect(c, kx, ky + 1.6, kw, kh, 3.4);
     c.fill();
-    c.fillStyle = vGrad(c, ky2, ky2 + kh * 1.5, shade(col, 0.22), shade(col, -0.1));
-    roundRect(c, x + w * 0.68, ky2, w * 0.24, kh * 1.5 - 4, 4);
+    c.fillStyle = brass(c, ky - 1, ky + kh + 1);
+    roundRect(c, kx - 1, ky - 1, kw + 2, kh + 2, 4);
     c.fill();
-    stroke(c);
-    hiLine(c, x + w * 0.7, ky2 + 1.5, w * 0.2, 0.35, 1.5);
+    c.fillStyle = vGrad(c, ky, ky + kh, shade(col, 0.3), shade(col, -0.12));
+    roundRect(c, kx, ky, kw, kh, 3.4);
+    c.fill();
+    hiLine(c, kx + 2.5, ky + 1, kw - 5, 0.6, 1);
   }
-  // display head: dark slate with a glossy glass pane
-  c.fillStyle = vGrad(c, y, y + h * 0.36, '#4a4e58', '#2a2d35');
-  roundRect(c, x + w * 0.12, y, w * 0.76, h * 0.36, 7);
+
+  // --- curled receipt rising from a slot behind the crown's left shoulder ---
+  const receipt = () => {
+    c.beginPath();
+    c.moveTo(34, 26);
+    c.lineTo(33.6, 9);
+    c.bezierCurveTo(33.4, 2.5, 24.5, 1.5, 22.5, 7);
+    c.quadraticCurveTo(21.6, 10, 22.4, 14);
+  };
+  c.lineCap = 'butt';
+  c.strokeStyle = 'rgba(110,80,50,0.45)';
+  c.lineWidth = 7.6;
+  receipt();
+  c.stroke();
+  c.strokeStyle = '#fffaf1';
+  c.lineWidth = 6.2;
+  receipt();
+  c.stroke();
+  c.lineCap = 'round';
+  // shade on the inside of the curl + printed lines
+  // underside of the curl is in shade
+  c.strokeStyle = 'rgba(150,120,90,0.28)';
+  c.lineWidth = 2.6;
+  c.beginPath();
+  c.moveTo(24.6, 7.6);
+  c.quadraticCurveTo(23.8, 10.5, 24.6, 13.6);
+  c.stroke();
+  c.strokeStyle = 'rgba(90,70,55,0.5)';
+  c.lineWidth = 0.6;
+  for (const yy of [13, 16, 19, 22]) {
+    c.beginPath();
+    c.moveTo(31.6, yy);
+    c.lineTo(yy % 2 ? 34.6 : 35.4, yy - 0.1);
+    c.stroke();
+  }
+  // --- brass crown with an amber display ---
+  const crown = () => {
+    c.beginPath();
+    c.moveTo(27, 46);
+    c.lineTo(27, 24);
+    c.bezierCurveTo(27, 15, 34, 13, 44, 12);
+    c.quadraticCurveTo(62, 10.5, 67, 6);
+    c.quadraticCurveTo(75, 1, 83, 6);
+    c.quadraticCurveTo(88, 10.5, 106, 12);
+    c.bezierCurveTo(116, 13, 123, 15, 123, 24);
+    c.lineTo(123, 46);
+    c.closePath();
+  };
+  c.fillStyle = 'rgba(45,28,18,0.25)';
+  c.save();
+  c.translate(1, 1.4);
+  crown();
   c.fill();
-  stroke(c);
-  hiLine(c, x + w * 0.15, y + 1, w * 0.7, 0.28, 1.5);
-  c.fillStyle = vGrad(c, y + h * 0.06, y + h * 0.28, '#2a4a3f', '#1c3029');
-  roundRect(c, x + w * 0.18, y + h * 0.06, w * 0.64, h * 0.22, 4);
+  c.restore();
+  c.fillStyle = brass(c, 2, 46);
+  crown();
   c.fill();
-  c.fillStyle = '#9ff0b0';
-  c.font = `800 ${Math.round(h * 0.13)}px "Baloo 2", system-ui, sans-serif`;
+  stroke(c, 'rgba(100,62,20,0.55)', 0.9);
+  c.save();
+  crown();
+  c.clip();
+  sheen(c, 27, 0, 96, 46, 0.32);
+  c.fillStyle = hGrad(c, 112, 123, 'rgba(120,70,20,0)', 'rgba(120,70,20,0.3)');
+  c.fillRect(112, 0, 11, 46);
+  c.restore();
+  // engraved scroll line following the arch + dot ornaments
+  c.strokeStyle = 'rgba(120,78,25,0.55)';
+  c.lineWidth = 0.7;
+  c.beginPath();
+  c.moveTo(31, 22);
+  c.bezierCurveTo(31, 17, 36, 16, 45, 15.5);
+  c.quadraticCurveTo(63, 14, 68, 9.5);
+  c.moveTo(119, 22);
+  c.bezierCurveTo(119, 17, 114, 16, 105, 15.5);
+  c.quadraticCurveTo(87, 14, 82, 9.5);
+  c.stroke();
+  c.fillStyle = 'rgba(255,245,215,0.75)';
+  for (const [dx, dy] of [
+    [31, 41],
+    [119, 41],
+    [31, 26],
+    [119, 26],
+  ]) {
+    circle(c, dx, dy, 0.9);
+    c.fill();
+  }
+  // enamel sakura medallion at the top of the arch
+  c.fillStyle = brass(c, 3, 15);
+  circle(c, 75, 9, 5.6);
+  c.fill();
+  stroke(c, 'rgba(100,62,20,0.5)', 0.6);
+  c.fillStyle = '#fff3f4';
+  circle(c, 75, 9, 4.4);
+  c.fill();
+  blossom(c, 75, 9, 4.2, PINK, true, 0);
+  // display bezel + warm glass
+  c.fillStyle = 'rgba(90,55,18,0.55)';
+  roundRect(c, 35, 19, 80, 22, 5);
+  c.fill();
+  const glass = c.createLinearGradient(0, 21, 0, 39);
+  glass.addColorStop(0, '#2c1a10');
+  glass.addColorStop(1, '#45291a');
+  c.fillStyle = glass;
+  roundRect(c, 37, 21, 76, 18, 4);
+  c.fill();
+  c.save();
+  roundRect(c, 37, 21, 76, 18, 4);
+  c.clip();
+  glow(c, 75, 30, 34, '255,170,70', 0.25);
+  c.font = `800 11.5px "Baloo 2", system-ui, sans-serif`;
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText('NOODLES', x + w / 2, y + h * 0.17);
-  c.fillStyle = 'rgba(159,240,176,0.25)';
-  c.fillText('NOODLES', x + w / 2, y + h * 0.17);
-  c.save();
-  roundRect(c, x + w * 0.18, y + h * 0.06, w * 0.64, h * 0.22, 4);
-  c.clip();
-  c.fillStyle = 'rgba(255,255,255,0.12)';
+  c.shadowColor = 'rgba(255,150,40,0.95)';
+  c.shadowBlur = 6;
+  c.fillStyle = '#ffb44f';
+  c.fillText('NOODLES', 75, 31);
+  c.shadowBlur = 0;
+  c.fillStyle = '#ffd890';
+  c.fillText('NOODLES', 75, 30.8);
+  // scanline hint + diagonal glass reflection
+  c.fillStyle = 'rgba(0,0,0,0.12)';
+  for (let yy = 22; yy < 39; yy += 1.6) c.fillRect(37, yy, 76, 0.5);
+  c.fillStyle = 'rgba(255,255,255,0.13)';
   c.beginPath();
-  c.moveTo(x + w * 0.18, y + h * 0.28);
-  c.lineTo(x + w * 0.36, y + h * 0.06);
-  c.lineTo(x + w * 0.48, y + h * 0.06);
-  c.lineTo(x + w * 0.3, y + h * 0.28);
+  c.moveTo(44, 39);
+  c.lineTo(56, 21);
+  c.lineTo(64, 21);
+  c.lineTo(52, 39);
   c.closePath();
+  c.fill();
+  innerAO(c, 37, 21, 76, 18, 3, 0.4);
+  c.restore();
+  hiLine(c, 37, 41, 76, 0.55, 0.8);
+  c.restore();
+}
+
+// coin pile inside the tip jar (design-box coords): x, y, tilt, kind (0 = 5-yen with a hole, 1 = gold, 2 = silver)
+const COIN_PILE: [number, number, number, number][] = [
+  [24, 77.5, 0.04, 1],
+  [40, 77.2, -0.08, 2],
+  [14, 76.2, -0.2, 0],
+  [47.5, 76, 0.22, 1],
+  [32, 74, 0.12, 0],
+  [19, 72.4, -0.3, 2],
+  [48, 72.8, 0.3, 1],
+  [31, 71, 0.05, 0],
+  [20, 69, -0.18, 1],
+  [42, 68.8, 0.16, 2],
+  [30, 66, -0.06, 1],
+  [38, 63.2, 0.34, 0],
+  [23, 63.6, -0.3, 2],
+  [31, 60, 0.1, 1],
+];
+
+function corkDots(
+  c: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  seed: number,
+  n: number,
+  col: string
+) {
+  const r = rng(seed);
+  c.fillStyle = col;
+  for (let i = 0; i < n; i++) {
+    circle(c, x + r() * w, y + r() * h, 0.25 + r() * 0.45);
+    c.fill();
+  }
+}
+
+function paintCoin(c: Ctx, x: number, y: number, tilt: number, kind: number) {
+  const rx = 8.6;
+  const ry = 3.4;
+  const th = 2;
+  const face = kind === 2 ? ['#ffffff', '#d9dee0', '#a9b2b6'] : ['#fff1c4', '#eec46a', '#c48f33'];
+  const side = kind === 2 ? '#8e979b' : '#a8752a';
+  c.save();
+  c.translate(x, y);
+  c.rotate(tilt);
+  // rim thickness
+  c.fillStyle = side;
+  ellipse(c, 0, th, rx, ry);
+  c.fill();
+  c.fillRect(-rx, 0, rx * 2, th);
+  // top face
+  const g = c.createLinearGradient(-rx, -ry, rx, ry);
+  g.addColorStop(0, face[0]);
+  g.addColorStop(0.45, face[1]);
+  g.addColorStop(1, face[2]);
+  c.fillStyle = g;
+  ellipse(c, 0, 0, rx, ry);
+  c.fill();
+  c.strokeStyle = kind === 2 ? 'rgba(80,90,95,0.45)' : 'rgba(120,75,20,0.45)';
+  c.lineWidth = 0.5;
+  c.stroke();
+  ellipse(c, 0, 0, rx * 0.74, ry * 0.7);
+  c.stroke();
+  if (kind === 0) {
+    c.fillStyle = 'rgba(60,35,15,0.55)';
+    ellipse(c, 0, 0, 1.7, 0.75);
+    c.fill();
+  }
+  c.fillStyle = 'rgba(255,255,255,0.7)';
+  ellipse(c, -3, -0.9, 2.6, 0.55);
   c.fill();
   c.restore();
 }
 
+/**
+ * Round glass tip jar with a cork stopper (coin slot on top), twine bow round the neck and a washi
+ * label hand-lettered with SALON_LABELS.tips. Coins pile up inside. Design box 62×82.
+ */
 function paintTipJar(c: Ctx, j: Rect, coins: number) {
-  const { x, y, w, h } = j;
-  softShadow(c, x + w / 2, y + h, w * 0.58, w * 0.15, 0.26);
-  // the glass bends light: a bright caustic patch on the counter in front of the jar
-  const cau = c.createRadialGradient(x + w * 0.55, y + h + 2, 0, x + w * 0.55, y + h + 2, w * 0.4);
-  cau.addColorStop(0, 'rgba(255,250,235,0.35)');
-  cau.addColorStop(1, 'rgba(255,250,235,0)');
-  c.fillStyle = cau;
-  ellipse(c, x + w * 0.55, y + h + 2, w * 0.4, w * 0.12);
-  c.fill();
-  // inside shading of the glass body (back wall of the jar)
-  const gy = y + h * 0.12;
-  const gh = h * 0.88;
-  c.fillStyle = hGrad(c, x, x + w, 'rgba(190,215,225,0.3)', 'rgba(120,150,165,0.32)');
-  roundRect(c, x, gy, w, gh, w * 0.22);
-  c.fill();
-  const n = clamp(Math.floor(coins), 0, 14);
-  for (let i = 0; i < n; i++) {
-    const row = Math.floor(i / 2);
-    const col = i % 2;
-    const cy = y + h - 6 - row * 7;
-    const cx = x + w * (0.33 + col * 0.34) + (row % 2) * 4;
-    c.fillStyle = 'rgba(100,65,15,0.3)';
-    ellipse(c, cx, cy + 1.5, w * 0.19, 4);
-    c.fill();
-    c.fillStyle = hGrad(
-      c,
-      cx - w * 0.19,
-      cx + w * 0.19,
-      '#f6dc96',
-      i % 3 === 0 ? '#d9a240' : '#e9b957'
-    );
-    ellipse(c, cx, cy, w * 0.19, 4);
-    c.fill();
-    stroke(c, 'rgba(120,80,20,0.35)', 1);
-    c.fillStyle = 'rgba(255,255,255,0.55)';
-    ellipse(c, cx - 2, cy - 1.2, w * 0.08, 1.3);
-    c.fill();
-  }
-  // front glass: faint sky tint, dark rim on the right, long bright reflection on the left
-  c.fillStyle = vGrad(c, gy, gy + gh, 'rgba(225,240,245,0.22)', 'rgba(200,225,235,0.3)');
-  roundRect(c, x, gy, w, gh, w * 0.22);
-  c.fill();
   c.save();
-  roundRect(c, x, gy, w, gh, w * 0.22);
+  c.translate(j.x, j.y);
+  c.scale(j.w / 62, j.h / 82);
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  const n = clamp(Math.floor(coins), 0, COIN_PILE.length);
+  const jar = () => {
+    c.beginPath();
+    c.moveTo(18, 19);
+    c.bezierCurveTo(18, 26, 3, 25, 3, 37);
+    c.lineTo(3, 71);
+    c.quadraticCurveTo(3, 82, 14, 82);
+    c.lineTo(48, 82);
+    c.quadraticCurveTo(59, 82, 59, 71);
+    c.lineTo(59, 37);
+    c.bezierCurveTo(59, 25, 44, 26, 44, 19);
+    c.closePath();
+  };
+  // shadow + a warm caustic thrown forward through the glass (golder with coins)
+  softShadow(c, 31, 82, 36, 6, 0.26);
+  c.fillStyle = 'rgba(45,28,18,0.25)';
+  ellipse(c, 31, 82, 25, 1.8);
+  c.fill();
+  const warm = n > 0 ? '255,214,130' : '255,250,235';
+  const cau = c.createRadialGradient(36, 86.5, 0, 36, 86.5, 20);
+  cau.addColorStop(0, `rgba(${warm},0.55)`);
+  cau.addColorStop(0.5, `rgba(${warm},0.2)`);
+  cau.addColorStop(1, `rgba(${warm},0)`);
+  c.fillStyle = cau;
+  ellipse(c, 36, 86.5, 20, 3.4);
+  c.fill();
+  c.fillStyle = `rgba(255,255,245,0.5)`;
+  ellipse(c, 38, 86, 7, 0.9);
+  c.fill();
+
+  // back wall of the glass (seen through the jar)
+  c.save();
+  jar();
   c.clip();
-  c.fillStyle = hGrad(c, x + w * 0.75, x + w, 'rgba(60,80,95,0)', 'rgba(60,80,95,0.22)');
-  c.fillRect(x + w * 0.75, gy, w * 0.25, gh);
-  c.fillStyle = hGrad(c, x, x + w * 0.12, 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0)');
-  c.fillRect(x, gy, w * 0.12, gh);
-  const rf = c.createLinearGradient(0, gy, 0, gy + gh);
-  rf.addColorStop(0, 'rgba(255,255,255,0.65)');
-  rf.addColorStop(0.5, 'rgba(255,255,255,0.3)');
-  rf.addColorStop(1, 'rgba(255,255,255,0.05)');
-  c.fillStyle = rf;
-  roundRect(c, x + w * 0.12, gy + h * 0.08, w * 0.13, gh * 0.7, 4);
-  c.fill();
-  c.fillStyle = 'rgba(255,255,255,0.35)';
-  roundRect(c, x + w * 0.3, gy + h * 0.1, w * 0.04, gh * 0.35, 2);
-  c.fill();
-  // bottom refraction: a bright crescent where the glass thickens
-  c.fillStyle = 'rgba(255,255,255,0.28)';
+  c.fillStyle = hGrad(c, 3, 59, 'rgba(205,228,232,0.4)', 'rgba(150,180,190,0.42)');
+  c.fillRect(0, 0, 62, 82);
+  // the counter seen through the glass, slightly lifted by refraction
+  c.fillStyle = 'rgba(214,170,115,0.35)';
+  c.fillRect(0, 70, 62, 12);
+  // inner back rim of the shoulder
+  c.strokeStyle = 'rgba(255,255,255,0.35)';
+  c.lineWidth = 0.8;
   c.beginPath();
-  c.ellipse(x + w / 2, y + h - 3, w * 0.42, 4, 0, 0, Math.PI);
+  c.ellipse(31, 30, 24, 3.4, 0, Math.PI, Math.PI * 2);
+  c.stroke();
+  // coins
+  for (let i = 0; i < n; i++) {
+    const [cx, cy, tl, kind] = COIN_PILE[i];
+    c.fillStyle = 'rgba(70,45,15,0.22)';
+    ellipse(c, cx + 0.6, cy + 2.6, 9, 3);
+    c.fill();
+    paintCoin(c, cx, cy, tl, kind);
+  }
+  // front glass: aqua tint, thick bottom, dark right edge, bright left edge
+  c.fillStyle = vGrad(c, 18, 82, 'rgba(225,242,245,0.16)', 'rgba(190,220,228,0.26)');
+  c.fillRect(0, 0, 62, 82);
+  c.fillStyle = hGrad(c, 49, 59, 'rgba(50,75,85,0)', 'rgba(50,75,85,0.3)');
+  c.fillRect(49, 0, 10, 82);
+  c.fillStyle = hGrad(c, 3, 9, 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0)');
+  c.fillRect(3, 0, 6, 82);
+  // thick glass base: a pale lens with a bright crescent
+  c.fillStyle = 'rgba(220,240,240,0.35)';
+  c.fillRect(0, 78.5, 62, 4);
+  c.fillStyle = 'rgba(255,255,255,0.5)';
+  c.beginPath();
+  c.ellipse(31, 78.6, 25, 1.6, 0, 0, Math.PI);
   c.fill();
   c.restore();
-  stroke(c, 'rgba(60,35,20,0.3)');
-  // wooden lid with a knob
-  c.fillStyle = vGrad(c, y + h * 0.04, y + h * 0.16, '#8f6a4c', '#5b3f2c');
-  roundRect(c, x - 2, y + h * 0.04, w + 4, h * 0.12, 4);
+  // window reflections: a tall curved streak following the shoulder + a short one
+  c.save();
+  jar();
+  c.clip();
+  const rf = c.createLinearGradient(0, 28, 0, 78);
+  rf.addColorStop(0, 'rgba(255,255,255,0.75)');
+  rf.addColorStop(0.55, 'rgba(255,255,255,0.32)');
+  rf.addColorStop(1, 'rgba(255,255,255,0.05)');
+  c.fillStyle = rf;
+  c.beginPath();
+  c.moveTo(13, 28);
+  c.quadraticCurveTo(8, 32, 8, 40);
+  c.lineTo(8, 74);
+  c.quadraticCurveTo(10, 75, 12, 74);
+  c.lineTo(12, 40);
+  c.quadraticCurveTo(12, 33, 16, 29);
+  c.closePath();
   c.fill();
-  stroke(c);
-  hiLine(c, x, y + h * 0.04 + 1, w, 0.3, 1.5);
-  dropAO(c, x, y + h * 0.16, w, 8, 0.2);
-  c.fillStyle = hGrad(c, x + w * 0.35, x + w * 0.65, '#8f6a4c', '#4e3626');
-  roundRect(c, x + w * 0.35, y, w * 0.3, h * 0.08, 3);
+  c.fillStyle = 'rgba(255,255,255,0.4)';
+  roundRect(c, 15.5, 62, 2.2, 10, 1.1);
   c.fill();
-  c.fillStyle = PAL.paper;
-  roundRect(c, x + w * 0.16, y + h * 0.4, w * 0.68, h * 0.22, 3);
+  c.fillStyle = 'rgba(255,255,255,0.55)';
+  roundRect(c, 50.5, 36, 2, 16, 1);
   c.fill();
-  stroke(c, 'rgba(60,35,20,0.2)', 1);
-  c.fillStyle = PAL.tomato;
-  c.font = `800 ${Math.round(h * 0.11)}px "Baloo 2", system-ui, sans-serif`;
-  c.textAlign = 'center';
-  c.textBaseline = 'middle';
-  c.fillText(SALON_LABELS.tips, x + w / 2, y + h * 0.51);
+  c.restore();
+  jar();
+  stroke(c, 'rgba(70,90,95,0.45)', 0.9);
+  // neck lip
+  c.fillStyle = 'rgba(210,232,236,0.55)';
+  ellipse(c, 31, 19.5, 14.5, 2.6);
+  c.fill();
+  stroke(c, 'rgba(70,90,95,0.45)', 0.7);
+  hiLine(c, 21, 18.2, 12, 0.7, 0.7);
+
+  // washi label wrapped on the body (edges bow with the cylinder, torn sides)
+  const lt = 41;
+  const lb = 59;
+  const lab = () => {
+    c.beginPath();
+    c.moveTo(6.5, lt);
+    c.quadraticCurveTo(31, lt + 3.2, 55.5, lt);
+    const rr = rng(77);
+    for (let yy = lt + 2; yy < lb; yy += 2) c.lineTo(55.5 + (rr() - 0.5) * 1.6, yy);
+    c.lineTo(55.5, lb);
+    c.quadraticCurveTo(31, lb + 3.2, 6.5, lb);
+    for (let yy = lb - 2; yy > lt; yy -= 2) c.lineTo(6.5 + (rr() - 0.5) * 1.6, yy);
+    c.closePath();
+  };
+  c.fillStyle = 'rgba(45,28,18,0.14)';
+  c.save();
+  c.translate(0.4, 0.9);
+  lab();
+  c.fill();
+  c.restore();
+  c.fillStyle = hGrad(c, 6, 56, '#fde7e8', '#f2cfd3');
+  lab();
+  c.fill();
+  c.save();
+  lab();
+  c.clip();
+  // faint washi fibres + little sakura dots, cylinder shading at the sides
+  speckle(c, 6, lt, 50, lb - lt + 4, 811, 26, 'rgba(255,255,255,0.55)');
+  speckle(c, 6, lt, 50, lb - lt + 4, 812, 14, 'rgba(200,120,135,0.18)');
+  for (const [px, py] of [
+    [10, 44],
+    [52, 57.5],
+    [51, 44.5],
+  ]) {
+    c.fillStyle = 'rgba(233,163,183,0.55)';
+    circle(c, px, py, 1.3);
+    c.fill();
+  }
+  c.fillStyle = hGrad(c, 44, 56, 'rgba(120,60,70,0)', 'rgba(120,60,70,0.18)');
+  c.fillRect(44, lt, 12, 22);
+  c.fillStyle = hGrad(c, 6, 14, 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0)');
+  c.fillRect(6, lt, 8, 22);
+  c.restore();
+  brushText(c, SALON_LABELS.tips, 28, 50.6, 11.5, 32, '#4a3426', 2804);
+  // tiny red hanko stamp
+  c.fillStyle = 'rgba(217,87,63,0.85)';
+  roundRect(c, 48, 51.4, 4.4, 4.4, 0.8);
+  c.fill();
+  // seal: a thin pale inner border with a tiny carved mark
+  c.strokeStyle = 'rgba(255,236,228,0.8)';
+  c.lineWidth = 0.4;
+  roundRect(c, 48.7, 52.1, 3, 3, 0.4);
+  c.stroke();
+  c.fillStyle = 'rgba(255,236,228,0.85)';
+  c.fillRect(49.5, 53, 1.4, 0.45);
+  c.fillRect(49.9, 53.9, 1, 0.45);
+
+  // cork stopper with a coin slot on top
+  c.fillStyle = vGrad(c, 5, 21, '#e2bb86', '#b4874f');
+  c.beginPath();
+  c.moveTo(18.5, 6);
+  c.lineTo(43.5, 6);
+  c.lineTo(42, 20.5);
+  c.quadraticCurveTo(31, 22.5, 20, 20.5);
+  c.closePath();
+  c.fill();
+  stroke(c, 'rgba(90,55,25,0.45)', 0.8);
+  corkDots(c, 20, 8, 22, 12, 2805, 34, 'rgba(110,70,30,0.4)');
+  corkDots(c, 20, 8, 22, 12, 2806, 14, 'rgba(255,240,210,0.5)');
+  c.fillStyle = hGrad(c, 36, 43.5, 'rgba(90,55,25,0)', 'rgba(90,55,25,0.3)');
+  c.fillRect(36, 6, 7.5, 15);
+  c.fillStyle = vGrad(c, 3, 9, '#f0d3a4', '#d6ad75');
+  ellipse(c, 31, 6, 12.5, 3);
+  c.fill();
+  stroke(c, 'rgba(90,55,25,0.45)', 0.7);
+  corkDots(c, 22, 4.4, 18, 3.4, 2807, 12, 'rgba(110,70,30,0.4)');
+  c.fillStyle = '#4a2f1c';
+  roundRect(c, 25.5, 5, 11, 2, 1);
+  c.fill();
+  c.fillStyle = 'rgba(255,235,200,0.6)';
+  c.fillRect(26.5, 7, 9, 0.5);
+
+  // twine wrapped twice round the neck, tied in a little bow
+  for (const yy of [22.4, 24.6]) {
+    c.strokeStyle = '#a07a4e';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(17.6, yy - 0.6);
+    c.quadraticCurveTo(31, yy + 2, 44.4, yy - 0.6);
+    c.stroke();
+    c.strokeStyle = 'rgba(255,235,200,0.55)';
+    c.lineWidth = 0.5;
+    c.setLineDash([1, 1.2]);
+    c.stroke();
+    c.setLineDash([]);
+  }
+  const bx = 37;
+  const by = 25.5;
+  c.lineWidth = 1.2;
+  c.strokeStyle = '#a07a4e';
+  // loops
+  for (const s of [-1, 1]) {
+    c.fillStyle = 'rgba(160,122,78,0.35)';
+    c.beginPath();
+    c.moveTo(bx, by);
+    c.bezierCurveTo(bx + s * 3, by - 5.5, bx + s * 7.5, by - 3.5, bx + s * 5.5, by - 0.5);
+    c.quadraticCurveTo(bx + s * 3, by + 0.8, bx, by);
+    c.fill();
+    c.stroke();
+  }
+  // tails
+  c.beginPath();
+  c.moveTo(bx, by);
+  c.quadraticCurveTo(bx - 2.5, by + 5, bx - 3.5, by + 9.5);
+  c.moveTo(bx, by);
+  c.quadraticCurveTo(bx + 2.5, by + 4.5, bx + 4.5, by + 8);
+  c.stroke();
+  c.fillStyle = '#8c663d';
+  circle(c, bx, by, 1.3);
+  c.fill();
+  c.restore();
 }
 
 /** Sleek tablet on a small wooden stand, showing the order app. */
@@ -3317,17 +3901,22 @@ function cachedProp(
   key: string,
   r: Rect,
   pad: number,
-  paint: (c: Ctx, r: Rect) => void
+  paint: (c: Ctx, r: Rect) => void,
+  res = 2
 ): HTMLCanvasElement {
-  return sprite(`${key}:${Math.round(r.w)}x${Math.round(r.h)}`, r.w + pad * 2, r.h + pad * 2, (c) =>
-    paint(c, { x: pad, y: pad, w: r.w, h: r.h })
+  return sprite(
+    `${key}:${Math.round(r.w)}x${Math.round(r.h)}`,
+    r.w + pad * 2,
+    r.h + pad * 2,
+    (c) => paint(c, { x: pad, y: pad, w: r.w, h: r.h }),
+    res
   );
 }
 
 function drawRegister(c: Ctx, r: Rect) {
   const pad = 20;
   c.drawImage(
-    cachedProp('salon:register', r, pad, paintRegister),
+    cachedProp('salon:register:v2', r, pad, paintRegister, 3),
     r.x - pad,
     r.y - pad,
     r.w + pad * 2,
@@ -3339,7 +3928,13 @@ function drawTipJar(c: Ctx, j: Rect, coins: number) {
   const pad = 24;
   const n = clamp(Math.floor(coins), 0, 14);
   c.drawImage(
-    cachedProp(`salon:tipjar:${n}`, j, pad, (cc, r) => paintTipJar(cc, r, n)),
+    cachedProp(
+      `salon:tipjar:${n}:${SALON_LABELS.tips}`,
+      j,
+      pad,
+      (cc, r) => paintTipJar(cc, r, n),
+      3
+    ),
     j.x - pad,
     j.y - pad,
     j.w + pad * 2,

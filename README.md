@@ -1,6 +1,6 @@
 # Noodles 🍜
 
-Çocuklar (10–14) için, tarayıcıda ve tablette çalışan hikâyeli bir Japon noodle dükkânı oyunu. Fener Sokağı’ndaki son noodle dükkânını Hana Nine’den devralıyorsun; mahalleyi ve meydanı Baron Kraker’in MegaNoodle fabrikasından kurtarmak için on gün boyunca tezgâhın arkasındasın.
+Çocuklar (10–14) için, tarayıcıda ve tablette çalışan hikâyeli bir Japon noodle dükkânı oyunu. Fener Sokağı’ndaki son noodle dükkânını Hana Nine’den devralıyorsun; mahalleyi ve meydanı Baron Kraker’in MegaNoodle fabrikasından kurtarmak için 50 gün boyunca tezgâhın arkasındasın.
 
 **Oyna:** https://yumusss.github.io/Noddles/
 
@@ -18,7 +18,10 @@ Tek bir dünya: **Salon · Tezgâh · Ocak** yan yana durur, parmakla sağa-sola
 
 ## Özellikler
 
-- 10 günlük hikâye; her gün giriş/kapanış diyalogu ve tarif defterinden yeni bir sayfa
+- 50 günlük, 5 perdelik hikâye (Yeniden açılış → Büyüme ve paket servis → Baron’un oyunları → Düşüş ve dönüş → Fener Festivali); her gün giriş/kapanış diyalogu ve tarif defterinden yeni bir sayfa
+- 1. gün adım adım “Nasıl oynanır?” anlatımı ve ipuçları (diğer günlerde yok)
+- Sipariş fişi üstteki fiş askısına asılır; online siparişler 10. günden itibaren tablete gelir
+- İngilizce modda müşteri isimleri de İngilizce
 - 4 erişte (3 kalınlık), 6 çorba, 4 sos, 18 malzeme, 6 Japon kasesi
 - Tezgâhtaki tablete dokununca üç uygulama: **Yorumlar** (müşteri puanları ve yorumları), **Siparişler** (hazırlanan/teslim edilen paketler), **Malzemeler** (açılmış tüm malzeme ve kaselerin resimli listesi)
 - Tabletten gelen paket siparişleri ve kurye Rüzgar; özel misafirler (eleştirmen, Baron, Hana Nine)

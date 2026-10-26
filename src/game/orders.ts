@@ -60,6 +60,46 @@ export interface Customer {
   reactions?: { great: string; ok: string; bad: string };
 }
 
+const FEMALE_EN = [
+  'Emma',
+  'Olivia',
+  'Ava',
+  'Mia',
+  'Lily',
+  'Chloe',
+  'Grace',
+  'Ruby',
+  'Zoe',
+  'Hannah',
+  'Ella',
+  'Nora',
+  'Maya',
+  'Sophie',
+  'Yuki',
+  'Aiko',
+  'Isla',
+  'Luna',
+];
+const MALE_EN = [
+  'Liam',
+  'Noah',
+  'Oliver',
+  'Jack',
+  'Leo',
+  'Ethan',
+  'Lucas',
+  'Max',
+  'Sam',
+  'Ben',
+  'Henry',
+  'Owen',
+  'Kenji',
+  'Hiro',
+  'Theo',
+  'Finn',
+  'Omar',
+  'Daniel',
+];
 const FEMALE = [
   'Ayşe',
   'Elif',
@@ -452,7 +492,240 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       },
     },
   ],
-  10: [
+  18: [
+    {
+      at: 4,
+      look: 'baron',
+      name: 'Bıyıklı Turist',
+      greet: 'Bonjour! Ben… çok uzaklardan gelen bir turistim. Kesinlikle Baron değilim. Hmph.',
+      text: 'Fıstık soslu, çorbasız bir kalın udon. Tam 2 dilim chashu, bol fasulye filizi ve biraz kırmızı biber. Erişte diri kalsın.',
+      order: {
+        thick: 'kalin',
+        noodle: 'udon',
+        broth: 'fistik',
+        bowl: null,
+        reqs: [
+          { id: 'chashu', mode: 'exact', n: 2 },
+          { id: 'filiz', mode: 'bol' },
+          { id: 'biber', mode: 'biraz' },
+        ],
+        rules: [],
+        cook: 'dente',
+      },
+      bonus: 80,
+      reactions: {
+        great: 'Magnifique! Yani… Hmph. İdare eder. (Bıyığı titrer.)',
+        ok: 'Hmph. Turistler daha iyisini hak eder.',
+        bad: 'Ha! Bunu bütün turist arkadaşlarıma anlatacağım!',
+      },
+    },
+  ],
+  23: [
+    {
+      at: 5,
+      look: 'lezzetova',
+      name: 'Peçeli Hanım',
+      greet: 'Bir masa lütfen. Ve… soru sormayın, şekerim.',
+      text: 'Köri suyuyla bir kalın udon. Tam 2 tempura karides, 3 pak choi, biraz çıtır soğan ve 2 dilim limon. Erişte iyice yumuşak olsun.',
+      order: {
+        thick: 'kalin',
+        noodle: 'udon',
+        broth: 'kori',
+        bowl: null,
+        reqs: [
+          { id: 'karides', mode: 'exact', n: 2 },
+          { id: 'pakchoi', mode: 'exact', n: 3 },
+          { id: 'citir', mode: 'biraz' },
+          { id: 'lime', mode: 'exact', n: 2 },
+        ],
+        rules: [],
+        cook: 'soft',
+      },
+      bonus: 120,
+      reactions: {
+        great: 'Hmm. (Not defterine uzun uzun bir şey yazar ve gülümser.)',
+        ok: 'Hmm. (Not defterine kısa bir şey yazar.)',
+        bad: 'Hmm. (Not defterini sertçe kapatır.)',
+      },
+    },
+  ],
+  27: [
+    {
+      at: 3,
+      look: 'baron',
+      name: 'Baron Kraker',
+      greet: 'Hmph! Hâlâ açık mısınız? İnatçı dükkân.',
+      text: 'Tatlı acı soslu, çorbasız bir ince soba. Tam 3 parça kimchi, 2 parça tofu ve bol yeşil soğan. Ama mısır olmasın! Hmph.',
+      order: {
+        thick: 'ince',
+        noodle: 'soba',
+        broth: 'tatliaci',
+        bowl: null,
+        reqs: [
+          { id: 'kimchi', mode: 'exact', n: 3 },
+          { id: 'tofu', mode: 'exact', n: 2 },
+          { id: 'yesil', mode: 'bol' },
+        ],
+        rules: [{ t: 'no', id: 'misir' }],
+        cook: 'perfect',
+      },
+      bonus: 90,
+      reactions: {
+        great: 'Hmph… Bu da nesi? Neden bu kadar güzel?! (Hızla kaşığını bırakır.)',
+        ok: 'Hmph. Görüyorsunuz, sonunuz yakın.',
+        bad: 'Ha! Fabrikam bundan iyisini uykusunda yapar!',
+      },
+    },
+  ],
+  29: [
+    {
+      at: 4,
+      look: 'hana',
+      name: 'Hana Nine',
+      greet: 'Önlüğümü getirdim. Bakalım hak edecek misin?',
+      text: 'Kemik suyuyla bir kalın ramen. Tam 3 dilim chashu, 2 yumurta, 2 yaprak nori, biraz bambu filizi ve bol yeşil soğan. Erişte diri kalsın. Bir usta gibi!',
+      order: {
+        thick: 'kalin',
+        noodle: 'ramen',
+        broth: 'tonkotsu',
+        bowl: null,
+        reqs: [
+          { id: 'chashu', mode: 'exact', n: 3 },
+          { id: 'yumurta', mode: 'exact', n: 2 },
+          { id: 'nori', mode: 'exact', n: 2 },
+          { id: 'bambu', mode: 'biraz' },
+          { id: 'yesil', mode: 'bol' },
+        ],
+        rules: [],
+        cook: 'dente',
+      },
+      bonus: 150,
+      reactions: {
+        great: 'İşte gerçek bir şef! Önlük senin, evladım.',
+        ok: 'Neredeyse… Bir dahakine kesin olacak.',
+        bad: 'Acele etme. Usta olmak zaman ister.',
+      },
+    },
+  ],
+  35: [
+    {
+      at: 2,
+      look: 'hana',
+      name: 'Hana Nine',
+      greet: 'Bakalım ben yokken neler öğrendin, evladım?',
+      text: 'Tavuk suyuyla bir orta kalınlıkta udon. 1 yumurta, 2 pak choi, biraz susam ve yeşil soğan. Erişte iyice yumuşak olsun; dişlerim eskisi gibi değil.',
+      order: {
+        thick: 'orta',
+        noodle: 'udon',
+        broth: 'tavuk',
+        bowl: null,
+        reqs: [
+          { id: 'yumurta', mode: 'exact', n: 1 },
+          { id: 'pakchoi', mode: 'exact', n: 2 },
+          { id: 'susam', mode: 'biraz' },
+          { id: 'yesil', mode: 'var' },
+        ],
+        rules: [],
+        cook: 'soft',
+      },
+      bonus: 100,
+      reactions: {
+        great: 'Mmm… Şifa gibi. Ben yokken büyümüşsün sen.',
+        ok: 'Güzel evladım. Biraz daha sevgi ekle.',
+        bad: 'Olsun. Yorgunsun, biliyorum. Yarın daha iyi olur.',
+      },
+    },
+  ],
+  42: [
+    {
+      at: 4,
+      look: 'lezzetova',
+      name: 'Madam Lezzetova',
+      greet: 'Jüri başkanı olmadan önce bir kez daha tatmalıyım, şekerim.',
+      text: 'Miso suyuyla bir kalın soba. Tam 3 shiitake, 2 parça tofu, 2 tutam mısır, biraz çıtır soğan ve bol fasulye filizi. Seladon yeşil kasede olsun lütfen. Erişte diri kalsın.',
+      order: {
+        thick: 'kalin',
+        noodle: 'soba',
+        broth: 'miso',
+        bowl: 'seladon',
+        reqs: [
+          { id: 'mantar', mode: 'exact', n: 3 },
+          { id: 'tofu', mode: 'exact', n: 2 },
+          { id: 'misir', mode: 'exact', n: 2 },
+          { id: 'citir', mode: 'biraz' },
+          { id: 'filiz', mode: 'bol' },
+        ],
+        rules: [],
+        cook: 'dente',
+      },
+      bonus: 150,
+      reactions: {
+        great: 'Mükemmel. Festivalde de böyle şaşırt beni.',
+        ok: 'İyi… ama festivalde “iyi” yetmez.',
+        bad: 'Endişeliyim şekerim. Çok endişeliyim.',
+      },
+    },
+  ],
+  46: [
+    {
+      at: 5,
+      look: 'baron',
+      name: 'Sahte Balıkçı',
+      greet: 'Ahoy! Ben… balıkçıyım. Gerçek bir balıkçı. Hmph.',
+      text: 'Tavuk suyuyla bir ince ramen. Tam 2 tempura karides, 2 dilim naruto, 1 dilim limon ve bol yeşil soğan. Siyah mat kasede olsun lütfen.',
+      order: {
+        thick: 'ince',
+        noodle: 'ramen',
+        broth: 'tavuk',
+        bowl: 'siyah',
+        reqs: [
+          { id: 'karides', mode: 'exact', n: 2 },
+          { id: 'naruto', mode: 'exact', n: 2 },
+          { id: 'lime', mode: 'exact', n: 1 },
+          { id: 'yesil', mode: 'bol' },
+        ],
+        rules: [],
+        cook: 'perfect',
+      },
+      bonus: 100,
+      reactions: {
+        great: '(Takma sakalı düşer.) …Bunu da mı beceriyorsunuz? Hmph. Çok lezzetli.',
+        ok: 'Hmph. Bir balıkçı bundan fazlasını bekler.',
+        bad: 'Ha! Karides bile üzgün görünüyor!',
+      },
+    },
+  ],
+  49: [
+    {
+      at: 3,
+      look: 'hana',
+      name: 'Hana Nine',
+      greet: 'Sıra bende! Festivalde nineler de acıkır.',
+      text: 'Köri suyuyla bir orta kalınlıkta pirinç eriştesi. Tam 2 tempura karides, 2 dilim limon, bol fasulye filizi, biraz kırmızı biber ve susam. Sakura desenli kasede olsun lütfen.',
+      order: {
+        thick: 'orta',
+        noodle: 'pirinc',
+        broth: 'kori',
+        bowl: 'sakura',
+        reqs: [
+          { id: 'karides', mode: 'exact', n: 2 },
+          { id: 'lime', mode: 'exact', n: 2 },
+          { id: 'filiz', mode: 'bol' },
+          { id: 'biber', mode: 'biraz' },
+          { id: 'susam', mode: 'var' },
+        ],
+        rules: [],
+        cook: 'perfect',
+      },
+      bonus: 120,
+      reactions: {
+        great: 'Mmm… Bu kaseyle festival kazanılır, evladım!',
+        ok: 'Güzel. Yarın biraz daha dikkat, olur mu?',
+        bad: 'Yorgunsun. Derin bir nefes al; yarın büyük gün.',
+      },
+    },
+  ],
+  50: [
     {
       at: 3,
       look: 'lezzetova',
@@ -472,7 +745,7 @@ const SPECIALS: Record<number, SpecialDef[]> = {
         rules: [],
         cook: 'perfect',
       },
-      bonus: 100,
+      bonus: 150,
       reactions: {
         great: 'Jüri notu: on üzerinden on!',
         ok: 'Jüri notu: yedi. Fena değil.',
@@ -499,7 +772,7 @@ const SPECIALS: Record<number, SpecialDef[]> = {
         rules: [],
         cook: 'perfect',
       },
-      bonus: 150,
+      bonus: 200,
       reactions: {
         great: 'Annem… tam böyle yapardı. (Gözlerini siler.)',
         ok: 'Güzel. Ama anneminki daha sıcaktı.',
@@ -545,7 +818,7 @@ export function makeCustomer(levelId: number, i: number): Customer {
     };
   }
   const phoneRatio = lv.phone / lv.customers;
-  const phone = i > 0 && Math.random() < phoneRatio;
+  const phone = levelId >= 10 && i > 0 && Math.random() < phoneRatio; // online orders start on day 10
   const force = (globalThis as { __forceGroup?: boolean }).__forceGroup === true; // test hook
   const group = !phone && levelId >= 5 && force; // friends arriving together is off for now (customers come one by one)
   const n = group ? 2 + (Math.random() < 0.5 ? 1 : 0) : 1;
@@ -554,7 +827,17 @@ export function makeCustomer(levelId: number, i: number): Customer {
     const order = randomOrder(levelId);
     const look = randomLook(Math.floor(Math.random() * 1e9));
     members.push({
-      name: phone ? L(pick(ONLINE_NAMES)) : pick(isFeminine(look) ? FEMALE : MALE),
+      name: phone
+        ? L(pick(ONLINE_NAMES))
+        : pick(
+            getLang() === 'en'
+              ? isFeminine(look)
+                ? FEMALE_EN
+                : MALE_EN
+              : isFeminine(look)
+                ? FEMALE
+                : MALE
+          ),
       look,
       order,
       text: orderText(order),

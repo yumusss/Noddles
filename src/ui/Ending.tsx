@@ -1,3 +1,4 @@
+import { LEVELS } from '../game/data';
 import { useMemo } from 'react';
 import type { Save } from '../App';
 import SceneCanvas from './SceneCanvas';
@@ -17,7 +18,7 @@ export default function Ending({ save, onMap }: { save: Save; onMap: () => void 
         <h1>{T('end.title')}</h1>
         <p>{T('end.text')}</p>
         <p className="ending-stats">
-          ★ {total}/30 · {T('end.cash', { n: fmt(save.cash) })}
+          ★ {total}/{LEVELS.length * 3} · {T('end.cash', { n: fmt(save.cash) })}
         </p>
         <p className="muted">{T('end.more')}</p>
         <button className="btn big primary" onClick={onMap}>

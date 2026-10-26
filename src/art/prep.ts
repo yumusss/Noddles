@@ -96,18 +96,18 @@ function pickRows(all: Rect[], n: number): Rect[] {
 }
 
 function landscape(W: number, H: number): PrepLayout {
-  const cx = W / 2;
-  const wallH = 150;
   const m = 24; // outer margin
   const narrow = W < 1200; // 4:3 tablets
+  // wide phones get a taller wall so the order ticket hanging on the rail never covers the counter
+  const wallH = narrow ? 150 : 196;
   // trays: 2×2 on wide screens, a single column of 4 on narrow ones
   const trW = narrow ? 100 : 110;
   const trH = narrow ? 66 : 74;
   const trCols = narrow ? 1 : 2;
   const traysW = trCols * trW + (trCols - 1) * 14;
   // pots: always 2 columns × 5
-  const pot = narrow ? 82 : 100;
   const pgap = 8;
+  const pot = Math.min(narrow ? 82 : 100, Math.floor((H - 14 - (wallH + 10)) / 5 - pgap));
   const potsW = 2 * pot + pgap;
   // middle region for the bowl + tubs
   const mx0 = m + traysW + 14;
@@ -131,15 +131,15 @@ function landscape(W: number, H: number): PrepLayout {
     )
   );
   const mcx = (mx0 + mx1) / 2;
-  // shelf with 6 bowl slots
-  const slotSp = 100;
+  // shelf with 6 bowl slots — on the left half of the wall (the ticket rail hangs on the right)
+  const slotSp = Math.min(100, (W * 0.5 - 2 * m) / 6);
   const shelfW = 6 * slotSp + 20;
   const shelf = {
-    x: cx - shelfW / 2,
-    y: 146,
+    x: m,
+    y: wallH - 4,
     w: shelfW,
     h: 14,
-    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 114 })),
+    slots: Array.from({ length: 6 }, (_, i) => ({ x: m + 10 + (i + 0.5) * slotSp, y: wallH - 36 })),
   };
   // top & bottom tub rows (6 each), centred on the middle region
   const rowW = 6 * tub + 5 * gap;
@@ -198,17 +198,18 @@ function landscape(W: number, H: number): PrepLayout {
 
 function portrait(W: number, H: number): PrepLayout {
   const cx = W / 2;
-  const wallH = 170;
+  // tall phones: a taller wall leaves room for the order ticket on the rail
+  const wallH = Math.max(170, Math.min(340, H - 1060));
   const tub = 88;
   const gap = 8;
   const slotSp = Math.min(104, (W - 80) / 6);
   const shelfW = 6 * slotSp + 16;
   const shelf = {
     x: cx - shelfW / 2,
-    y: 152,
+    y: wallH - 18,
     w: shelfW,
     h: 14,
-    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 118 })),
+    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: wallH - 52 })),
   };
   // trays: 4 in a row
   const trW = 110;
