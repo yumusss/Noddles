@@ -36,7 +36,9 @@ export function cost(b: BowlState): number {
 
 /** How much of the bill a customer actually pays, by satisfaction. */
 export function paid(score: number, p: number): number {
-  return Math.round(p * (score >= 50 ? 1 : score >= 25 ? 0.6 : 0.3));
+  // a poor bowl gets a discount, step by step (rounded to 5)
+  const k = score >= 85 ? 1 : score >= 70 ? 0.9 : score >= 50 ? 0.75 : score >= 25 ? 0.5 : 0.3;
+  return k === 1 ? p : Math.max(5, Math.round((p * k) / 5) * 5);
 }
 
 export function tip(score: number, p: number, bonusPct: number): number {
@@ -87,8 +89,8 @@ export interface DayLedger {
   utilities: number;
 }
 
-export const RENT = (level: number) => 120 + level * 20;
-export const UTILITIES = (level: number) => 40 + level * 8;
+export const RENT = (level: number) => 100 + level * 6; // gentle over 50 short days
+export const UTILITIES = (level: number) => 30 + level * 3;
 
 export function emptyLedger(level: number): DayLedger {
   return {

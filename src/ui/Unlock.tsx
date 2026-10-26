@@ -1,4 +1,4 @@
-import { INGREDIENTS, BOWLS, type Level } from '../game/data';
+import { INGREDIENTS, BOWLS, dayMinutes, type Level } from '../game/data';
 import { drawIngredientIcon, drawBowlIcon } from '../art/food';
 import SceneCanvas from './SceneCanvas';
 import { sfx } from '../game/audio';
@@ -76,7 +76,7 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
             <i>★</i> 90%
           </span>
           <em>
-            {T('unlock.minutes', { n: level.minutes })}
+            {T('unlock.minutes', { n: dayMinutes(level) })}
             {level.phone ? ` · ${T('unlock.phone')}` : ''}
           </em>
         </div>

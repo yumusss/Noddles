@@ -793,7 +793,7 @@ export function makeCustomer(levelId: number, i: number): Customer {
   const lv = LEVELS[levelId - 1];
   const specials = SPECIALS[levelId] ?? [];
   const sp = specials.find((s) => s.at === i);
-  const basePatience = Math.max(70, 150 - levelId * 6);
+  const basePatience = Math.max(95, 150 - levelId * 1.5); // happiness drains at a calm, medium pace
   if (sp) {
     return {
       id: i,

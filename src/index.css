@@ -1885,3 +1885,268 @@ i.note {
     margin: 4px 0 8px;
   }
 }
+
+/* change due is written in its own corner box (customers no longer say it) */
+.cash-info .change-due {
+  background: #fff4d6;
+  border: 2px solid #f0c768;
+  border-radius: 12px;
+  padding: 4px 10px;
+}
+.cash-info .change-due strong {
+  color: #b5651d;
+}
+.cash-info .giving-sum {
+  display: block;
+  font-size: 12px;
+  opacity: 0.85;
+}
+.cash-info .giving-sum.bad {
+  color: #c0392b;
+  opacity: 1;
+}
+.cash-info .giving-sum.good {
+  color: #3c8d5a;
+  opacity: 1;
+}
+.cash-info .discount {
+  display: block;
+  font-size: 11.5px;
+  color: #c0392b;
+}
+.cash-info .discount s {
+  opacity: 0.6;
+  margin-right: 3px;
+}
+
+/* ---------- round day dial (HUD) ---------- */
+.day-dial {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  margin: -6px 2px -8px;
+  border-radius: 50%;
+  flex: none;
+  background: conic-gradient(
+    rgba(60, 35, 20, 0.14) var(--p),
+    #ffd27a var(--p) calc(var(--p) + 1%),
+    #f6b25c 60%,
+    #ee8a6a 85%,
+    #b07ac0
+  );
+  box-shadow:
+    0 3px 8px rgba(60, 35, 20, 0.22),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+.day-dial .dial-face {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fffdf6, #fbeed8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  color: var(--ink, #3a2a22);
+}
+.day-dial small {
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  opacity: 0.7;
+  font-weight: 800;
+}
+.day-dial b {
+  font-family: var(--font-display);
+  font-size: 17px;
+}
+.day-dial em {
+  font-style: normal;
+  font-size: 8px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+}
+.day-dial .dial-sun {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff6c8, #ffb636);
+  box-shadow: 0 0 8px 2px rgba(255, 190, 60, 0.7);
+  transform: rotate(var(--a)) translateY(-24px);
+  z-index: 1;
+}
+.day-dial.late .dial-sun {
+  background: radial-gradient(circle at 35% 35%, #fff, #d8c8ff);
+  box-shadow: 0 0 8px 2px rgba(190, 160, 255, 0.7);
+}
+.day-dial.late {
+  animation: dialPulse 1.2s ease-in-out infinite;
+}
+@keyframes dialPulse {
+  50% {
+    box-shadow:
+      0 3px 8px rgba(60, 35, 20, 0.22),
+      0 0 0 4px rgba(239, 120, 90, 0.35);
+  }
+}
+
+/* ---------- chef's reply to an order ---------- */
+.reply-row {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab, 0px) + 18px);
+  transform: translateX(-50%);
+  z-index: 6;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: max-content;
+  max-width: 94vw;
+  animation: chitIn 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.reply-chip {
+  font: inherit;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  border: 0;
+  background: #fffdf6;
+  color: #3a2a22;
+  box-shadow:
+    0 4px 0 #e2cfb4,
+    0 8px 16px rgba(60, 35, 20, 0.2);
+  cursor: pointer;
+}
+.reply-chip:first-child {
+  background: #ef8a76;
+  color: #fff;
+  box-shadow:
+    0 4px 0 #c96753,
+    0 8px 16px rgba(60, 35, 20, 0.2);
+}
+.reply-chip.ghost {
+  background: rgba(255, 253, 246, 0.85);
+  font-weight: 700;
+}
+.reply-chip:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #e2cfb4;
+}
+
+/* ---------- happiness meter on each ticket ---------- */
+.chit {
+  padding-right: 46px;
+}
+.chit-mood {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  bottom: 10px;
+  width: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.mood-face {
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.15));
+}
+.mood-bar {
+  position: relative;
+  flex: 1;
+  min-height: 16px;
+  width: 12px;
+  border-radius: 7px;
+  background: rgba(60, 35, 20, 0.12);
+  box-shadow: inset 0 1px 2px rgba(60, 35, 20, 0.2);
+  overflow: hidden;
+}
+.mood-bar i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--v);
+  border-radius: 7px;
+  background: linear-gradient(0deg, #6cbf7c, #a6dd8a);
+  transition: height 0.5s linear;
+}
+.chit-mood.mid .mood-bar i {
+  background: linear-gradient(0deg, #e9b54a, #f7d77c);
+}
+.chit-mood.low .mood-bar i {
+  background: linear-gradient(0deg, #e0634f, #f39a7c);
+}
+.chit-mood.low .mood-face {
+  animation: moodShake 0.8s ease-in-out infinite;
+}
+@keyframes moodShake {
+  25% {
+    transform: rotate(-10deg);
+  }
+  75% {
+    transform: rotate(10deg);
+  }
+}
+.chit-stamp {
+  position: absolute;
+  right: 44px;
+  bottom: 10px;
+  transform: rotate(-12deg);
+  border: 2.5px solid #d0473a;
+  color: #d0473a;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.85;
+  pointer-events: none;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .chit {
+    padding-right: 56px;
+    min-height: 52px;
+  }
+  .chit-mood {
+    flex-direction: row;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%);
+    width: 44px;
+    gap: 4px;
+  }
+  .chit-mood .mood-bar {
+    height: 40px;
+    flex: none;
+    width: 13px;
+  }
+  .mood-face {
+    font-size: 22px;
+  }
+  .reply-chip {
+    font-size: 14px;
+    padding: 9px 14px;
+  }
+  .day-dial {
+    width: 48px;
+    height: 48px;
+    margin: -4px 2px -6px;
+  }
+  .day-dial .dial-sun {
+    transform: rotate(var(--a)) translateY(-21px);
+  }
+  .day-dial b {
+    font-size: 15px;
+  }
+}

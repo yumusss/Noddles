@@ -189,10 +189,18 @@ function Overlays({
         </button>
         <div className="hud-mid">
           <span
-            className={`chip clock ${ui.clock > 0.85 ? 'late' : ''}`}
-            style={{ ['--p' as string]: `${Math.round(ui.clock * 100)}%` }}>
-            <i className="clock-ring" />
-            {ui.clockText}
+            className={`day-dial ${ui.clock > 0.85 ? 'late' : ''}`}
+            style={{
+              ['--p' as string]: `${(ui.clock * 100).toFixed(1)}%`,
+              ['--a' as string]: `${(ui.clock * 360).toFixed(1)}deg`,
+            }}
+            title={ui.clockText}>
+            <i className="dial-sun" />
+            <span className="dial-face">
+              <small>{T('play.dayShort')}</small>
+              <b>{s.level.id}</b>
+              <em>{ui.clockText}</em>
+            </span>
           </span>
           <span className="chip served">{ui.served} 🍜</span>
           <span className="chip gold">{fmt(ui.earned)}</span>
@@ -215,6 +223,19 @@ function Overlays({
           ))}
         </nav>
       </header>
+      {ui.reply && (
+        <div className="reply-row">
+          <button className="reply-chip" onClick={() => s.reply('ok')}>
+            {T('g.replyOk')}
+          </button>
+          <button className="reply-chip" onClick={() => s.reply('soon')}>
+            {T('g.replySoon')}
+          </button>
+          <button className="reply-chip ghost" onClick={() => s.reply('again')}>
+            {T('g.replyAgain')}
+          </button>
+        </div>
+      )}
       {ui.tickets.length > 0 && (
         <div className={`ticket-rail ${ui.station === 0 && b ? 'tucked' : ''}`}>
           <div className="rail-bar" />
@@ -228,6 +249,35 @@ function Overlays({
                 style={{ ['--tilt' as string]: `${idx % 2 ? 1.2 : -1.4}deg` }}
                 onClick={() => setOpen(isOpen ? tk.id : null)}>
                 <i className="chit-clip" />
+                {(() => {
+                  const m = ui.moods.find((q) => q.id === tk.id);
+                  if (!m) return null;
+                  const cls = m.free ? 'free' : m.v > 0.6 ? 'good' : m.v > 0.3 ? 'mid' : 'low';
+                  return (
+                    <div
+                      className={`chit-mood ${cls}`}
+                      style={{ ['--v' as string]: `${(m.v * 100).toFixed(1)}%` }}
+                      aria-label={T('play.happy')}>
+                      <span className="mood-face">
+                        {m.free
+                          ? '😠'
+                          : m.v > 0.75
+                            ? '😄'
+                            : m.v > 0.5
+                              ? '🙂'
+                              : m.v > 0.25
+                                ? '😟'
+                                : '😣'}
+                      </span>
+                      <span className="mood-bar">
+                        <i />
+                      </span>
+                    </div>
+                  );
+                })()}
+                {ui.moods.find((q) => q.id === tk.id)?.free && (
+                  <span className="chit-stamp">{T('play.free')}</span>
+                )}
                 <div className="chit-head">
                   <span>
                     {tk.phone ? '🛵' : '#'}
@@ -255,11 +305,6 @@ function Overlays({
                 ) : (
                   <div className="chit-sum">{tk.lines.slice(0, 2).join(' · ')}…</div>
                 )}
-                <div
-                  className="patience"
-                  style={{ ['--p' as string]: `${Math.round(tk.patience * 100)}%` }}>
-                  <i className={tk.patience > 0.5 ? 'ok' : tk.patience > 0.25 ? 'warn' : 'bad'} />
-                </div>
               </div>
             );
           })}
@@ -290,6 +335,11 @@ function Overlays({
             <div>
               <small>{T('cash.bill')}</small>
               <strong>{fmt(cash.due)}</strong>
+              {cash.full > cash.due && (
+                <span className="discount">
+                  <s>{fmt(cash.full)}</s> −{fmt(cash.full - cash.due)} {T('cash.discount')}
+                </span>
+              )}
             </div>
             <div>
               <small>{T('cash.given')}</small>
@@ -302,12 +352,13 @@ function Overlays({
                 ))}
               </span>
             </div>
-            <div>
+            <div className="change-due">
               <small>{T('cash.change')}</small>
-              <strong
-                className={cash.result === 'less' ? 'bad' : cash.result === 'ok' ? 'good' : ''}>
-                {fmt(giving)}
-              </strong>
+              <strong>{fmt(need)}</strong>
+              <span
+                className={`giving-sum ${cash.result === 'less' ? 'bad' : cash.result === 'ok' ? 'good' : ''}`}>
+                {T('cash.giving')}: {fmt(giving)}
+              </span>
             </div>
           </div>
           <div className="drawer">

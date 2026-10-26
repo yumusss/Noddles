@@ -22,6 +22,9 @@ Tek bir dünya: **Salon · Tezgâh · Ocak** yan yana durur, parmakla sağa-sola
 - 1. gün adım adım “Nasıl oynanır?” anlatımı ve ipuçları (diğer günlerde yok)
 - Sipariş fişi üstteki fiş askısına asılır; online siparişler 10. günden itibaren tablete gelir
 - İngilizce modda müşteri isimleri de İngilizce
+- Siparişe cevap verirsin (Tamam / Hemen geliyor / Tekrar söyler misin?); fişte mutluluk çubuğu yavaşça azalır — biterse yemek bedava, kötü kaseye indirim
+- Para üstünü müşteri söylemez; kasadaki sarı kutuda yazar
+- Bir gün en fazla 6 dakika; HUD'da yuvarlak gün kadranı
 - 4 erişte (3 kalınlık), 6 çorba, 4 sos, 18 malzeme, 6 Japon kasesi
 - Tezgâhtaki tablete dokununca üç uygulama: **Yorumlar** (müşteri puanları ve yorumları), **Siparişler** (hazırlanan/teslim edilen paketler), **Malzemeler** (açılmış tüm malzeme ve kaselerin resimli listesi)
 - Tabletten gelen paket siparişleri ve kurye Rüzgar; özel misafirler (eleştirmen, Baron, Hana Nine)

@@ -30,16 +30,18 @@ const PAGES: Page[] = [
       'Siparişi dinle',
       [
         'Müşteri konuşurken baloncuktaki cümleyi oku.',
+        'Bitince ona cevap ver: "Tamam!", "Hemen geliyor!" ya da "Tekrar söyler misin?"',
         'Sipariş bir fiş olarak üstteki askıya asılır — her şey orada yazar.',
-        'Fişin altındaki çizgi müşterinin sabrı: yeşilden kırmızıya iner. Acele et!',
+        'Fişin yanındaki yüz ve çubuk müşterinin mutluluğu: beklerken yavaşça azalır. Ne kadar hızlıysan o kadar mutlu!',
       ],
     ],
     en: [
       'Listen to the order',
       [
         'Read the speech bubble while the customer talks.',
+        'Then answer them: "Okay!", "Coming right up!" or "Say that again?"',
         'The order is pinned as a ticket on the rail at the top — everything is written there.',
-        'The bar under the ticket is the customer’s patience: green turns red. Hurry!',
+        'The face and bar next to the ticket show how happy they are: it slowly drops while they wait. The faster you are, the happier they get!',
       ],
     ],
   },
@@ -142,7 +144,8 @@ const PAGES: Page[] = [
       'Servis ve kasa',
       [
         'Kaseyi Salon’da müşterinin önüne bırak.',
-        'Müşteri parayı verir: kasadan doğru para üstünü seç ve "Para üstünü ver"e dokun.',
+        'Müşteri parayı verir. Ne kadar para üstü vereceğin sarı kutuda yazar: çekmeceden o kadarını seç, "Para üstünü ver"e dokun.',
+        'Mutluluk çubuğu biterse müşteri hiç ödemez; yemek kötü olursa indirim ister.',
         'Mutlu müşteri bahşiş kavanozuna bahşiş atar. Bahşişler dekor için birikir.',
         'Bir şey yanlışsa müşteri şikâyet eder — "Özür dile"ye dokun (o zaman bahşiş yok).',
       ],
@@ -151,7 +154,8 @@ const PAGES: Page[] = [
       'Serving and the register',
       [
         'Drop the bowl in front of the customer in the Salon.',
-        'They pay: pick the correct change from the register and tap "Give the change".',
+        'They pay. The yellow box shows how much change to give: pick that much from the drawer and tap "Give the change".',
+        'If the happiness bar runs out they won’t pay at all; a poor bowl gets a discount.',
         'Happy customers drop a tip in the tip jar. Tips add up for decorations.',
         'If something is wrong they complain — tap "Apologize" (and no tip then).',
       ],

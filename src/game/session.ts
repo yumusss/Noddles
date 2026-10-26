@@ -41,6 +41,7 @@ import {
   unlockedUpTo,
   type Level,
   type Thick,
+  dayMinutes,
 } from './data';
 import {
   BOWL_C,
@@ -78,7 +79,8 @@ import { tipBonus, type DecorState } from './decor';
 import { sfx, buzz } from './audio';
 import { L, T } from './i18n';
 
-export type Phase = 'idle' | 'enter' | 'greet' | 'order' | 'waiting' | 'toTable' | 'dayEnd';
+export type Phase =
+  'idle' | 'enter' | 'greet' | 'order' | 'replied' | 'waiting' | 'toTable' | 'dayEnd';
 export type PickPhase = 'pickup' | 'served' | 'react' | 'complain' | 'pay' | 'leave' | 'delivering';
 
 export interface Bubble {
@@ -96,6 +98,8 @@ export interface CashUI {
   giving: Denom[];
   result?: 'ok' | 'less' | 'more';
   tipAmount: number;
+  /** full price before any discount for a poor bowl */
+  full: number;
 }
 
 export interface DayResult {
@@ -154,6 +158,10 @@ export interface UiSnapshot {
   clockText: string;
   dayEnd: boolean;
   intro: boolean;
+  /** the counter customer finished ordering and waits for the chef's answer */
+  reply: boolean;
+  /** happiness meters (0..1) of open orders, the counter customer first */
+  moods: { id: number; who: string; v: number; free: boolean; phone: boolean }[];
 }
 
 /** An open order waiting to be cooked. */
@@ -163,6 +171,8 @@ interface Slot {
   mi: number;
   waitT: number;
   lines: string[];
+  /** the happiness meter ran out: this meal will be on the house */
+  free?: boolean;
 }
 
 interface GroupState {
@@ -170,6 +180,8 @@ interface GroupState {
   tip: number;
   served: number; // bowls served so far
   complained: boolean;
+  full: number; // list price of everything served
+  free: boolean; // someone's happiness ran out → the meal is on the house
 }
 
 type Drag =
@@ -311,7 +323,7 @@ export class DaySession {
   ) {
     this.engine = new Engine(canvas);
     this.level = LEVELS[levelId - 1];
-    this.dayLen = this.level.minutes * 60;
+    this.dayLen = dayMinutes(this.level) * 60;
     this.ledger = emptyLedger(levelId);
     this.decor = decor;
     this.cashBefore = cash;
@@ -391,6 +403,14 @@ export class DaySession {
       clockText: `${mm}:${String(ss).padStart(2, '0')}`,
       dayEnd: this.phase === 'dayEnd',
       intro: this.intro > 0,
+      reply: this.awaitReply,
+      moods: this.open.map((o) => ({
+        id: o.id,
+        who: o.cu.members[o.mi].name,
+        v: Math.max(0, 1 - o.waitT / o.cu.patience),
+        free: !!o.free,
+        phone: o.cu.phone,
+      })),
     };
     return this.snap;
   }
@@ -519,6 +539,39 @@ export class DaySession {
     this.notify();
   }
 
+  private awaitReply = false;
+
+  /** a waiting customer's face follows their happiness meter */
+  private counterMood(i: number, active: boolean): Mood {
+    const cu = this.counter;
+    const slot = cu && this.open.find((o) => o.cu === cu && o.mi === i);
+    if (!slot) return active ? 'neutral' : i < this.mi ? 'happy' : 'neutral';
+    if (slot.free) return 'angry';
+    const v = 1 - slot.waitT / cu.patience;
+    return v > 0.6 ? 'happy' : v > 0.3 ? 'neutral' : 'worried';
+  }
+
+  /** the chef answers the customer's order */
+  reply(kind: 'ok' | 'soon' | 'again') {
+    if (!this.awaitReply || !this.counter || this.phase !== 'order') return;
+    this.awaitReply = false;
+    sfx('tap');
+    if (kind === 'again') {
+      this.startOrder(); // they repeat the order
+      return;
+    }
+    const m = this.counter.members[this.mi];
+    this.setBubble(
+      m.name,
+      kind === 'soon' ? T('g.replyYay') : T('g.replyThanks'),
+      'counter',
+      'good'
+    );
+    this.phase = 'replied';
+    this.phaseT = 0;
+    this.notify();
+  }
+
   private startOrder() {
     const cu = this.counter!;
     const m = cu.members[this.mi];
@@ -534,7 +587,14 @@ export class DaySession {
     const m = cu.members[mi];
     this.open.push({ id: this.slotId++, cu, mi, waitT: 0, lines: orderLines(m.order) });
     if (!this.groups.has(cu.id))
-      this.groups.set(cu.id, { pay: 0, tip: 0, served: 0, complained: false });
+      this.groups.set(cu.id, {
+        pay: 0,
+        tip: 0,
+        served: 0,
+        complained: false,
+        full: 0,
+        free: false,
+      });
   }
 
   /** the ordering group walks to a table (or waits standing) */
@@ -602,6 +662,18 @@ export class DaySession {
     setTimeout(() => this.onDayEnd?.(r), 900);
   }
 
+  /** the happiness meter hit zero: they still wait, but won't pay for this bowl */
+  private happinessGone(s: Slot) {
+    s.free = true;
+    const m = s.cu.members[s.mi];
+    const atCounter = this.counter === s.cu && this.phase === 'waiting';
+    if (s.cu.phone || atCounter)
+      this.setBubble(m.name, T('g.freeNow'), s.cu.phone ? 'phone' : 'counter', 'bad');
+    else this.showToast(T('g.freeToast', { n: m.name }));
+    sfx('angry');
+    this.notify();
+  }
+
   /** an open order's customer gives up */
   private giveUp(s: Slot) {
     this.open = this.open.filter((x) => x !== s);
@@ -649,16 +721,26 @@ export class DaySession {
     const m = cu.members[s.mi];
     const v = judge(m.order, this.bowl, s.waitT / cu.patience);
     const p = price(m.order);
-    const pay = paid(v.score, p);
-    const tp = tip(v.score, p, tipBonus(this.decor));
+    // an empty happiness meter makes the bowl free; a poor bowl gets a discount (paid())
+    const pay = s.free ? 0 : paid(v.score, p);
+    const tp = s.free ? 0 : tip(v.score, p, tipBonus(this.decor));
     this.open = this.open.filter((x) => x !== s);
     if (this.target === s.id) this.target = null;
     this.scores.push(v.score);
     this.lastScore = v.score;
     this.ledger.ingredients += cost(this.bowl);
     this.ledger.bowls++;
-    const g = this.groups.get(cu.id) ?? { pay: 0, tip: 0, served: 0, complained: false };
+    const g = this.groups.get(cu.id) ?? {
+      pay: 0,
+      tip: 0,
+      served: 0,
+      complained: false,
+      full: 0,
+      free: false,
+    };
     g.pay += pay;
+    g.full += p;
+    if (s.free) g.free = true;
     g.served++;
     const complaint = v.score < 70 && v.notes.length > 0;
     if (complaint) {
@@ -760,24 +842,30 @@ export class DaySession {
       return;
     }
     // everyone served: pay for the whole group
+    const pay = g.pay;
+    if (pay <= 0) {
+      // waited too long: they don't pay at all
+      this.setBubble(cu.members[pk.mi].name, T('g.freeMeal'), 'pickup', 'bad');
+      sfx('fail');
+      this.groups.delete(cu.id);
+      this.sendToTable(0);
+      return;
+    }
     pk.phase = 'pay';
     pk.t = 0;
-    const pay = g.pay;
     this.ledger.sales += pay;
     this.earned += pay;
     const given = cashGiven(pay, this.level.id);
-    const change = sum(given) - pay;
-    this.cash = { due: pay, given, giving: [], tipAmount: g.tip };
+    this.cash = { due: pay, given, giving: [], tipAmount: g.tip, full: g.full };
     const who = cu.members.length > 1 ? T('g.billAll') : '';
+    const off = g.full - pay;
     this.setBubble(
       cu.members[pk.mi].name,
-      T('g.bill', {
-        who,
-        p: pay,
-        g: sum(given),
-        rest: change > 0 ? T('g.changeWillBe', { n: change }) : T('g.exactMoney'),
-      }),
-      'pickup'
+      off > 0
+        ? T('g.billDiscount', { who, off, p: pay, g: sum(given) })
+        : T('g.bill', { who, p: pay, g: sum(given), rest: '' }),
+      'pickup',
+      off > 0 ? 'neutral' : undefined
     );
     sfx('coins');
   }
@@ -834,10 +922,16 @@ export class DaySession {
         'good'
       );
     } else if (g?.complained) this.setBubble(name, T('g.noTip'), 'pickup', 'neutral');
+    this.groups.delete(pk.cu.id);
+    this.sendToTable(tp);
+  }
+
+  /** after paying (or not), the group sits down and eats */
+  private sendToTable(tp: number) {
+    const pk = this.pick!;
     this.ledger.tips += tp;
     this.earned += tp;
     this.cash = null;
-    this.groups.delete(pk.cu.id);
     // the group eats at the table now
     pk.cu.members.forEach((m, i) => {
       if (!this.diners.some((d) => d.cuId === pk.cu.id && d.mi === i))
@@ -1528,7 +1622,8 @@ export class DaySession {
     for (const s of [...this.open]) {
       s.waitT += dt;
       if (Math.floor(s.waitT) !== Math.floor(s.waitT - dt)) tick = true;
-      if (s.waitT >= s.cu.patience) this.giveUp(s);
+      if (!s.free && s.waitT >= s.cu.patience) this.happinessGone(s);
+      else if (s.waitT >= s.cu.patience * 1.9) this.giveUp(s);
     }
     if (this.ringing) {
       this.ringT += dt;
@@ -1613,11 +1708,19 @@ export class DaySession {
         break;
       case 'order':
         if (
+          !this.awaitReply &&
           this.phaseT > 1.2 &&
           (!this.bubble ||
             this.bubble.at !== 'counter' ||
             this.bubble.shown >= this.bubble.text.length)
         ) {
+          // the customer looks at the chef and waits for an answer
+          this.awaitReply = true;
+          this.notify();
+        }
+        break;
+      case 'replied':
+        if (this.phaseT > 0.9) {
           const cu = this.counter!;
           this.placeOrder(cu, this.mi);
           if (this.mi + 1 < cu.members.length) {
@@ -1748,7 +1851,7 @@ export class DaySession {
   }
 
   private spawnGap() {
-    const busy = this.level.customers / this.level.minutes;
+    const busy = this.level.customers / (this.dayLen / 60);
     return clamp(16 / busy, 3, 12) * (0.6 + Math.random() * 0.8);
   }
 
@@ -1848,23 +1951,15 @@ export class DaySession {
           psize = lerp(size, size * 0.55, ge);
           c.globalAlpha = 1 - Math.max(0, (ge - 0.75) * 4);
         }
-        drawAvatar(
-          c,
-          m.look,
-          active ? 'neutral' : i < this.mi ? 'happy' : 'neutral',
-          px,
-          py,
-          psize,
-          {
-            pose: 'stand',
-            talking:
-              active &&
-              this.phase === 'order' &&
-              !!this.bubble &&
-              this.bubble.shown < this.bubble.text.length,
-            bob: Math.sin(t * 2 + i) * 2,
-          }
-        );
+        drawAvatar(c, m.look, this.counterMood(i, active), px, py, psize, {
+          pose: 'stand',
+          talking:
+            active &&
+            (this.phase === 'order' || this.phase === 'replied') &&
+            !!this.bubble &&
+            this.bubble.shown < this.bubble.text.length,
+          bob: Math.sin(t * 2 + i) * 2,
+        });
         c.restore();
       }
     }

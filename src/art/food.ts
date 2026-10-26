@@ -35,7 +35,7 @@ const TAU = Math.PI * 2;
 // soft edges, subsurface colour, contact shadows, no cartoon outlines.
 
 export const PIECE_SIZE: Record<string, number> = {
-  yesil: 40,
+  yesil: 48,
   yumurta: 68,
   chashu: 74,
   nori: 74,
@@ -218,15 +218,20 @@ type PieceDrawer = (c: Ctx, v: number, rand: () => number) => void;
 const PIECES: Record<string, PieceDrawer> = {
   // --- green onion: a loose pinch of rings, a few cut on the bias ---
   yesil(c, v, rand) {
-    const n = 6 + (v % 3) + (rand() < 0.5 ? 1 : 0);
+    // a few loose rings, spaced apart so they read as separate slices (not a clump)
+    const n = 3 + (v % 2) + (rand() < 0.4 ? 1 : 0);
     const rings: { x: number; y: number; r: number; bias: number; ang: number; white: number }[] =
       [];
-    for (let i = 0; i < n; i++) {
+    for (let i = 0, tries = 0; i < n && tries < 60; tries++) {
       const a = rand() * TAU;
-      const d = Math.sqrt(rand()) * 13;
+      const d = i === 0 ? rand() * 4 : 7 + rand() * 11;
+      const x = Math.cos(a) * d;
+      const y = Math.sin(a) * d;
+      if (rings.some((q) => Math.hypot(q.x - x, q.y - y) < 12.5)) continue;
+      i++;
       rings.push({
-        x: Math.cos(a) * d,
-        y: Math.sin(a) * d,
+        x,
+        y,
         r: 4.4 + rand() * 1.8,
         bias: rand() < 0.3 ? 1.5 + rand() * 0.5 : 1,
         ang: rand() * TAU,
@@ -1866,12 +1871,16 @@ function pieceSprite(id: string, variant: number): HTMLCanvasElement {
   );
 }
 
+/** per-ingredient display tweak (eggs read a touch too big next to the rest) */
+const PIECE_DRAW_SCALE: Record<string, number> = { yumurta: 0.88 };
+
 export function drawPiece(c: Ctx, id: string, variant: number, scale: number, rot: number): void {
   const s = pieceSprite(id, variant);
   const box = Math.ceil((PIECE_SIZE[id] ?? 30) * PIECE_PAD);
+  const k = scale * (PIECE_DRAW_SCALE[id] ?? 1);
   c.save();
   c.rotate(rot);
-  c.scale(scale, scale);
+  c.scale(k, k);
   c.drawImage(s, -box / 2, -box / 2, box, box);
   c.restore();
 }

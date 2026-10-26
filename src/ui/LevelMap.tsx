@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { LEVELS } from '../game/data';
+import { LEVELS, dayMinutes } from '../game/data';
 import type { Save } from '../App';
 import SceneCanvas from './SceneCanvas';
 import { salonScene } from './scenes';
@@ -82,7 +82,7 @@ export default function LevelMap({
                   <strong>{L(l.title)}</strong>
                   <small>
                     {TOD_ICON[l.time]} {l.rain ? '🌧 ' : ''}
-                    {T('map.minutes', { n: l.minutes })}
+                    {T('map.minutes', { n: dayMinutes(l) })}
                   </small>
                   <span className="stars">
                     {[0, 1, 2].map((k) => (

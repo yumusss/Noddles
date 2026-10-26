@@ -1650,3 +1650,8 @@ export const ONLINE_NAMES = [
   'Fırın Ustası',
   'Kuaför Salonu',
 ];
+
+/** Real-time length of a day in minutes: compact, never more than 6 (level.minutes is the "design" length 5–10). */
+export function dayMinutes(l: Level): number {
+  return Math.min(6, Math.round((3 + l.minutes * 0.3) * 2) / 2);
+}
