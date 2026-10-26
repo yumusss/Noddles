@@ -217,6 +217,21 @@ function drawSalon(
     anchors.head = { x: ox + cx, y: L.seatY - 200 };
   }
 
+  // courier
+  for (const cr of s.couriers) {
+    const k = cr.t;
+    const bx = L.box.x;
+    let x: number;
+    if (k < 2.6) x = -160 + (bx + 60 + 160) * Math.min(1, k / 2.6);
+    else if (k < 4) x = bx + 60;
+    else x = bx + 60 - (k - 4) * 220;
+    c.save();
+    c.translate(x, L.box.y + 60);
+    if (k >= 4) c.scale(-1, 1);
+    drawCourier(c, 80, t);
+    c.restore();
+  }
+
   // counter (foreground)
   drawCounter(c, L);
   if (seated) {
@@ -315,21 +330,6 @@ function drawSalon(
   drawInky(c, I.s, t, inkyMood);
   c.restore();
   hs('inky', I.x - I.s / 2, I.y, I.s, I.s * 0.9);
-
-  // courier
-  for (const cr of s.couriers) {
-    const k = cr.t;
-    const bx = L.box.x;
-    let x: number;
-    if (k < 2.6) x = -160 + (bx + 60 + 160) * Math.min(1, k / 2.6);
-    else if (k < 4) x = bx + 60;
-    else x = bx + 60 - (k - 4) * 220;
-    c.save();
-    c.translate(x, L.box.y + 60);
-    if (k >= 4) c.scale(-1, 1);
-    drawCourier(c, 80, t);
-    c.restore();
-  }
 
   // a warm rim light for evening
   if (sky.lamps >= 1) {
