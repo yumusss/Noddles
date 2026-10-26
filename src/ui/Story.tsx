@@ -1,94 +1,87 @@
-import { useEffect, useMemo, useState } from 'react';
-import SceneCanvas from './SceneCanvas';
-import { salonScene } from './scenes';
-import { CHARS, type Line } from '../game/data';
-import type { DecorState } from '../game/decor';
-import type { Tod } from '../art/common';
+// Day intro / outro dialogue with typewriter text.
+
+import { useEffect, useState } from 'react';
+import { type Day, type Line, SPEAKERS, ACTS } from '../game/data';
+import { t, tx } from '../game/i18n';
 import { sfx } from '../game/audio';
 import Portrait from './Portrait';
-import { L, T } from '../game/i18n';
+import { useLang } from '../App';
 
 export default function Story({
-  heading,
-  title,
+  day,
   lines,
-  decor,
-  tod,
-  rain,
+  mode,
   onDone,
 }: {
-  heading: string;
-  title: string;
+  day: Day;
   lines: Line[];
-  decor: DecorState;
-  tod: Tod;
-  rain?: boolean;
+  mode: 'intro' | 'outro';
   onDone: () => void;
 }) {
+  useLang();
   const [i, setI] = useState(0);
-  const [shown, setShown] = useState(0);
+  const [n, setN] = useState(0);
   const line = lines[i];
-  const text = L(line.text);
-  const scene = useMemo(() => salonScene(decor, tod, rain), [decor, tod, rain]);
-
+  const full = line ? tx(line.text) : '';
   useEffect(() => {
-    setShown(0);
-    const id = setInterval(() => {
-      setShown((s) => {
-        if (s >= text.length) {
-          clearInterval(id);
-          return s;
-        }
-        if (s % 3 === 0) sfx('type');
-        return s + 1;
-      });
+    setN(0);
+  }, [i]);
+  useEffect(() => {
+    if (n >= full.length) return;
+    const id = setTimeout(() => {
+      setN((x) => x + 2);
+      if (n % 6 === 0) sfx('type');
     }, 22);
-    return () => clearInterval(id);
-  }, [i, text]);
-
-  const advance = () => {
-    if (shown < text.length) {
-      setShown(text.length);
-      return;
-    }
-    sfx('tap');
-    if (i + 1 >= lines.length) onDone();
-    else setI(i + 1);
+    return () => clearTimeout(id);
+  }, [n, full]);
+  useEffect(() => {
+    if (!line) onDone();
+  }, [line, onDone]);
+  if (!line) return null;
+  const next = () => {
+    if (n < full.length) setN(full.length);
+    else if (i + 1 < lines.length) {
+      sfx('tap');
+      setI(i + 1);
+    } else onDone();
   };
-
   return (
-    <div className="screen story" onClick={advance}>
-      <SceneCanvas draw={scene} className="bg" />
-      <div className="story-veil" />
+    <div className={'screen story ' + day.time + (day.rain ? ' rain' : '')} onClick={next}>
+      <div className="story-sky" />
       <div className="story-head">
-        <span className="chip">{heading}</span>
-        <strong>{L(title)}</strong>
+        {mode === 'intro' && (
+          <>
+            <small>
+              {t('act', { n: day.act })} · {tx(ACTS[day.act - 1])}
+            </small>
+            <h1>
+              {t('day', { n: day.n })} — {tx(day.title)}
+            </h1>
+          </>
+        )}
       </div>
-      <button
-        className="btn ghost small skip"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDone();
-        }}>
-        {T('story.skip')}
+      <div className="story-card">
+        <Portrait who={line.who} size={160} talking={n < full.length} />
+        <div className="story-text">
+          <b>{tx(SPEAKERS[line.who])}</b>
+          <p>{full.slice(0, n)}</p>
+          <div className="story-nav">
+            <span>
+              {i + 1}/{lines.length}
+            </span>
+            <button className="btn coral" onClick={(e) => (e.stopPropagation(), next())}>
+              {i + 1 < lines.length || n < full.length
+                ? t('next')
+                : mode === 'intro'
+                  ? t('start')
+                  : t('continue')}
+            </button>
+          </div>
+        </div>
+      </div>
+      <button className="skip" onClick={(e) => (e.stopPropagation(), onDone())}>
+        {t('skip')}
       </button>
-      <div className="dialog">
-        <div className="portrait">
-          <Portrait who={line.who} />
-        </div>
-        <div className="dialog-box">
-          <span className="name" style={{ background: CHARS[line.who].color }}>
-            {L(CHARS[line.who].name)}
-          </span>
-          <p>
-            {text.slice(0, shown)}
-            {shown < text.length && <span className="caret">▍</span>}
-          </p>
-          <span className="count">
-            {i + 1}/{lines.length} ▸
-          </span>
-        </div>
-      </div>
     </div>
   );
 }

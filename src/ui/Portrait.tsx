@@ -1,38 +1,54 @@
-import SceneCanvas from './SceneCanvas';
-import { drawAvatar, randomLook, type Mood } from '../art/avatar';
-import { drawCat } from '../art/cat';
-import type { CharId } from '../game/data';
+// A small canvas portrait of a story character (or Inky).
 
-/** Canvas portrait of a story character (head & shoulders) that fills its container. */
-export default function Portrait({ who, mood = 'happy' }: { who: CharId | string; mood?: Mood }) {
-  return (
-    <SceneCanvas
-      draw={(c, W, H, t) => {
-        c.clearRect(0, 0, W, H);
-        const s = Math.min(W, H);
-        if (who === 'mochi') {
-          drawCat(c, W / 2, H / 2 + s * 0.42, s * 0.62, 'sit', t, false);
-          return;
+import { useEffect, useRef } from 'react';
+import type { Speaker } from '../game/data';
+import { drawInky, drawSeated, SPECIAL_LOOKS } from '../art/people';
+import { setPx } from '../art/common';
+
+export default function Portrait({
+  who,
+  size = 150,
+  talking = false,
+}: {
+  who: Speaker;
+  size?: number;
+  talking?: boolean;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  const talkRef = useRef(talking);
+  talkRef.current = talking;
+  useEffect(() => {
+    const cv = ref.current!;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.width = size * dpr;
+    cv.height = size * dpr;
+    const c = cv.getContext('2d')!;
+    let raf = 0;
+    const t0 = performance.now();
+    const draw = () => {
+      const t = (performance.now() - t0) / 1000;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      setPx(dpr);
+      c.clearRect(0, 0, size, size);
+      if (who === 'inky') {
+        c.save();
+        c.translate(size / 2, size * 0.55);
+        drawInky(c, size * 0.8, t, 'wave');
+        c.restore();
+      } else if (who !== 'me') {
+        const L = SPECIAL_LOOKS[who];
+        if (L) {
+          c.save();
+          c.translate(size / 2, size * 1.02);
+          const talk = talkRef.current ? (Math.sin(t * 22) + 1) / 2 : 0;
+          drawSeated(c, L, size * 0.2, { mood: 'happy', talk, t });
+          c.restore();
         }
-        if (who === 'mahalle') {
-          drawAvatar(c, randomLook(11), 'happy', W / 2 - s * 0.22, H / 2 + s * 0.45, s * 0.8, {
-            bob: Math.sin(t * 2),
-          });
-          drawAvatar(c, randomLook(29), 'neutral', W / 2 + s * 0.22, H / 2 + s * 0.48, s * 0.8, {
-            bob: Math.cos(t * 2),
-          });
-          return;
-        }
-        drawAvatar(
-          c,
-          { seed: 1, special: who as 'hana' },
-          mood,
-          W / 2,
-          H / 2 + s * 0.48,
-          s * 0.96,
-          { bob: Math.sin(t * 2) * 2 }
-        );
-      }}
-    />
-  );
+      }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, [who, size]);
+  return <canvas ref={ref} style={{ width: size, height: size }} className="portrait" />;
 }

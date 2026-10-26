@@ -1,78 +1,97 @@
-import { useMemo, useState } from 'react';
-import type { Save } from '../App';
-import { DECOR, SLOTS, type DecorState, type Slot, tipBonus } from '../game/decor';
-import { fmt } from '../game/money';
-import SceneCanvas from './SceneCanvas';
-import { salonScene } from './scenes';
+// Decor shop: walls, floors, lamps, tables, plants. Each item gives a small tip bonus.
+
+import { DECOR, DECOR_SLOTS } from '../game/data';
+import { money, t, tx } from '../game/i18n';
+import type { Save } from '../game/save';
+import { tipBonus } from '../game/save';
 import { sfx } from '../game/audio';
-import { L, T } from '../game/i18n';
+import { useLang } from '../App';
+
+const SWATCH: Record<string, string> = {
+  'wall-plain': '#f3e4cc',
+  'wall-wave': 'repeating-radial-gradient(circle at 50% 100%, #dfe7ec 0 6px, #c8d5df 6px 12px)',
+  'wall-indigo': '#5c6b94',
+  'floor-plank': 'repeating-linear-gradient(0deg, #d9b48a 0 14px, #c99a6b 14px 16px)',
+  'floor-stone': 'radial-gradient(circle at 30% 30%, #e3dbcd, #b9ae9c)',
+  'lamp-paper': 'radial-gradient(circle, #fff3d8, #f6e7c8)',
+  'lamp-coral': 'radial-gradient(circle, #ffd2c6, #ef8f7a)',
+  'lamp-brass': 'linear-gradient(90deg, #a87a2e, #f0c870, #8a6020)',
+  'table-pine': '#d6ae80',
+  'table-walnut': '#7a5236',
+  'plant-none': '#f4efe3',
+  'plant-bonsai': 'radial-gradient(circle, #a9c98e, #5f8a52)',
+  'plant-sakura': 'radial-gradient(circle, #f6c2cc, #f3a9b9)',
+};
 
 export default function DecorShop({
   save,
-  onChange,
+  update,
   onBack,
 }: {
   save: Save;
-  onChange: (cash: number, decor: DecorState, owned: string[]) => void;
+  update: (f: (s: Save) => Save) => void;
   onBack: () => void;
 }) {
-  const [slot, setSlot] = useState<Slot>('duvar');
-  const scene = useMemo(() => salonScene(save.decor, 'ogle', false), [save.decor]);
-  const items = DECOR.filter((d) => d.slot === slot);
+  useLang();
   return (
     <div className="screen decor">
-      <div className="decor-preview">
-        <SceneCanvas draw={scene} animate={false} />
-        <header className="bar overlay">
-          <button className="btn ghost small" onClick={onBack}>
-            {T('map.back')}
-          </button>
-          <div className="bar-mid">
-            <span className="chip">{fmt(save.cash)}</span>
-            <span className="chip gold">{T('decor.tip', { n: tipBonus(save.decor) })}</span>
-          </div>
-        </header>
-      </div>
-      <div className="decor-panel">
-        <div className="slot-tabs">
-          {SLOTS.map((s) => (
-            <button
-              key={s.id}
-              className={`tab ${slot === s.id ? 'on' : ''}`}
-              onClick={() => setSlot(s.id)}>
-              {L(s.name)}
-            </button>
-          ))}
-        </div>
-        <div className="items">
-          {items.map((it) => {
-            const owned = save.owned.includes(it.id);
-            const on = save.decor[slot] === it.id;
-            const can = save.cash >= it.price;
-            return (
-              <button
-                key={it.id}
-                className={`item ${on ? 'on' : ''} ${!owned && !can ? 'cant' : ''}`}
-                onClick={() => {
-                  if (on) return;
-                  if (owned) {
-                    sfx('pop');
-                    onChange(save.cash, { ...save.decor, [slot]: it.id }, save.owned);
-                  } else if (can) {
-                    sfx('coins');
-                    onChange(save.cash - it.price, { ...save.decor, [slot]: it.id }, [
-                      ...save.owned,
-                      it.id,
-                    ]);
-                  } else sfx('fail');
-                }}>
-                <strong>{L(it.name)}</strong>
-                <small>{owned ? (on ? T('decor.using') : T('decor.owned')) : fmt(it.price)}</small>
-                {it.tip > 0 && <em>{T('decor.tipItem', { n: it.tip })}</em>}
-              </button>
-            );
-          })}
-        </div>
+      <header className="map-head">
+        <button className="btn ghost small" onClick={onBack}>
+          ←
+        </button>
+        <h2>{t('decor')}</h2>
+        <span className="pill">
+          {t('wallet')}: {money(save.wallet)} ·{' '}
+          {t('tipBonus', { n: Math.round(tipBonus(save) * 100) })}
+        </span>
+      </header>
+      <div className="decor-list">
+        {DECOR_SLOTS.map((sl) => (
+          <section key={sl.slot}>
+            <h3>{tx(sl.name)}</h3>
+            <div className="decor-row">
+              {DECOR.filter((d) => d.slot === sl.slot).map((d) => {
+                const owned = save.owned.includes(d.id);
+                const using = save.equipped[d.slot] === d.id;
+                const afford = save.wallet >= d.price;
+                return (
+                  <div key={d.id} className={'decor-card' + (using ? ' using' : '')}>
+                    <div className="swatch" style={{ background: SWATCH[d.id] }} />
+                    <b>{tx(d.name)}</b>
+                    {d.tip > 0 && <small>{t('tipBonus', { n: d.tip })}</small>}
+                    {using ? (
+                      <span className="tag done">{t('inUse')}</span>
+                    ) : owned ? (
+                      <button
+                        className="btn small"
+                        onClick={() => {
+                          sfx('tap');
+                          update((s) => ({ ...s, equipped: { ...s.equipped, [d.slot]: d.id } }));
+                        }}>
+                        {t('equip')}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn small coral"
+                        disabled={!afford}
+                        onClick={() => {
+                          sfx('coins');
+                          update((s) => ({
+                            ...s,
+                            wallet: s.wallet - d.price,
+                            owned: [...s.owned, d.id],
+                            equipped: { ...s.equipped, [d.slot]: d.id },
+                          }));
+                        }}>
+                        {t('buy')} · {money(d.price)}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        ))}
       </div>
     </div>
   );

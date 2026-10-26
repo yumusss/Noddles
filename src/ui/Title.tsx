@@ -1,82 +1,94 @@
-import { useMemo, useState } from 'react';
-import SceneCanvas from './SceneCanvas';
-import { salonScene } from './scenes';
-import { DEFAULT_DECOR } from '../game/decor';
-import { drawBowlTop } from '../art/food';
-import type { BowlState } from '../game/bowl';
-import Fullscreen from './Fullscreen';
-import { T } from '../game/i18n';
+// Title screen with a living little scene.
 
-const HERO: BowlState = {
-  style: 'kirmizi',
-  noodle: 'ramen',
-  thick: 'orta',
-  broth: 'shoyu',
-  fill: 0.95,
-  progress: 70,
-  pieces: [
-    { id: 'chashu', x: 112, y: 118, rot: 0.2, v: 0, s: 1 },
-    { id: 'chashu', x: 150, y: 100, rot: -0.3, v: 1, s: 1 },
-    { id: 'yumurta', x: 196, y: 150, rot: 0.6, v: 0, s: 1 },
-    { id: 'nori', x: 104, y: 178, rot: -0.9, v: 0, s: 1 },
-    { id: 'naruto', x: 172, y: 198, rot: 0.1, v: 0, s: 1 },
-    { id: 'yesil', x: 150, y: 150, rot: 0, v: 0, s: 1 },
-    { id: 'yesil', x: 170, y: 132, rot: 0, v: 1, s: 0.9 },
-    { id: 'bambu', x: 120, y: 150, rot: 0.4, v: 0, s: 1 },
-  ],
-};
+import { useEffect, useRef } from 'react';
+import { t } from '../game/i18n';
+import type { Save } from '../game/save';
+import { setPx } from '../art/common';
+import { drawInky } from '../art/people';
+import { drawPiece } from '../art/food';
+import { LangToggle } from './PauseMenu';
+import { useLang } from '../App';
 
-export default function Title({
-  hasSave,
-  onPlay,
-  onLang,
-}: {
-  hasSave: boolean;
-  onPlay: () => void;
-  onLang: () => void;
-}) {
-  const [pressed, setPressed] = useState(false);
-  const scene = useMemo(
-    () =>
-      salonScene(
-        { ...DEFAULT_DECOR, lamba: 'lamba-kagit', bitki: 'bitki-bambu', tablo: 'tablo-fuji' },
-        'gunbatimi'
-      ),
-    []
-  );
+export default function Title({ onPlay, save }: { onPlay: () => void; save: Save }) {
+  const lang = useLang();
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = ref.current!;
+    let raf = 0;
+    const t0 = performance.now();
+    const draw = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+      const w = cv.clientWidth;
+      const h = cv.clientHeight;
+      if (cv.width !== Math.round(w * dpr)) {
+        cv.width = Math.round(w * dpr);
+        cv.height = Math.round(h * dpr);
+      }
+      const c = cv.getContext('2d')!;
+      const tt = (performance.now() - t0) / 1000;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      setPx(dpr);
+      c.clearRect(0, 0, w, h);
+      const s = Math.min(w, h) / 3.2;
+      const u = s * 2.2;
+      const pieces = [
+        { kind: 'nigiri', rice: 'just', neta: 'salmon', tops: [] },
+        {
+          kind: 'maki',
+          style: 'ura',
+          fill: ['crab', 'avocado'],
+          coat: 'tobiko',
+          rice: 'just',
+          roll: 'tight',
+          cut: 'clean',
+          idx: 0,
+          tops: [],
+        },
+        { kind: 'nigiri', rice: 'just', neta: 'tuna', tops: [] },
+        {
+          kind: 'maki',
+          style: 'hoso',
+          fill: ['cucumber'],
+          rice: 'just',
+          roll: 'tight',
+          cut: 'clean',
+          idx: 1,
+          tops: [],
+        },
+        { kind: 'nigiri', rice: 'just', neta: 'tamago', band: true, tops: [] },
+      ] as never[];
+      pieces.forEach((p, i) => {
+        const x = w / 2 + (i - 2) * s * 0.62;
+        const y = h * 0.66 + Math.sin(tt * 1.4 + i) * 5;
+        c.save();
+        c.translate(x, y);
+        drawPiece(c, u, p, i + 1);
+        c.restore();
+      });
+      c.save();
+      c.translate(w / 2 + s * 1.7, h * 0.86);
+      drawInky(c, s * 0.7, tt, 'wave');
+      c.restore();
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return () => cancelAnimationFrame(raf);
+  }, []);
   return (
     <div className="screen title">
-      <SceneCanvas draw={scene} className="bg" />
-      <div className="title-veil" />
-      <Fullscreen />
-      <button className="btn ghost small lang-btn" onClick={onLang}>
-        {T('map.lang')}
-      </button>
-      <div className="title-body">
-        <h1 className="logo">
-          Noodles
-          <span className="logo-sub">{T('title.sub')}</span>
-        </h1>
-        <div className="hero-bowl">
-          <SceneCanvas
-            animate
-            draw={(c, W, H, t) => {
-              c.clearRect(0, 0, W, H);
-              c.save();
-              c.translate(W / 2, H / 2 + Math.sin(t * 1.3) * 4);
-              drawBowlTop(c, HERO, Math.min(W, H) * 0.92, t, { steam: 0.8 });
-              c.restore();
-            }}
-          />
-        </div>
-        <button
-          className={`btn big primary ${pressed ? 'pressed' : ''}`}
-          onPointerDown={() => setPressed(true)}
-          onPointerUp={() => setPressed(false)}
-          onClick={onPlay}>
-          {hasSave ? T('title.continue') : T('title.open')}
+      <div className="title-sun" />
+      <div className="title-waves" />
+      <canvas ref={ref} className="title-canvas" />
+      <div className="title-logo">
+        <span className="kanji">波屋</span>
+        <h1>{t('title')}</h1>
+        <p>{t('subtitle')}</p>
+      </div>
+      <div className="title-actions">
+        <button className="btn coral big" onClick={onPlay}>
+          {save.unlocked > 1 ? t('continue') : t('play')}
         </button>
-        <p className="credits">{T('title.credits')}</p>
+        <LangToggle lang={lang} />
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 {
-  "name": "noodles",
+  "name": "nami-ya-sushi",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,11 +9,10 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:sim": "node tests/sim.mjs"
   },
   "dependencies": {
-    "@dicebear/core": "^9.4.2",
-    "@dicebear/toon-head": "^9.4.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

@@ -2,26 +2,25 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// GitHub Pages serves the site under /<repo>/
+// GitHub Pages serves this game under /<repo>/sushi/ (the noodle game lives at /<repo>/)
 export default defineConfig({
-  base: '/Noddles/',
+  base: '/Noddles/sushi/',
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Noodles — Noodle Dükkânı',
-        short_name: 'Noodles',
-        description:
-          'Hikâyeli noodle dükkânı oyunu. Siparişleri al, kaseyi hazırla, mahalleyi kurtar.',
+        name: 'Nami-ya — Liman Sushi Barı',
+        short_name: 'Nami-ya',
+        description: 'Hikâyeli sushi barı oyunu. Nigiri sık, maki sar, limanı mutlu et.',
         lang: 'tr',
-        start_url: '/Noddles/',
-        scope: '/Noddles/',
+        start_url: '/Noddles/sushi/',
+        scope: '/Noddles/sushi/',
         display: 'fullscreen',
         orientation: 'any',
-        background_color: '#fbeedc',
-        theme_color: '#fbeedc',
+        background_color: '#f7ead6',
+        theme_color: '#f7ead6',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },

@@ -1,2162 +1,1727 @@
-// One working day: a real-time clock, a queue of customers, up to three open orders at once,
-// complaints and apologies, the bowl, the three stations, input and rendering.
-import { Engine, type View } from '../core/engine';
-import { PAL, TOD_LIGHT, clamp, lerp, rgba, type Ctx } from '../art/common';
+// One working day at Nami-ya: customers, the plate, the rolling board, heat, money.
+// Plain mutable state; the canvas reads it every frame and React listens to `bump()`.
+
+import { sfx, buzz } from './audio';
 import {
-  drawBowlTop,
-  drawTub,
-  drawNoodleTray,
-  drawPot,
-  drawBowlIcon,
-  PIECE_VARIANTS,
-  BOWL_PIECE_SCALE,
-  drawPiece,
-} from '../art/food';
-import {
-  prepLayout,
-  drawPrepBack,
-  drawGauge,
-  drawCookRing,
-  drawPointerHint,
-  type PrepLayout,
-} from '../art/prep';
-import { kamadoLayout, drawKamadoBack, drawKamadoFront, type KamadoLayout } from '../art/kamado';
-import {
-  salonLayout,
-  drawSalonBack,
-  drawSalonFront,
-  drawSalonLight,
-  type SalonLayout,
-  type Diner,
-} from '../art/salon';
-import { drawAvatar, preloadAvatar, randomLook, type Look, type Mood } from '../art/avatar';
-import { drawCat, type CatPose } from '../art/cat';
-import { drawScooter } from '../art/courier';
-import { ParticleSystem } from '../art/fx';
-import {
-  BOWLS,
-  INGREDIENTS,
-  LEVELS,
-  THICK_LABEL,
-  unlockedUpTo,
-  type Level,
-  type Thick,
+  type Day,
+  type IngId,
+  type PlateId,
+  type Speaker,
+  ING,
+  NAMES_EN,
+  NAMES_TR,
+  hasHeat,
+  hasStation2,
+  unlockedIngs,
+  unlockedPlates,
 } from './data';
+import { getLang, tx, type L, money, t as tt } from './i18n';
 import {
-  BOWL_C,
-  BOWL_SPACE,
-  BOWL_R,
-  cookOf,
-  inBowl,
-  newBowl,
-  type BowlState,
-  type CookState,
-  COOK_LABEL,
-} from './bowl';
-import {
-  makeCustomer,
-  judge,
-  orderLines,
-  reactionLine,
-  starsFor,
-  type Customer,
-  type Member,
+  type Order,
+  type Score,
+  makeOrder,
+  mulberry,
+  orderPrice,
+  orderSpeech,
+  pieceCost,
+  REASON_TEXT,
+  scorePlate,
+  specialOrder,
+  STYLE_DAY,
 } from './orders';
 import {
-  cashGiven,
-  cost,
-  emptyLedger,
-  net,
-  paid,
-  price,
-  sum,
-  tip,
-  type DayLedger,
-  type Denom,
-} from './money';
-import { tipBonus, type DecorState } from './decor';
-import { sfx, buzz } from './audio';
-import { L, T } from './i18n';
+  type CutQ,
+  type Done,
+  type Hand,
+  type MakiStyle,
+  type Piece,
+  type PieceBody,
+  type PlateState,
+  type RiceQ,
+  type RollQ,
+  type Thick,
+  newUid,
+  pieceRadius,
+} from './plate';
+import type { Review } from './save';
 
-export type Phase = 'idle' | 'enter' | 'greet' | 'order' | 'waiting' | 'toTable' | 'dayEnd';
-export type PickPhase = 'pickup' | 'served' | 'react' | 'complain' | 'pay' | 'leave' | 'delivering';
+export type Mood = 'happy' | 'neutral' | 'worried' | 'angry' | 'love';
+export type CState =
+  | 'queue'
+  | 'enter'
+  | 'order'
+  | 'wait'
+  | 'eat'
+  | 'react'
+  | 'complain'
+  | 'pay'
+  | 'toTable'
+  | 'table'
+  | 'leave';
 
-export interface Bubble {
-  name: string;
-  text: string;
-  shown: number;
-  phone?: boolean;
-  tone?: 'good' | 'bad' | 'neutral';
-  at: 'counter' | 'pickup' | 'phone';
-}
-
-export interface CashUI {
-  due: number;
-  given: Denom[];
-  giving: Denom[];
-  result?: 'ok' | 'less' | 'more';
-  tipAmount: number;
-}
-
-export interface DayResult {
-  level: number;
-  ledger: DayLedger;
-  scores: number[];
-  avg: number;
-  stars: number;
-  cashBefore: number;
-  cashAfter: number;
-  served: number;
-  lost: number;
-  complaints: number;
-  reviews: Review[];
-}
-
-export interface Review {
-  name: string;
-  stars: number;
-  text: string;
-  delivery: boolean;
-  day: number;
-}
-
-export interface Hint {
-  station: number;
-  x: number;
-  y: number;
-  text: string;
-}
-
-export interface TicketInfo {
+export interface Customer {
   id: number;
-  who: string;
-  lines: string[];
-  patience: number; // 0..1 remaining
-  phone: boolean;
-}
-
-export interface UiSnapshot {
-  served: number;
-  bubble: Bubble | null;
-  tickets: TicketInfo[];
-  target: number | null; // slot id chosen for the next serve (null = auto)
-  cash: CashUI | null;
-  complaint: { name: string } | null;
-  earned: number;
-  cook: CookState | null;
-  cookWhere: 'prep' | 'stove' | 'hand' | null;
-  score: number | null;
-  toast: string | null;
-  hint: Hint | null;
-  station: number;
-  ringing: boolean;
-  clock: number;
-  clockText: string;
-  dayEnd: boolean;
-  intro: boolean;
-}
-
-/** An open order waiting to be cooked. */
-interface Slot {
-  id: number;
-  cu: Customer;
-  mi: number;
-  waitT: number;
-  lines: string[];
-}
-
-interface GroupState {
-  pay: number;
-  tip: number;
-  served: number; // bowls served so far
-  complained: boolean;
-}
-
-type Drag =
-  | {
-      kind: 'pan';
-      lastX: number;
-      lastT: number;
-      vel: number;
-      startX: number;
-      startY: number;
-      moved: boolean;
-    }
-  | { kind: 'bowl'; ox: number; oy: number }
-  | {
-      kind: 'tub';
-      id: string;
-      sx: number;
-      sy: number;
-      moved: boolean;
-      x: number;
-      y: number;
-      v: number;
-      rot: number;
-    }
-  | { kind: 'hold'; id: string }
-  | { kind: 'tap'; target: string; sx: number; sy: number };
-
-interface CatState {
-  pose: CatPose;
-  spot: number;
-  x: number;
-  y: number;
-  tx: number;
-  flip: boolean;
-  timer: number;
-}
-
-type DinerX = Diner & {
-  leaveT: number;
-  cuId?: number;
-  mi?: number;
   seed: number;
-  hidden?: boolean;
-};
+  kid: boolean;
+  female: boolean;
+  nameIdx: number;
+  special?: Speaker;
+  bonus?: number;
+  state: CState;
+  st: number; // time in state
+  x: number; // salon fraction 0..1
+  fromX: number;
+  toX: number;
+  walkDur: number;
+  order: Order;
+  greet?: L;
+  /** speech is rebuilt from this so it follows the language toggle */
+  say: () => string;
+  sayAt: number;
+  patience: number;
+  patienceMax: number;
+  doorWait: number;
+  mood: Mood;
+  bill: number;
+  cash: number;
+  score?: Score;
+  sat?: number;
+  tip: number;
+  table: number;
+  eatLeft: number;
+  angryLeave?: boolean;
+  apologized?: boolean;
+}
 
-const COOK_RATE = 8.2;
-const FILL_RATE = 0.62;
-const MAX_OPEN = 2; // one walk-in at the counter + at most one delivery order
-const QUEUE_MAX = 2; // customers wait outside; only one is at the counter at a time
-const INTRO_LEN = 3.6;
+export interface OnlineOrder {
+  id: number;
+  nameIdx: number;
+  female: boolean;
+  order: Order;
+  status: 'waiting' | 'ringing' | 'active' | 'packed' | 'delivered';
+  age: number;
+  stars?: number;
+  summary: L;
+}
 
-export class DaySession {
-  engine: Engine;
-  level: Level;
-  dayLen: number;
-  clock = 0;
-  // counter (ordering)
+export type Board =
+  | { m: 'idle' }
+  | {
+      m: 'maki';
+      style: MakiStyle;
+      stage: 'rice' | 'fill' | 'rolling' | 'cut';
+      rice: number;
+      riceQ?: RiceQ;
+      fill: IngId[];
+      coat?: IngId;
+      prog: number;
+      speed: number;
+      roll?: RollQ;
+      n: 6 | 8;
+      cutT: number;
+      done?: Done;
+    }
+  | { m: 'temaki'; stage: 'rice' | 'fill'; rice: number; riceQ?: RiceQ; fill: IngId[]; n: 1 | 2 }
+  | { m: 'sashimi'; fish: IngId; n: 3 | 5; cutT: number };
+
+export interface Cook {
+  ing: IngId; // raw: shrimp | eel
+  t: number; // 0..1+ along the dial
+}
+
+export interface Toast {
+  id: number;
+  text: string;
+  kind: 'info' | 'good' | 'bad' | 'unlock';
+  t: number;
+}
+
+export interface Ledger {
+  sales: number;
+  tips: number;
+  ing: number;
+  waste: number;
+  overpaid: number;
+  bonus: number;
+  served: number;
+  complaints: number;
+  walkouts: number;
+  satSum: number;
+  satN: number;
+}
+
+export interface Coin {
+  x: number;
+  y: number;
+  vy: number;
+  rest: boolean;
+  kind: number;
+  rot: number;
+}
+
+export interface Fx {
+  kind: 'sparkle' | 'smoke' | 'grain' | 'heart' | 'steam' | 'puff' | 'drop';
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  t: number;
+  life: number;
+  s: number;
+  station: number;
+}
+
+export interface Courier {
+  t: number;
+  order: OnlineOrder;
+}
+
+/** seats at tables in the back of the dining room, as salon fractions */
+export const TABLE_SEATS = [0.14, 0.24, 0.76, 0.86];
+export const DOOR_X = -0.04;
+export const COUNTER_X = 0.5;
+export const QUEUE_X = [0.1, 0.03];
+
+export const RICE_MAX = 1.45;
+export function riceQuality(a: number): RiceQ {
+  return a < 0.62 ? 'less' : a <= 1.02 ? 'just' : 'more';
+}
+export const DIAL = { done: 0.45, over: 0.7, burnt: 0.88 };
+export function doneness(t: number): Done {
+  return t < DIAL.done ? 'raw' : t < DIAL.over ? 'done' : t < DIAL.burnt ? 'over' : 'burnt';
+}
+/** sashimi cut bar zones */
+export const SASHIMI_ZONES: { a: number; b: number; q: Thick | null }[] = [
+  { a: 0, b: 0.1, q: null },
+  { a: 0.1, b: 0.3, q: 'thin' },
+  { a: 0.3, b: 0.38, q: null },
+  { a: 0.38, b: 0.62, q: 'normal' },
+  { a: 0.62, b: 0.7, q: null },
+  { a: 0.7, b: 0.9, q: 'thick' },
+  { a: 0.9, b: 1, q: null },
+];
+export const MAKI_GREEN = { a: 0.38, b: 0.62 };
+export function cutMarker(t: number, period: number) {
+  const p = (t / period) % 2;
+  return p < 1 ? p : 2 - p;
+}
+
+export class Session {
+  day: Day;
+  n: number;
+  rng: () => number;
+  t = 0;
+  started = false;
+  over = false;
+  paused = false;
+  customers: Customer[] = [];
   counter: Customer | null = null;
-  mi = 0;
-  phase: Phase = 'idle';
-  phaseT = 0;
-  // line & open orders
-  queue: Customer[] = [];
-  open: Slot[] = [];
-  ringing: Slot | null = null;
-  private slotId = 1;
-  target: number | null = null;
-  // pickup (receiving / paying)
-  pick: {
-    cu: Customer;
-    mi: number;
-    phase: PickPhase;
-    t: number;
-    score: number;
-    notes: string[];
-    tone: Bubble['tone'];
-    bowl: BowlState | null;
-  } | null = null;
-  groups = new Map<number, GroupState>();
-  delivery: { cu: Customer; score: number; tone: Bubble['tone']; t: number } | null = null;
-  nextId = 0;
-  spawnT = 2;
-  ledger: DayLedger;
-  scores: number[] = [];
-  lost = 0;
-  complaints = 0;
-  decor: DecorState;
-  cashBefore: number;
-  bowl: BowlState = newBowl();
-  bowlAt: 'prep' | 'stove' | 'hand' | 'counter' | 'box' = 'prep';
-  bowlPos = { x: 0, y: 0 };
-  bowlLift = 0;
-  servedPos = { x: 0, y: 0 };
-  bubble: Bubble | null = null;
-  cash: CashUI | null = null;
-  lastScore: number | null = null;
-  toast: string | null = null;
-  toastT = 0;
-  earned = 0;
-  typeT = 0;
-  prepL!: PrepLayout;
-  kamL!: KamadoLayout;
-  salL!: SalonLayout;
-  tops: string[];
-  noods: string[];
-  liqs: string[];
-  private drag: Drag | null = null;
-  private pointer = { x: 0, y: 0, sx: 0, sy: 0, down: false };
-  private fx = new ParticleSystem();
-  private cat: CatState = { pose: 'sit', spot: 1, x: 0, y: 0, tx: 0, flip: false, timer: 2 };
-  diners: DinerX[] = [];
-  private seedCounter = 1;
-  private scooter: { x: number; t: number } | null = null;
-  private tipCoins: number;
-  private heat = 0.15;
-  private unlocked: Set<string>;
-  private lastCook: CookState = 'raw';
-  private listeners = new Set<() => void>();
-  private snap: UiSnapshot | null = null;
-  private ringT = 0;
-  private counterY = 0;
-  private leaveTo: { x: number; y: number } | null = null;
-  intro = INTRO_LEN;
-  private pickY = 0;
-  private dayOver = false;
-  private tapHintShown = false;
-  held: string | null = null; // topping picked from a tub, placed by tapping the bowl
-  onDayEnd: ((r: DayResult) => void) | null = null;
-  onOpenTablet: (() => void) | null = null;
-  /** reviews collected today (name, stars 1–5, line, delivery?) */
+  plate: PlateState;
+  served: { plate: PlateState; cust: Customer | null; t: number } | null = null;
+  hand: Hand | null = null;
+  board: Board = { m: 'idle' };
+  squeeze: { a: number; on: boolean } = { a: 0, on: false };
+  heat: { fryer: Cook | null; grill: Cook | null } = { fryer: null, grill: null };
+  prepared: Partial<Record<IngId, Done[]>> = {};
+  ledger: Ledger = {
+    sales: 0,
+    tips: 0,
+    ing: 0,
+    waste: 0,
+    overpaid: 0,
+    bonus: 0,
+    served: 0,
+    complaints: 0,
+    walkouts: 0,
+    satSum: 0,
+    satN: 0,
+  };
+  online: OnlineOrder[] = [];
+  activeOnline: OnlineOrder | null = null;
+  onlineTimer = 70;
+  couriers: Courier[] = [];
+  doorBox: OnlineOrder | null = null;
+  coins: Coin[] = [];
+  fx: Fx[] = [];
+  toasts: Toast[] = [];
   reviews: Review[] = [];
+  drawer: { open: boolean; given: number[]; warn: number } = { open: false, given: [], warn: 0 };
+  spawnTimer = 4;
+  nextId = 1;
+  have: Set<IngId>;
+  plates: PlateId[];
+  station2: boolean;
+  heatOn: boolean;
+  tipBonus: number;
+  tutorial: boolean;
+  guestsLeft: { who: Speaker; at: number; greet: L; order: string; bonus: number }[];
+  /** set by the view: station requested by game logic */
+  wantStation: number | null = null;
+  /** current station the camera is at (written by the view) */
+  station = 0;
+  version = 0;
+  private listeners = new Set<() => void>();
+  private tableUse: (Customer | null)[] = [null, null, null, null];
 
-  constructor(
-    canvas: HTMLCanvasElement,
-    levelId: number,
-    decor: DecorState,
-    cash: number,
-    tipCoins: number
-  ) {
-    this.engine = new Engine(canvas);
-    this.level = LEVELS[levelId - 1];
-    this.dayLen = this.level.minutes * 60;
-    this.ledger = emptyLedger(levelId);
-    this.decor = decor;
-    this.cashBefore = cash;
-    this.tipCoins = tipCoins;
-    this.unlocked = new Set(unlockedUpTo(levelId));
-    this.tops = TOPPINGS.filter((t) => this.unlocked.has(t));
-    this.noods = NOODLES.filter((t) => this.unlocked.has(t));
-    this.liqs = LIQUIDS.filter((t) => this.unlocked.has(t));
-    this.layout(this.engine.view);
-    this.engine.onResize = (v) => this.layout(v);
-    this.engine.onFrame = (c, v, t, dt) => this.frame(c, v, t, dt);
-    this.engine.camX = 0;
-    this.resetBowl();
-    for (let i = 0; i < Math.min(2, this.salL.seats.length); i++)
-      this.seatExtra(60 + Math.random() * 60);
-    this.cat.x = this.salL.catSpots[1].x;
-    this.cat.y = this.salL.catSpots[1].y;
-    this.cat.tx = this.cat.x;
-    this.bindInput(canvas);
-    this.engine.start();
-  }
-
-  destroy() {
-    this.engine.destroy();
+  constructor(day: Day, opts: { tipBonus: number; seed?: number }) {
+    this.day = day;
+    this.n = day.n;
+    this.rng = mulberry(opts.seed ?? day.n * 7919 + Math.floor(Math.random() * 1e6));
+    this.have = unlockedIngs(day.n);
+    this.plates = unlockedPlates(day.n);
+    this.station2 = hasStation2(day.n);
+    this.heatOn = hasHeat(day.n);
+    this.tipBonus = opts.tipBonus;
+    this.tutorial = day.n === 1;
+    this.plate = { id: 'geta', pieces: [] };
+    this.guestsLeft = [...(day.guests ?? [])].sort((a, b) => a.at - b.at);
   }
 
-  // ---------- React bridge ----------
-  subscribe(fn: () => void) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
+  // ---------- plumbing ----------
+
+  on(f: () => void) {
+    this.listeners.add(f);
+    return () => this.listeners.delete(f);
   }
-  private notify() {
-    this.snap = null;
-    for (const l of this.listeners) l();
+  bump() {
+    this.version++;
+    this.listeners.forEach((f) => f());
   }
-  snapshot(): UiSnapshot {
-    if (this.snap) return this.snap;
-    const left = Math.max(0, this.dayLen - this.clock);
-    const mm = Math.floor(left / 60);
-    const ss = Math.floor(left % 60);
-    this.snap = {
-      served: this.scores.length,
-      bubble: this.bubble ? { ...this.bubble } : null,
-      tickets: this.open.map((s) => ({
-        id: s.id,
-        who: s.cu.members[s.mi].name,
-        lines: s.lines,
-        patience: clamp(1 - s.waitT / s.cu.patience, 0, 1),
-        phone: s.cu.phone,
-      })),
-      target: this.target,
-      cash: this.cash ? { ...this.cash, giving: [...this.cash.giving] } : null,
-      complaint:
-        this.pick?.phase === 'complain' ? { name: this.pick.cu.members[this.pick.mi].name } : null,
-      earned: this.earned,
-      cook: this.bowl.noodle ? cookOf(this.bowl) : null,
-      cookWhere:
-        this.bowlAt === 'stove'
-          ? 'stove'
-          : this.bowlAt === 'hand'
-            ? 'hand'
-            : this.bowlAt === 'prep'
-              ? 'prep'
-              : null,
-      score:
-        this.pick &&
-        (this.pick.phase === 'react' ||
-          this.pick.phase === 'complain' ||
-          this.pick.phase === 'served')
-          ? this.pick.score
-          : null,
-      toast: this.toast,
-      hint: this.currentHint(),
-      station: this.engine.station,
-      ringing: !!this.ringing,
-      clock: Math.min(1, this.clock / this.dayLen),
-      clockText: `${mm}:${String(ss).padStart(2, '0')}`,
-      dayEnd: this.phase === 'dayEnd',
-      intro: this.intro > 0,
+  toast(text: string, kind: Toast['kind'] = 'info') {
+    this.toasts.push({ id: this.nextId++, text, kind, t: 0 });
+    if (this.toasts.length > 3) this.toasts.shift();
+    this.bump();
+  }
+  goStation(i: number) {
+    this.wantStation = i;
+  }
+
+  get name() {
+    return (c: { nameIdx: number; female: boolean; special?: Speaker }) => {
+      const list = getLang() === 'tr' ? NAMES_TR : NAMES_EN;
+      return (c.female ? list.f : list.m)[c.nameIdx % 12];
     };
-    return this.snap;
   }
 
-  jumpTo(i: number) {
-    this.engine.snapTo(i);
-    sfx('whoosh');
+  /** current order on the ticket rail */
+  get activeOrder(): Order | null {
+    if (this.activeOnline) return this.activeOnline.order;
+    const c = this.counter;
+    if (c && (c.state === 'wait' || c.state === 'order')) return c.order;
+    return null;
   }
 
-  showToast(t: string) {
-    this.toast = t;
-    this.toastT = 2.4;
-    this.notify();
+  get clock(): string {
+    const ranges: Record<string, [number, number]> = {
+      morning: [8 * 60, 11 * 60 + 30],
+      noon: [11 * 60 + 30, 15 * 60],
+      sunset: [16 * 60 + 30, 20 * 60],
+      evening: [19 * 60, 22 * 60 + 30],
+    };
+    const [a, b] = ranges[this.day.time];
+    const m = Math.round(a + (b - a) * Math.min(1, this.t / this.day.duration));
+    const hh = Math.floor(m / 60);
+    const mm = m % 60;
+    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
   }
 
-  setTarget(id: number | null) {
-    this.target = this.target === id ? null : id;
-    sfx('tap');
-    this.notify();
+  get open() {
+    return this.t < this.day.duration;
   }
 
-  get tipJarCoins() {
-    return this.tipCoins;
+  // ---------- main tick ----------
+
+  tick(dt: number) {
+    if (!this.started || this.over || this.paused) return;
+    this.t += dt;
+
+    this.toasts.forEach((x) => (x.t += dt));
+    const before = this.toasts.length;
+    this.toasts = this.toasts.filter((x) => x.t < 3.2);
+    if (this.toasts.length !== before) this.bump();
+
+    this.tickSpawns(dt);
+    this.tickOnline(dt);
+    for (const c of [...this.customers]) this.tickCustomer(c, dt);
+    this.tickHeat(dt);
+    this.tickBoard(dt);
+    this.tickSqueeze(dt);
+    this.tickCoins(dt);
+    this.tickFx(dt);
+    if (this.served) this.served.t += dt;
+    this.couriers.forEach((c) => (c.t += dt));
+    const leaving = this.couriers.filter((c) => c.t > 9);
+    if (leaving.length) {
+      this.couriers = this.couriers.filter((c) => c.t <= 9);
+    }
+    for (const c of this.couriers)
+      if (c.t > 3.2 && this.doorBox === c.order) {
+        this.doorBox = null;
+        this.deliver(c.order);
+      }
+    this.drawer.warn = Math.max(0, this.drawer.warn - dt);
+
+    if (!this.open && !this.over) this.checkEnd();
   }
 
-  // ---------- layout ----------
-  private layout(v: View) {
-    this.prepL = prepLayout(v.W, v.H, {
-      tubs: this.tops.length,
-      trays: this.noods.length,
-      pots: this.liqs.length,
-    });
-    this.kamL = kamadoLayout(v.W, v.H);
-    this.salL = salonLayout(v.W, v.H, this.decor);
-    if (this.bowlAt === 'prep') this.bowlPos = { x: v.W + this.prepL.bowl.x, y: this.prepL.bowl.y };
-    if (this.bowlAt === 'stove')
-      this.bowlPos = { x: 2 * v.W + this.kamL.bowl.x, y: this.kamL.bowl.y };
-    this.notify();
+  private checkEnd() {
+    const busy =
+      this.counter ||
+      this.activeOnline ||
+      this.doorBox ||
+      this.customers.some((c) => c.state === 'queue' || c.state === 'enter');
+    if (!busy) {
+      // anyone still calling is told we're closed
+      this.online
+        .filter((o) => o.status === 'waiting' || o.status === 'ringing')
+        .forEach((o) => {
+          o.status = 'delivered';
+          o.stars = 0;
+        });
+      this.over = true;
+      sfx('win');
+      this.bump();
+    }
   }
 
-  private resetBowl(style?: string) {
-    this.bowl = newBowl(style ?? this.bowl.style ?? 'kirmizi');
-    this.bowlAt = 'prep';
-    const v = this.engine.view;
-    this.bowlPos = { x: v.W + this.prepL.bowl.x, y: this.prepL.bowl.y };
-    this.bowlLift = 0;
-    this.lastCook = 'raw';
-  }
-
-  /** standing spots for the queue (from the salon layout, with a fallback) */
-  private queueSpots() {
-    const S = this.salL as SalonLayout & { queue?: { x: number; y: number; size: number }[] };
-    if (S.queue?.length) return S.queue;
-    const c = S.customer;
-    return [0, 1, 2].map((i) => ({
-      x: c.x + c.size * (0.95 + i * 0.5),
-      y: c.y - 14 - i * 4,
-      size: c.size * 0.78,
-    }));
-  }
-
-  counterX() {
-    const S = this.salL;
-    const n = this.counter?.members.length ?? 1;
-    let x = S.customer.x - (n - 1) * S.customer.size * 0.22;
-    if (this.pick && this.counter) x += S.customer.size * 0.45;
-    return x;
-  }
-  pickupX() {
-    return this.counter
-      ? this.salL.customer.x - this.salL.customer.size * 0.5
-      : this.salL.customer.x;
-  }
-
-  // ---------- customers ----------
-  private calls: Customer[] = [];
-
-  private spawn() {
-    const cu = makeCustomer(this.level.id, this.nextId++);
-    for (const m of cu.members)
-      preloadAvatar(m.look, ['neutral', 'happy', 'love', 'angry', 'worried']);
-    if (cu.phone) {
-      // calls wait in a line of their own and ring as soon as the counter is free
-      if (this.calls.length < 2) this.calls.push(cu);
+  private tickSpawns(dt: number) {
+    if (!this.open) return;
+    // special guests arrive at their moment and jump the queue
+    const g = this.guestsLeft[0];
+    if (g && this.t >= g.at * this.day.duration) {
+      if (this.queue.length < 2) {
+        this.guestsLeft.shift();
+        this.spawn({
+          special: g.who,
+          greet: g.greet,
+          order: specialOrder(g.order),
+          bonus: g.bonus,
+        });
+      }
       return;
     }
-    if (this.queue.length >= QUEUE_MAX) return;
-    this.queue.push(cu);
-    sfx('door');
-    this.notify();
-  }
-
-  /** ring the tablet for a waiting call when nobody is at the counter */
-  private tryRing() {
-    if (!this.calls.length || this.dayOver) return;
-    if (this.ringing || this.open.length >= MAX_OPEN || this.counter || this.pick || this.delivery)
+    this.spawnTimer -= dt;
+    if (this.spawnTimer > 0) return;
+    const q = this.queue.length;
+    if (this.tutorial && (this.counter || q > 0)) {
+      this.spawnTimer = 2;
       return;
-    const cu = this.calls.shift()!;
-    const m = cu.members[0];
-    this.ringing = { id: this.slotId++, cu, mi: 0, waitT: 0, lines: orderLines(m.order) };
-    this.ringT = 0;
-    sfx('phone');
-    this.notify();
+    }
+    if (q >= 2) {
+      this.spawnTimer = 4;
+      return;
+    }
+    this.spawn({});
+    const jitter = 0.75 + this.rng() * 0.5;
+    this.spawnTimer = this.day.spawn * jitter * (this.customers.length === 1 ? 0.6 : 1);
   }
 
-  answerPhone() {
-    if (!this.ringing) return;
-    const s = this.ringing;
-    this.ringing = null;
-    s.waitT = 0;
-    this.open.push(s);
-    const m = s.cu.members[0];
-    this.setBubble(m.name, s.cu.greet + ' ' + m.text, 'phone', 'neutral');
-    sfx('tap');
-    this.notify();
+  get queue() {
+    return this.customers.filter((c) => c.state === 'queue');
   }
 
-  private setBubble(
-    name: string,
-    text: string,
-    at: Bubble['at'],
-    tone: Bubble['tone'] = 'neutral'
-  ) {
-    this.bubble = { name, text, shown: 0, phone: at === 'phone', tone, at };
-    this.typeT = 0;
-    this.notify();
+  private spawn(o: { special?: Speaker; greet?: L; order?: Order; bonus?: number }) {
+    const kid = !o.special && this.n >= 2 && this.rng() < 0.2;
+    const female = this.rng() < 0.5;
+    const order = o.order ?? makeOrder(this.day, this.rng, { kid });
+    const seed = Math.floor(this.rng() * 1e9);
+    const r2 = mulberry(seed);
+    const c: Customer = {
+      id: this.nextId++,
+      seed,
+      kid,
+      female,
+      nameIdx: Math.floor(this.rng() * 12),
+      special: o.special,
+      bonus: o.bonus,
+      state: 'queue',
+      st: 0,
+      x: DOOR_X,
+      fromX: DOOR_X,
+      toX: QUEUE_X[Math.min(1, this.queue.length)],
+      walkDur: 1.6,
+      order,
+      greet: o.greet,
+      say: () => (o.greet ? tx(o.greet) : orderSpeech(order, mulberry(seed), kid)),
+      sayAt: 0,
+      patience: this.day.patience,
+      patienceMax: this.day.patience,
+      doorWait: 0,
+      mood: 'neutral',
+      bill: orderPrice(order),
+      cash: 0,
+      tip: 0,
+      table: -1,
+      eatLeft: 0,
+    };
+    void r2;
+    if (o.special) {
+      // special guests go to the front of the line
+      this.customers.unshift(c);
+    } else this.customers.push(c);
+    this.reflowQueue();
+    sfx('door');
   }
 
-  private startOrder() {
-    const cu = this.counter!;
-    const m = cu.members[this.mi];
-    this.phase = 'order';
-    this.phaseT = 0;
-    const n = cu.members.length;
-    const pre =
-      n > 1 ? (this.mi === 0 ? T('g.first') : this.mi === n - 1 ? T('g.last') : T('g.mine')) : '';
-    this.setBubble(m.name, pre + m.text, 'counter');
-  }
-
-  private placeOrder(cu: Customer, mi: number) {
-    const m = cu.members[mi];
-    this.open.push({ id: this.slotId++, cu, mi, waitT: 0, lines: orderLines(m.order) });
-    if (!this.groups.has(cu.id))
-      this.groups.set(cu.id, { pay: 0, tip: 0, served: 0, complained: false });
-  }
-
-  /** the ordering group walks to a table (or waits standing) */
-  private seatGroup(cu: Customer) {
-    cu.members.forEach((m, i) => {
-      const seat = this.freeSeat();
-      this.diners.push({
-        seat,
-        look: m.look,
-        mood: 'neutral',
-        bob: 0,
-        eating: false,
-        waiting: true,
-        leaveT: 1e9,
-        cuId: cu.id,
-        mi: i,
-        seed: m.look.seed,
-      } as DinerX);
+  private reflowQueue() {
+    this.queue.forEach((c, i) => {
+      const target = QUEUE_X[Math.min(1, i)];
+      if (Math.abs(c.toX - target) > 0.001) this.walk(c, target, 1.2);
     });
   }
 
-  private freeSeat(): number {
-    const used = new Set(this.diners.filter((d) => d.seat >= 0).map((d) => d.seat));
-    const free = this.salL.seats.map((_, i) => i).filter((i) => !used.has(i));
-    if (!free.length) return -1; // standing
-    // prefer seats at the same table as a groupmate
-    return free[Math.floor(Math.random() * free.length)];
+  private walk(c: Customer, to: number, dur: number) {
+    c.fromX = c.x;
+    c.toX = to;
+    c.walkDur = dur;
+    c.st = 0;
   }
 
-  private seatExtra(stay: number) {
-    const seat = this.freeSeat();
-    if (seat < 0) return;
-    const seed = (this.seedCounter++ * 7919) % 100000;
-    this.diners.push({
-      seat,
-      look: randomLook(seed),
-      mood: 'happy',
-      bob: 0,
-      eating: true,
-      leaveT: stay,
-      seed,
-    } as DinerX);
+  private setState(c: Customer, s: CState) {
+    c.state = s;
+    c.st = 0;
+    this.bump();
   }
 
-  private endDay() {
-    if (this.dayOver) return;
-    this.dayOver = true;
-    this.phase = 'dayEnd';
-    const avg = this.scores.length ? sum(this.scores) / this.scores.length : 0;
-    const stars = this.scores.length < 3 ? 0 : starsFor(avg);
-    const r: DayResult = {
-      level: this.level.id,
-      ledger: this.ledger,
-      scores: this.scores,
-      avg,
-      stars,
-      cashBefore: this.cashBefore,
-      cashAfter: this.cashBefore + net(this.ledger),
-      served: this.scores.length,
-      lost: this.lost,
-      complaints: this.complaints,
-      reviews: this.reviews,
-    };
-    this.notify();
-    setTimeout(() => this.onDayEnd?.(r), 900);
-  }
-
-  /** an open order's customer gives up */
-  private giveUp(s: Slot) {
-    this.open = this.open.filter((x) => x !== s);
-    if (this.target === s.id) this.target = null;
-    this.scores.push(0);
-    this.lost++;
-    const m = s.cu.members[s.mi];
-    this.setBubble(
-      m.name,
-      s.cu.phone ? T('g.waitedPhone') : T('g.waited'),
-      s.cu.phone ? 'phone' : 'pickup',
-      'bad'
-    );
-    sfx('angry');
-    // the whole group leaves the table
-    this.diners = this.diners.filter((d) => d.cuId !== s.cu.id);
-    this.open = this.open.filter((x) => x.cu !== s.cu);
-    this.notify();
+  private tickCustomer(c: Customer, dt: number) {
+    c.st += dt;
+    // walking
+    if (c.x !== c.toX) {
+      const k = Math.min(1, c.st / c.walkDur);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      c.x = c.fromX + (c.toX - c.fromX) * e;
+      if (k >= 1) c.x = c.toX;
+    }
+    switch (c.state) {
+      case 'queue': {
+        c.doorWait += dt;
+        const first = this.queue[0] === c;
+        const ringBlock = this.online.some((o) => o.status === 'ringing') && c.doorWait < 15;
+        if (first && !this.counter && !this.activeOnline && !ringBlock) {
+          this.counter = c;
+          this.walk(c, COUNTER_X, 2.2);
+          this.setState(c, 'enter');
+          this.reflowQueue();
+        } else if (c.doorWait > 75 && !c.special) {
+          this.ledger.walkouts++;
+          c.angryLeave = true;
+          c.mood = 'angry';
+          this.walk(c, DOOR_X - 0.1, 1.6);
+          this.setState(c, 'leave');
+          this.reflowQueue();
+        }
+        break;
+      }
+      case 'enter':
+        if (c.x === c.toX && c.st > 2.2) {
+          this.setState(c, 'order');
+          c.sayAt = 0;
+          sfx('bubble');
+        }
+        break;
+      case 'order': {
+        c.sayAt += dt;
+        const len = c.say().length;
+        // typing speed ~32 chars/s, then the ticket drops
+        if (c.sayAt * 32 >= len + 10) {
+          this.setState(c, 'wait');
+          sfx('ding');
+          if (this.tutorial) this.goStation(1);
+        }
+        break;
+      }
+      case 'wait': {
+        if (!this.tutorial) c.patience -= dt;
+        const f = c.patience / c.patienceMax;
+        c.mood = f > 0.6 ? 'neutral' : f > 0.3 ? 'worried' : 'angry';
+        if (c.patience <= 0) {
+          c.angryLeave = true;
+          c.mood = 'angry';
+          c.sat = 0;
+          this.ledger.walkouts++;
+          this.ledger.satN++;
+          this.counter = null;
+          this.walk(c, DOOR_X - 0.1, 2.4);
+          this.setState(c, 'leave');
+          sfx('angry');
+          this.addReview(c.nameIdx, c.female, 1, false);
+          this.toast(
+            getLang() === 'tr' ? 'Müşteri bekleyemedi, gitti!' : 'The customer gave up and left!',
+            'bad'
+          );
+        }
+        break;
+      }
+      case 'eat':
+        if (c.st > 2.6) this.finishEating(c);
+        break;
+      case 'react':
+        if (c.st > 2.2) this.startPay(c);
+        break;
+      case 'complain':
+        break;
+      case 'pay':
+        break;
+      case 'toTable':
+        if (c.x === c.toX && c.st >= c.walkDur) this.setState(c, 'table');
+        break;
+      case 'table':
+        if (c.st > c.eatLeft) {
+          this.tableUse[c.table] = null;
+          this.walk(c, DOOR_X - 0.1, 2.6);
+          this.setState(c, 'leave');
+        }
+        break;
+      case 'leave':
+        if (c.x === c.toX) this.customers = this.customers.filter((x) => x !== c);
+        break;
+    }
   }
 
   // ---------- serving ----------
-  private pickSlotFor(b: BowlState): Slot | null {
-    if (!this.open.length) return null;
-    if (this.target !== null) {
-      const t = this.open.find((s) => s.id === this.target);
-      if (t) return t;
+
+  canServe() {
+    const c = this.counter;
+    if (this.activeOnline) return this.plate.pieces.length > 0;
+    return !!c && c.state === 'wait' && this.plate.pieces.length > 0;
+  }
+
+  serve() {
+    if (!this.canServe()) {
+      if (!this.plate.pieces.length) this.toast(t2('plateEmpty'));
+      else this.toast(t2('noCustomer'));
+      return;
     }
-    let best: Slot | null = null;
-    let bestScore = -1;
-    for (const s of this.open) {
-      const sc = judge(s.cu.members[s.mi].order, b, 0).score;
-      if (
-        sc > bestScore + 0.01 ||
-        (Math.abs(sc - bestScore) < 0.01 && best && s.waitT > best.waitT)
-      ) {
-        best = s;
-        bestScore = sc;
+    if (this.activeOnline) return this.pack();
+    const c = this.counter!;
+    this.hand = this.hand?.k === 'plate' ? null : this.hand;
+    c.score = scorePlate(c.order, this.plate.pieces, this.plate.id);
+    this.served = { plate: this.plate, cust: c, t: 0 };
+    this.plate = { id: this.plate.id, pieces: [] };
+    this.setState(c, 'eat');
+    this.goStation(0);
+    sfx('place');
+    buzz(12);
+  }
+
+  private finishEating(c: Customer) {
+    const sc = c.score!;
+    const pf = Math.max(0, c.patience / c.patienceMax);
+    const sat = this.tutorial ? sc.score : Math.round(sc.score - (1 - pf) * 12);
+    c.sat = Math.max(0, Math.min(100, sat));
+    c.mood =
+      c.sat >= 95
+        ? 'love'
+        : c.sat >= 78
+          ? 'happy'
+          : c.sat >= 58
+            ? 'neutral'
+            : c.sat >= 38
+              ? 'worried'
+              : 'angry';
+    this.ledger.satSum += c.sat;
+    this.ledger.satN++;
+    this.ledger.served++;
+    if (c.mood === 'love' || c.mood === 'happy') sfx('perfect');
+    else if (sc.complaint) sfx('fail');
+    for (let i = 0; i < (c.mood === 'love' ? 8 : 3); i++)
+      this.addFx(
+        c.mood === 'love' ? 'heart' : 'sparkle',
+        COUNTER_X + (this.rng() - 0.5) * 0.12,
+        0.42,
+        0
+      );
+    if (sc.complaint) {
+      this.ledger.complaints++;
+      this.setState(c, 'complain');
+    } else this.setState(c, 'react');
+  }
+
+  apologize() {
+    const c = this.counter;
+    if (!c || c.state !== 'complain') return;
+    c.apologized = true;
+    sfx('tap');
+    this.setState(c, 'react');
+  }
+
+  private startPay(c: Customer) {
+    // the customer pays cash and says the change out loud
+    const notes = [5, 10, 20, 50, 100, 200];
+    const i = notes.findIndex((x) => x >= c.bill);
+    const idx = Math.min(notes.length - 1, i + (this.rng() < 0.3 ? 1 : 0));
+    c.cash = notes[idx];
+    if (c.cash < c.bill) c.cash = Math.ceil(c.bill / 10) * 10;
+    const pf = Math.max(0, c.patience / c.patienceMax);
+    const speed = this.tutorial ? 1.2 : pf > 0.6 ? 1.4 : pf > 0.3 ? 1 : 0.7;
+    const base = c.bill * Math.pow((c.sat ?? 0) / 100, 2) * 0.22;
+    c.tip = c.apologized || c.score?.complaint ? 0 : Math.round(base * speed * (1 + this.tipBonus));
+    if (c.special && (c.sat ?? 0) >= 70 && !c.score?.complaint) {
+      this.ledger.bonus += c.bonus ?? 0;
+      this.toast(
+        (getLang() === 'tr' ? 'Özel misafir bonusu ' : 'Special guest bonus ') +
+          money(c.bonus ?? 0),
+        'good'
+      );
+    }
+    this.ledger.sales += c.bill;
+    this.drawer = { open: c.cash > c.bill, given: [], warn: 0 };
+    this.setState(c, 'pay');
+    c.sayAt = 0;
+    if (c.cash === c.bill) setTimeout(() => this.finishPay(c), 1400);
+    else if (this.tutorial) this.goStation(0);
+  }
+
+  /** words while paying */
+  paySpeech(c: Customer): string {
+    const tr = getLang() === 'tr';
+    const change = c.cash - c.bill;
+    if (change === 0)
+      return tr
+        ? `Hesap ${money(c.bill)}, tam para. Buyur!`
+        : `That’s ${money(c.bill)}, exact change. Here!`;
+    return tr
+      ? `Hesap ${money(c.bill)}, buyur ${money(c.cash)}. ${money(change)} üstü.`
+      : `That’s ${money(c.bill)}, here’s ${money(c.cash)}. ${money(change)} change, please.`;
+  }
+
+  reactSpeech(c: Customer): string {
+    const tr = getLang() === 'tr';
+    if (c.state === 'complain') {
+      const r = c.score?.reasons[0] ?? 'missing';
+      return tx(REASON_TEXT[r]);
+    }
+    if (c.apologized) return tr ? 'Peki… ama bahşiş yok.' : 'Fine… but no tip.';
+    const m = c.mood;
+    const pool: Record<Mood, L[]> = {
+      love: [
+        { tr: 'Bu… muhteşem! Ağzımda eriyor!', en: 'This is… amazing! It melts in my mouth!' },
+        { tr: 'Hayatımın en güzel sushisi!', en: 'Best sushi of my life!' },
+      ],
+      happy: [
+        { tr: 'Çok lezzetli, eline sağlık!', en: 'Delicious, great job!' },
+        { tr: 'Mmm, tam istediğim gibi.', en: 'Mmm, just how I wanted it.' },
+      ],
+      neutral: [
+        { tr: 'Fena değil.', en: 'Not bad.' },
+        { tr: 'İdare eder.', en: 'It’s okay.' },
+      ],
+      worried: [
+        { tr: 'Hmm… daha iyisini beklerdim.', en: 'Hmm… I expected better.' },
+        { tr: 'Biraz bekledim ama…', en: 'I waited a while, but…' },
+      ],
+      angry: [{ tr: 'Hiç memnun kalmadım.', en: 'I’m not happy at all.' }],
+    };
+    return tx(pool[m][c.id % pool[m].length]);
+  }
+
+  addMoney(v: number) {
+    if (!this.drawer.open) return;
+    this.drawer.given.push(v);
+    sfx('coins');
+    this.bump();
+  }
+  clearMoney() {
+    this.drawer.given = [];
+    this.bump();
+  }
+  get givenTotal() {
+    return this.drawer.given.reduce((a, b) => a + b, 0);
+  }
+
+  giveChange() {
+    const c = this.counter;
+    if (!c || c.state !== 'pay') return;
+    const due = c.cash - c.bill;
+    const g = this.givenTotal;
+    if (g < due) {
+      this.drawer.warn = 2.5;
+      sfx('fail');
+      this.bump();
+      return;
+    }
+    if (g > due) {
+      this.ledger.overpaid += g - due;
+      this.toast(
+        getLang() === 'tr' ? 'Sağ ol! (fazla verdin)' : 'Thanks! (you gave too much)',
+        'bad'
+      );
+    }
+    this.finishPay(c);
+  }
+
+  private finishPay(c: Customer) {
+    if (c.state !== 'pay') return;
+    this.drawer = { open: false, given: [], warn: 0 };
+    if (c.tip > 0) {
+      this.ledger.tips += c.tip;
+      this.dropCoins(Math.min(8, Math.ceil(c.tip / 2)));
+      sfx('coins');
+    }
+    const stars = c.sat! >= 90 ? 5 : c.sat! >= 75 ? 4 : c.sat! >= 55 ? 3 : c.sat! >= 35 ? 2 : 1;
+    if (!c.special) this.addReview(c.nameIdx, c.female, stars, false);
+    this.served = null;
+    this.counter = null;
+    const seat = this.tableUse.findIndex((x) => x === null);
+    if (seat >= 0) {
+      this.tableUse[seat] = c;
+      c.table = seat;
+      c.eatLeft = 18 + this.rng() * 18;
+      this.walk(c, TABLE_SEATS[seat], 2.4);
+      this.setState(c, 'toTable');
+    } else {
+      this.walk(c, DOOR_X - 0.1, 2.4);
+      this.setState(c, 'leave');
+    }
+  }
+
+  // ---------- online orders (day 10+) ----------
+
+  private tickOnline(dt: number) {
+    if (!this.day.online) return;
+    for (const o of this.online) if (o.status !== 'delivered') o.age += dt;
+    if (this.open) {
+      this.onlineTimer -= dt;
+      if (this.onlineTimer <= 0) {
+        this.onlineTimer = 80 + this.rng() * 50;
+        const order = makeOrder(this.day, this.rng, { online: true });
+        this.online.push({
+          id: this.nextId++,
+          nameIdx: Math.floor(this.rng() * 12),
+          female: this.rng() < 0.5,
+          order,
+          status: 'waiting',
+          age: 0,
+          summary: summaryOf(order),
+        });
+      }
+    }
+    // a call only rings when the counter is free; nothing is ever dropped
+    const ringing = this.online.find((o) => o.status === 'ringing');
+    if (!ringing && !this.counter && !this.activeOnline) {
+      const next = this.online.find((o) => o.status === 'waiting');
+      if (next) {
+        next.status = 'ringing';
+        sfx('phone');
+        this.bump();
+      }
+    } else if (ringing && this.counter) {
+      ringing.status = 'waiting';
+      this.bump();
+    }
+    if (ringing && Math.floor(this.t * 0.5) !== Math.floor((this.t - dt) * 0.5)) sfx('phone');
+  }
+
+  get ringing() {
+    return this.online.find((o) => o.status === 'ringing') ?? null;
+  }
+
+  acceptOnline() {
+    const o = this.ringing;
+    if (!o || this.counter) return;
+    o.status = 'active';
+    this.activeOnline = o;
+    this.plate = { id: 'box', pieces: this.plate.pieces };
+    this.goStation(1);
+    sfx('ding');
+    this.bump();
+  }
+
+  private pack() {
+    const o = this.activeOnline!;
+    const sc = scorePlate(o.order, this.plate.pieces, 'box');
+    const lateness = Math.max(0, o.age - 150) / 120;
+    const s = Math.max(0, sc.score - lateness * 30);
+    o.stars = s >= 90 ? 5 : s >= 75 ? 4 : s >= 55 ? 3 : s >= 35 ? 2 : 1;
+    o.status = 'packed';
+    const bill = orderPrice(o.order);
+    this.ledger.sales += bill;
+    const tip = sc.complaint
+      ? 0
+      : Math.round(bill * Math.pow(s / 100, 2) * 0.15 * (1 + this.tipBonus));
+    this.ledger.tips += tip;
+    this.ledger.satSum += s;
+    this.ledger.satN++;
+    this.ledger.served++;
+    if (sc.complaint) this.ledger.complaints++;
+    this.doorBox = o;
+    this.activeOnline = null;
+    this.plate = { id: 'geta', pieces: [] };
+    this.couriers.push({ t: 0, order: o });
+    this.goStation(0);
+    sfx('scooter');
+    this.toast(t2('courier'));
+    this.bump();
+  }
+
+  private deliver(o: OnlineOrder) {
+    o.status = 'delivered';
+    this.addReview(o.nameIdx, o.female, o.stars ?? 3, true);
+    this.bump();
+  }
+
+  private addReview(nameIdx: number, female: boolean, stars: number, online: boolean) {
+    const pools: Record<number, L[]> = {
+      5: [
+        { tr: 'Limanın en iyisi! Pirinç sıcacık.', en: 'Best in the harbor! The rice is so warm.' },
+        { tr: 'Mükemmel, yine geleceğim.', en: 'Perfect, I’ll be back.' },
+        {
+          tr: 'Mürekkep bana el salladı, sushi de harikaydı!',
+          en: 'Inky waved at me, and the sushi was great!',
+        },
+      ],
+      4: [
+        { tr: 'Çok güzeldi, tavsiye ederim.', en: 'Really good, recommended.' },
+        { tr: 'Taze ve özenli.', en: 'Fresh and careful.' },
+      ],
+      3: [
+        { tr: 'Fena değil, biraz bekledim.', en: 'Not bad, waited a bit.' },
+        { tr: 'Ortalama bir tabak.', en: 'An average plate.' },
+      ],
+      2: [{ tr: 'Siparişim tam değildi.', en: 'My order wasn’t quite right.' }],
+      1: [{ tr: 'Çok bekledim, memnun kalmadım.', en: 'Waited too long, not happy.' }],
+    };
+    const p = pools[Math.max(1, Math.min(5, stars))];
+    this.reviews.push({
+      day: this.n,
+      nameIdx,
+      female,
+      stars,
+      text: p[Math.floor(this.rng() * p.length)],
+      online,
+    });
+  }
+
+  // ---------- prep counter ----------
+
+  /** prepared stock for cooked ingredients */
+  stock(i: IngId) {
+    return this.prepared[i]?.length ?? 0;
+  }
+  private takeStock(i: IngId): Done | undefined {
+    return this.prepared[i]?.shift();
+  }
+
+  /** prep tubs visible right now (only unlocked, cooked ones only when stocked) */
+  prepTubs(): IngId[] {
+    const order: IngId[] = [
+      'rice',
+      'salmon',
+      'tuna',
+      'tamago',
+      'unagi',
+      'wasabi',
+      'ginger',
+      'soy',
+      'sesame',
+      'tobiko',
+      'scallion',
+      'spicymayo',
+      'unagisauce',
+      'noriband',
+    ];
+    return order.filter((i) => {
+      if (!this.have.has(i)) return false;
+      // cooked things only get a tub while there is something in it
+      if (ING[i].cookedFrom) return this.stock(i) > 0;
+      if (i === 'noriband') return this.have.has('noriband');
+      return true;
+    });
+  }
+
+  pickTub(i: IngId) {
+    if (i === 'rice') return; // rice is squeezed with a hold
+    if (ING[i].cookedFrom && this.stock(i) <= 0) {
+      this.toast(
+        getLang() === 'tr'
+          ? `Önce ${tx(ING[i].name).toLowerCase()} hazırla (Isıtma)`
+          : `Cook ${tx(ING[i].name).toLowerCase()} first (Heat)`,
+        'info'
+      );
+      return;
+    }
+    if (this.hand?.k === 'tub' && this.hand.ing === i) {
+      this.hand = null;
+    } else {
+      this.dropHand();
+      this.hand = { k: 'tub', ing: i };
+    }
+    sfx('pick');
+    this.bump();
+  }
+
+  squeezeStart() {
+    this.dropHand();
+    this.squeeze = { a: 0, on: true };
+    this.bump();
+  }
+  squeezeEnd() {
+    if (!this.squeeze.on) return;
+    const a = this.squeeze.a;
+    this.squeeze.on = false;
+    if (a < 0.18) {
+      this.squeeze.a = 0;
+      this.toast(
+        tx({ tr: 'Pirinci sıkmak için basılı tut', en: 'Press and hold to shape the rice' })
+      );
+      return;
+    }
+    this.hand = { k: 'rice', q: riceQuality(a) };
+    sfx('pick');
+    this.bump();
+  }
+  private tickSqueeze(dt: number) {
+    if (this.squeeze.on) this.squeeze.a = Math.min(RICE_MAX, this.squeeze.a + dt * 0.62);
+    else if (this.squeeze.a > 0 && this.hand?.k !== 'rice')
+      this.squeeze.a = Math.max(0, this.squeeze.a - dt * 2);
+  }
+
+  dropHand() {
+    const h = this.hand;
+    if (!h) return;
+    if (h.k === 'batch' && h.pieces.length) {
+      // unused slices are thrown away
+      this.waste(h.pieces.reduce((a, p) => a + bodyCost(p), 0));
+    }
+    this.hand = null;
+    this.bump();
+  }
+
+  setPlate(id: PlateId) {
+    if (this.activeOnline) return;
+    this.plate.id = id;
+    sfx('place');
+    this.bump();
+  }
+
+  private waste(v: number) {
+    this.ledger.waste += v;
+  }
+  private spend(v: number) {
+    this.ledger.ing += v;
+  }
+
+  trash() {
+    if (this.hand && this.hand.k !== 'plate') {
+      this.dropHand();
+      sfx('trash');
+      return;
+    }
+    if (this.plate.pieces.length) {
+      this.waste(this.plate.pieces.reduce((a, p) => a + pieceCost(p, p.tops) + bodyCost(p), 0));
+      this.plate.pieces = [];
+      this.hand = null;
+      sfx('trash');
+      this.bump();
+    }
+  }
+
+  pieceAt(x: number, y: number): Piece | null {
+    let best: Piece | null = null;
+    let bd = 1e9;
+    for (const p of this.plate.pieces) {
+      const d = Math.hypot(p.x - x, (p.y - y) * 1.1);
+      if (d < pieceRadius(p) * 1.5 && d < bd) {
+        bd = d;
+        best = p;
       }
     }
     return best;
   }
 
-  private serve(s: Slot, viaBox: boolean) {
-    const cu = s.cu;
-    const m = cu.members[s.mi];
-    const v = judge(m.order, this.bowl, s.waitT / cu.patience);
-    const p = price(m.order);
-    const pay = paid(v.score, p);
-    const tp = tip(v.score, p, tipBonus(this.decor));
-    this.open = this.open.filter((x) => x !== s);
-    if (this.target === s.id) this.target = null;
-    this.scores.push(v.score);
-    this.lastScore = v.score;
-    this.ledger.ingredients += cost(this.bowl);
-    this.ledger.bowls++;
-    const g = this.groups.get(cu.id) ?? { pay: 0, tip: 0, served: 0, complained: false };
-    g.pay += pay;
-    g.served++;
-    const complaint = v.score < 70 && v.notes.length > 0;
-    if (complaint) {
-      g.complained = true;
-      this.complaints++;
-    } else g.tip += tp;
-    this.groups.set(cu.id, g);
-    const served = this.bowl;
-    this.bowl = newBowl(this.bowl.style);
-    this.reviews.push({
-      name: m.name,
-      stars: Math.max(1, Math.min(5, Math.round(v.score / 20))),
-      text: complaint
-        ? T('g.complain', {
-            notes: v.notes
-              .slice(0, 2)
-              .map((n) => L(n))
-              .join(' · '),
-          })
-        : reactionLine(cu, v.score),
-      delivery: viaBox,
-      day: this.level.id,
-    });
-    const tone: Bubble['tone'] = v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad';
-    this.bubble = null;
-    if (v.score >= 85) this.fx.emit('sparkle', this.bowlPos.x, this.bowlPos.y - 40, 14, 60);
-    if (viaBox) {
-      this.bowlAt = 'box';
-      this.scooter = { x: this.salL.deliveryBox.x, t: 0 };
-      sfx('scooter');
-      this.ledger.sales += pay;
-      this.ledger.tips += complaint ? 0 : tp;
-      this.earned += pay + (complaint ? 0 : tp);
-      if (!complaint && tp > 0) this.tipCoins += 1;
-      this.delivery = { cu, score: v.score, tone, t: 0 };
-      this.groups.delete(cu.id);
-      this.resetBowl();
-    } else {
-      this.servedPos = { ...this.bowlPos };
-      this.resetBowl(); // a fresh bowl is ready on the counter immediately
-      this.diners = this.diners.filter((d) => !(d.cuId === cu.id && d.mi === s.mi));
-      const atCounter = this.counter === cu;
-      if (atCounter) {
-        this.counter = null;
-        this.phase = 'idle';
-        this.phaseT = -0.5;
+  /** a tap on the plate in plate-local coordinates (x: -0.5..0.5, y: -0.3..0.3) */
+  tapPlate(x: number, y: number) {
+    const h = this.hand;
+    if (!h) {
+      if (this.plate.pieces.length && this.activeOrder) {
+        this.hand = { k: 'plate' };
+        sfx('pick');
+        this.bump();
       }
-      this.pick = {
-        cu,
-        mi: s.mi,
-        phase: this.counter ? 'pickup' : 'served',
-        t: 0,
-        score: v.score,
-        notes: complaint ? v.notes : v.notes.concat(v.praise),
-        tone,
-        bowl: served,
-      };
-      this.pickY = atCounter ? 1 : 0;
+      return;
+    }
+    if (h.k === 'plate') {
+      this.hand = null;
+      this.bump();
+      return;
+    }
+    // edge taps are pulled inside the plate
+    const lim = this.plate.id === 'porcelain' ? { x: 0.42, y: 0.24 } : { x: 0.44, y: 0.25 };
+    x = Math.max(-lim.x, Math.min(lim.x, x));
+    y = Math.max(-lim.y, Math.min(lim.y, y));
+    if (this.plate.pieces.length >= 22) {
+      this.toast(t2('plateFull'));
+      return;
+    }
+    const add = (body: PieceBody, tops: IngId[] = []) => {
+      const p = {
+        ...body,
+        uid: newUid(),
+        x,
+        y,
+        rot: (this.rng() - 0.5) * 0.25,
+        tops,
+        born: this.t,
+      } as Piece;
+      this.plate.pieces.push(p);
+      this.spend(pieceCost(body, tops));
       sfx('place');
-    }
-    this.notify();
-  }
-
-  apologize() {
-    if (!this.pick || this.pick.phase !== 'complain') return;
-    const m = this.pick.cu.members[this.pick.mi];
-    this.setBubble(T('g.you'), T('g.sorry'), 'pickup', 'neutral');
-    sfx('tap');
-    this.pick.phase = 'react';
-    this.pick.t = 1.4; // short wait before the reply
-    this.pick.notes = [];
-    this.pick.tone = 'neutral';
-    this.pendingSorryReply = m.name;
-    this.notify();
-  }
-  private pendingSorryReply: string | null = null;
-
-  /** after the reaction: next step for this member/group */
-  private afterReaction() {
-    const pk = this.pick!;
-    const cu = pk.cu;
-    const g = this.groups.get(cu.id)!;
-    if (g.served < cu.members.length) {
-      // this friend goes back to the table and eats; others are still waiting for their bowls
-      this.diners.push({
-        seat: this.freeSeat(),
-        look: cu.members[pk.mi].look,
-        mood: 'happy',
-        bob: 0,
-        eating: true,
-        leaveT: 1e9,
-        cuId: cu.id,
-        mi: pk.mi,
-        seed: cu.members[pk.mi].look.seed,
-      } as DinerX);
-      pk.phase = 'leave';
-      pk.t = 0;
-      this.notify();
-      return;
-    }
-    // everyone served: pay for the whole group
-    pk.phase = 'pay';
-    pk.t = 0;
-    const pay = g.pay;
-    this.ledger.sales += pay;
-    this.earned += pay;
-    const given = cashGiven(pay, this.level.id);
-    const change = sum(given) - pay;
-    this.cash = { due: pay, given, giving: [], tipAmount: g.tip };
-    const who = cu.members.length > 1 ? T('g.billAll') : '';
-    this.setBubble(
-      cu.members[pk.mi].name,
-      T('g.bill', {
-        who,
-        p: pay,
-        g: sum(given),
-        rest: change > 0 ? T('g.changeWillBe', { n: change }) : T('g.exactMoney'),
-      }),
-      'pickup'
-    );
-    sfx('coins');
-  }
-
-  // ---------- cash ----------
-  giveDenom(d: Denom) {
-    if (!this.cash || this.cash.result === 'ok') return;
-    this.cash.giving.push(d);
-    this.cash.result = undefined;
-    sfx('tap');
-    this.notify();
-  }
-  takeBack(i: number) {
-    if (!this.cash || this.cash.result === 'ok') return;
-    this.cash.giving.splice(i, 1);
-    this.cash.result = undefined;
-    sfx('tap');
-    this.notify();
-  }
-  confirmChange() {
-    if (!this.cash || this.cash.result === 'ok' || !this.pick) return;
-    const need = sum(this.cash.given) - this.cash.due;
-    const give = sum(this.cash.giving);
-    const pk = this.pick;
-    const name = pk.cu.members[pk.mi].name;
-    if (give === need) {
-      this.cash.result = 'ok';
-      sfx('coins');
-    } else if (give < need) {
-      this.cash.result = 'less';
-      this.ledger.changeMistakes++;
-      this.setBubble(name, T('g.lessChange', { n: need }), 'pickup', 'bad');
-      sfx('fail');
-      this.notify();
-      return;
-    } else {
-      this.cash.result = 'ok';
-      this.ledger.overChange += give - need;
-      this.ledger.changeMistakes++;
-      this.setBubble(name, T('g.moreChange'), 'pickup', 'neutral');
-      sfx('coins');
-    }
-    const tp = this.cash.tipAmount;
-    const g = this.groups.get(pk.cu.id);
-    if (tp > 0) {
-      this.tipCoins += 1;
-      const j = this.salL.tipJar;
-      this.fx.emit('coin', j.x + j.w / 2, j.y - 10, Math.min(6, tp), 20);
-      sfx('ding');
-      this.setBubble(
-        name,
-        tp >= 10 ? T('g.tipBig', { n: tp }) : T('g.tipSmall', { n: tp }),
-        'pickup',
-        'good'
-      );
-    } else if (g?.complained) this.setBubble(name, T('g.noTip'), 'pickup', 'neutral');
-    this.ledger.tips += tp;
-    this.earned += tp;
-    this.cash = null;
-    this.groups.delete(pk.cu.id);
-    // the group eats at the table now
-    pk.cu.members.forEach((m, i) => {
-      if (!this.diners.some((d) => d.cuId === pk.cu.id && d.mi === i))
-        this.diners.push({
-          seat: this.freeSeat(),
-          look: m.look,
-          mood: tp > 0 ? 'love' : 'happy',
-          bob: 0,
-          eating: true,
-          leaveT: 1e9,
-          cuId: pk.cu.id,
-          mi: i,
-          seed: m.look.seed,
-        } as DinerX);
-    });
-    for (const d of this.diners) if (d.cuId === pk.cu.id) d.leaveT = 50 + Math.random() * 50;
-    const mine = this.diners.find((d) => d.cuId === pk.cu.id && d.mi === pk.mi);
-    const sp = mine && mine.seat >= 0 ? this.salL.seats[mine.seat] : null;
-    this.leaveTo = sp ? { x: sp.x, y: sp.y } : { x: -200, y: this.salL.customer.y };
-    if (mine) mine.hidden = true;
-    pk.phase = 'leave';
-    pk.t = -1.4;
-    this.notify();
-  }
-
-  // ---------- input ----------
-  private bindInput(el: HTMLElement) {
-    el.style.touchAction = 'none';
-    const pos = (e: PointerEvent) => {
-      const r = el.getBoundingClientRect();
-      return { sx: e.clientX - r.left, sy: e.clientY - r.top };
+      this.bump();
+      return p;
     };
-    el.addEventListener('pointerdown', (e) => {
-      if (this.pointer.down) return;
-      el.setPointerCapture(e.pointerId);
-      const { sx, sy } = pos(e);
-      const w = this.engine.toWorld(sx, sy);
-      this.pointer = { x: w.x, y: w.y, sx, sy, down: true };
-      this.onDown(w.x, w.y, sx, sy);
-    });
-    el.addEventListener('pointermove', (e) => {
-      if (!this.pointer.down) return;
-      const { sx, sy } = pos(e);
-      const w = this.engine.toWorld(sx, sy);
-      this.pointer.x = w.x;
-      this.pointer.y = w.y;
-      this.pointer.sx = sx;
-      this.pointer.sy = sy;
-      this.onMove(w.x, w.y, sx, sy);
-    });
-    const up = (e: PointerEvent) => {
-      if (!this.pointer.down) return;
-      this.pointer.down = false;
-      try {
-        el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* ignore */
+
+    if (h.k === 'rice') {
+      add({ kind: 'nigiri', rice: h.q });
+      for (let i = 0; i < 4; i++) this.addFx('grain', x, y, 1);
+      return;
+    }
+    if (h.k === 'batch') {
+      const body = h.pieces.shift()!;
+      add(body);
+      if (!h.pieces.length) this.hand = null;
+      this.bump();
+      return;
+    }
+    // tub in hand
+    const ing = h.ing;
+    const roles = ING[ing].roles;
+    if (roles.includes('side')) {
+      add({ kind: 'side', ing });
+      return;
+    }
+    const target = this.pieceAt(x, y);
+    if (roles.includes('neta') && ing !== 'noriband') {
+      if (!target || target.kind !== 'nigiri' || target.neta) {
+        this.toast(t2('next1'));
+        sfx('fail');
+        return;
       }
-      this.onUp();
-    };
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
-  }
-
-  private hit(r: { x: number; y: number; w: number; h: number }, x: number, y: number, pad = 0) {
-    return x >= r.x - pad && x <= r.x + r.w + pad && y >= r.y - pad && y <= r.y + r.h + pad;
-  }
-
-  private onDown(x: number, y: number, sx: number, sy: number) {
-    if (this.intro > 0) return;
-    const v = this.engine.view;
-    const st = Math.floor(x / v.W);
-    const lx = x - st * v.W;
-    if (this.bowlAt === 'prep' || this.bowlAt === 'stove') {
-      const r = this.bowlAt === 'prep' ? this.prepL.bowl.size / 2 : this.kamL.bowl.size / 2;
-      if (Math.hypot(x - this.bowlPos.x, y - this.bowlPos.y) < r + 14) {
-        if (this.held && this.bowlAt === 'prep') {
-          // a tap places the held topping here; dragging still carries the bowl
-          this.drag = { kind: 'tap', target: `placeAt:${x},${y}`, sx, sy };
+      let done: Done | undefined;
+      if (ING[ing].cookedFrom) {
+        if (this.stock(ing) <= 0) {
+          this.toast(tx({ tr: 'Hazır stok bitti', en: 'Out of cooked stock' }));
+          this.hand = null;
+          this.bump();
           return;
         }
-        this.drag = { kind: 'bowl', ox: x - this.bowlPos.x, oy: y - this.bowlPos.y };
-        this.bowlAt = 'hand';
-        sfx('pick');
-        buzz(8);
-        this.notify();
-        return;
-      }
-    }
-    if (st === 1) {
-      const Lp = this.prepL;
-      for (let i = 0; i < Lp.tubs.length; i++) {
-        const id = this.tops[i];
-        if (!id || !this.hit(Lp.tubs[i], lx, y, 6)) continue;
-        this.drag = {
-          kind: 'tub',
-          id,
-          sx,
-          sy,
-          moved: false,
-          x,
-          y,
-          v: Math.floor(Math.random() * (PIECE_VARIANTS[id] ?? 1)),
-          rot: (Math.random() - 0.5) * 1.2,
-        };
-        return;
-      }
-      for (let i = 0; i < Lp.pots.length; i++) {
-        const id = this.liqs[i];
-        if (!id || !this.hit(Lp.pots[i], lx, y, 6)) continue;
-        this.drag = { kind: 'hold', id };
-        if (this.bowlAt !== 'prep') return;
-        if (this.bowl.broth !== id) {
-          if (this.bowl.broth && this.bowl.fill > 0.05) this.ledger.waste += 2;
-          this.bowl.broth = id;
-          this.bowl.fill = Math.min(this.bowl.fill, 0.25);
-        }
-        return;
-      }
-      for (let i = 0; i < Lp.trays.length; i++) {
-        if (this.noods[i] && this.hit(Lp.trays[i], lx, y, 6)) {
-          this.drag = { kind: 'tap', target: 'tray:' + this.noods[i], sx, sy };
-          return;
-        }
-      }
-      for (let i = 0; i < Lp.shelf.slots.length; i++) {
-        const s = Lp.shelf.slots[i];
-        if (BOWLS[i] && Math.hypot(lx - s.x, y - s.y) < 34) {
-          this.drag = { kind: 'tap', target: 'shelf:' + BOWLS[i].id, sx, sy };
-          return;
-        }
-      }
-      if (this.hit(Lp.thickChips, lx, y, 4)) {
-        const tc = Lp.thickChips;
-        const k =
-          tc.h > tc.w * 0.8
-            ? Math.floor(((y - tc.y) / tc.h) * 3)
-            : Math.floor(((lx - tc.x) / tc.w) * 3);
-        this.drag = {
-          kind: 'tap',
-          target: 'thick:' + (['ince', 'orta', 'kalin'] as Thick[])[clamp(k, 0, 2)],
-          sx,
-          sy,
-        };
-        return;
-      }
-      if (this.hit(Lp.trash, lx, y, 6)) {
-        this.drag = { kind: 'tap', target: 'trash', sx, sy };
-        return;
-      }
-    }
-    if (st === 0) {
-      const S = this.salL;
-      if (this.hit(S.phone, lx, y, 14)) {
-        this.drag = { kind: 'tap', target: 'phone', sx, sy };
-        return;
-      }
-      if (this.hit(S.tipJar, lx, y, 10)) {
-        this.drag = { kind: 'tap', target: 'jar', sx, sy };
-        return;
-      }
-      if (Math.hypot(lx - this.cat.x, y - this.cat.y + 30) < 60) {
-        this.drag = { kind: 'tap', target: 'cat', sx, sy };
-        return;
-      }
-    }
-    this.drag = {
-      kind: 'pan',
-      lastX: sx,
-      lastT: performance.now(),
-      vel: 0,
-      startX: sx,
-      startY: sy,
-      moved: false,
-    };
-    this.engine.camTarget = null;
-    this.engine.camVel = 0;
-  }
-
-  private onMove(x: number, y: number, sx: number, sy: number) {
-    const d = this.drag;
-    if (!d) return;
-    const v = this.engine.view;
-    if (d.kind === 'pan') {
-      const now = performance.now();
-      const dx = sx - d.lastX;
-      if (Math.abs(sx - d.startX) > 6 || Math.abs(sy - d.startY) > 6) d.moved = true;
-      this.engine.camX = clamp(this.engine.camX - dx / v.scale, -40, this.engine.maxCam + 40);
-      const dt = Math.max(1, now - d.lastT) / 1000;
-      d.vel = lerp(d.vel, -dx / v.scale / dt, 0.5);
-      d.lastX = sx;
-      d.lastT = now;
-    } else if (d.kind === 'bowl') {
-      this.bowlPos = { x: x - d.ox, y: y - d.oy };
-    } else if (d.kind === 'tub') {
-      if (!d.moved && Math.hypot(sx - d.sx, sy - d.sy) > 10) {
-        d.moved = true;
-        sfx('pick');
-        buzz(5);
-      }
-      d.x = x;
-      d.y = y;
-    } else if (d.kind === 'tap') {
-      if (d.target.startsWith('placeAt:') && Math.hypot(sx - d.sx, sy - d.sy) > 14) {
-        this.drag = { kind: 'bowl', ox: x - this.bowlPos.x, oy: y - this.bowlPos.y };
-        this.bowlAt = 'hand';
-        sfx('pick');
-        return;
-      }
-      if (Math.hypot(sx - d.sx, sy - d.sy) > 14) {
-        this.drag = {
-          kind: 'pan',
-          lastX: sx,
-          lastT: performance.now(),
-          vel: 0,
-          startX: d.sx,
-          startY: d.sy,
-          moved: true,
-        };
-        this.engine.camTarget = null;
-      }
-    }
-  }
-
-  private onUp() {
-    const d = this.drag;
-    this.drag = null;
-    if (!d) return;
-    const v = this.engine.view;
-    if (d.kind === 'pan') {
-      if (d.moved) {
-        if (Math.abs(d.vel) > 500) this.engine.snapTo(this.engine.station + (d.vel > 0 ? 1 : -1));
-        else this.engine.snapTo(Math.round(this.engine.camX / v.W));
-      } else this.engine.snapTo(this.engine.station);
-      return;
-    }
-    if (d.kind === 'bowl') return this.dropBowl();
-    if (d.kind === 'hold') return;
-    if (d.kind === 'tub') {
-      if (!d.moved) {
-        this.held = this.held === d.id ? null : d.id;
-        if (this.held && !this.tapHintShown) {
-          this.tapHintShown = true;
-          this.showToast(T('g.tapHint'));
-        }
-        sfx(this.held ? 'pick' : 'tap');
-        this.notify();
-        return;
-      }
-      if (this.bowlAt !== 'prep') {
-        sfx('trash');
-        return;
-      }
-      const b = this.bowlSpace(d.x, d.y);
-      if (b && inBowl(b.x, b.y, 6)) this.place(d.id, b, d.v, d.rot);
-      else {
-        this.ledger.waste += INGREDIENTS[d.id].cost;
-        sfx('trash');
-      }
-      return;
-    }
-    if (d.kind === 'tap') this.tap(d.target);
-  }
-
-  private bowlSpace(x: number, y: number) {
-    const size = this.bowlSize();
-    const k = BOWL_SPACE / size;
-    return { x: BOWL_C + (x - this.bowlPos.x) * k, y: BOWL_C + (y - this.bowlPos.y) * k };
-  }
-
-  private bowlSize() {
-    return this.bowlAt === 'stove' ? this.kamL.bowl.size : this.prepL.bowl.size;
-  }
-
-  private place(id: string, at: { x: number; y: number }, v: number, rot: number) {
-    if (this.bowl.pieces.length >= 30) return this.showToast(T('g.bowlFull'));
-    this.bowl.pieces.push({ id, x: at.x, y: at.y, rot, v, s: 0.92 + Math.random() * 0.16 });
-    sfx('place');
-    buzz(6);
-    this.notify();
-  }
-
-  private tap(target: string) {
-    if (target.startsWith('placeAt:')) {
-      if (!this.held || this.bowlAt !== 'prep') return;
-      const [px, py] = target.slice(8).split(',').map(Number);
-      const b = this.bowlSpace(px, py);
-      if (b && inBowl(b.x, b.y, 6)) {
-        // big pieces near the rim are nudged inward so they sit inside the bowl
-        const dx = b.x - BOWL_C;
-        const dy = b.y - BOWL_C;
-        const d = Math.hypot(dx, dy);
-        const maxR = BOWL_R - 22;
-        if (d > maxR) {
-          b.x = BOWL_C + (dx / d) * maxR;
-          b.y = BOWL_C + (dy / d) * maxR;
-        }
-      }
-      if (b && inBowl(b.x, b.y, 6))
-        this.place(
-          this.held,
-          b,
-          Math.floor(Math.random() * (PIECE_VARIANTS[this.held] ?? 1)),
-          (Math.random() - 0.5) * 1.2
-        );
-      return;
-    }
-    if (target.startsWith('tray:')) {
-      const id = target.slice(5);
-      if (this.bowlAt !== 'prep') return this.showToast(T('g.bowlFirst'));
-      if (this.bowl.progress > 0) return this.showToast(T('g.noodleLocked'));
-      this.bowl.noodle = id;
-      this.bowl.progress = 0;
+        done = this.takeStock(ing);
+        if (this.stock(ing) <= 0) this.hand = null;
+      } else this.spend(ING[ing].cost * 0.5);
+      target.neta = ing;
+      target.done = done;
+      target.born = this.t;
       sfx('place');
-      buzz(6);
-      this.notify();
+      this.bump();
       return;
     }
-    if (target.startsWith('thick:')) {
-      this.bowl.thick = target.slice(6) as Thick;
-      sfx('tap');
-      this.notify();
-      return;
-    }
-    if (target.startsWith('shelf:')) {
-      const id = target.slice(6);
-      const b = BOWLS.find((x) => x.id === id)!;
-      if (b.unlock > this.level.id)
-        return this.showToast(T('g.bowlLocked', { b: L(b.name), n: b.unlock }));
-      if (this.bowlAt !== 'prep') return this.showToast(T('g.bowlFirst'));
-      this.bowl.style = id;
+    if (roles.includes('topping')) {
+      if (!target || target.kind === 'side') {
+        this.toast(t2('onPiece'));
+        sfx('fail');
+        return;
+      }
+      if (ing === 'noriband') {
+        if (target.kind !== 'nigiri') {
+          this.toast(
+            tx({ tr: 'Nori kuşağı nigiriye sarılır', en: 'The nori belt goes on a nigiri' })
+          );
+          return;
+        }
+        target.band = true;
+      } else if (!target.tops.includes(ing)) target.tops.push(ing);
+      this.spend(ING[ing].cost);
+      target.born = this.t;
       sfx('pop');
-      this.notify();
-      return;
-    }
-    if (target === 'trash') {
-      if (this.bowlAt !== 'prep') return;
-      if (!this.bowl.noodle && !this.bowl.broth && !this.bowl.pieces.length) return;
-      this.ledger.waste += cost(this.bowl);
-      this.resetBowl();
-      sfx('trash');
-      this.showToast(T('g.binned'));
-      return;
-    }
-    if (target === 'phone') {
-      if (this.ringing) this.answerPhone();
-      else {
-        sfx('tap');
-        this.onOpenTablet?.();
-      }
-      return;
-    }
-    if (target === 'jar') {
-      const j = this.salL.tipJar;
-      this.fx.emit('sparkle', j.x + j.w / 2, j.y + j.h / 2, 6, 24);
-      sfx('coins');
-      return;
-    }
-    if (target === 'cat') {
-      sfx('cat');
-      this.fx.emit('heart', this.cat.x, this.cat.y - 60, 3, 16);
-      if (this.cat.pose === 'sleep') this.cat.pose = 'sit';
+      this.bump();
     }
   }
 
-  private dropBowl() {
-    const v = this.engine.view;
-    const { x, y } = this.bowlPos;
-    const st = Math.floor(x / v.W);
-    const lx = x - st * v.W;
-    if (
-      st === 2 &&
-      Math.hypot(lx - this.kamL.ring.x, y - this.kamL.ring.y) < this.kamL.ring.r + 40
-    ) {
-      this.bowlAt = 'stove';
-      this.bowlPos = { x: 2 * v.W + this.kamL.bowl.x, y: this.kamL.bowl.y };
-      sfx('place');
-      if (this.bowl.noodle) sfx('sizzle');
-      this.notify();
-      return;
+  // ---------- rolling board & cutting (station 2) ----------
+
+  boardStart(m: 'maki' | 'temaki') {
+    if (this.board.m !== 'idle') return;
+    if (m === 'maki') {
+      this.board = {
+        m: 'maki',
+        style: 'hoso',
+        stage: 'rice',
+        rice: 0,
+        fill: [],
+        prog: 0,
+        speed: 0,
+        n: 6,
+        cutT: 0,
+      };
+      this.spend(ING.nori.cost);
+    } else {
+      this.board = { m: 'temaki', stage: 'rice', rice: 0, fill: [], n: 1 };
+      this.spend(ING.nori.cost * 0.5);
     }
-    if (st === 0 && this.bowl.noodle) {
-      const S = this.salL;
-      const busy = !!this.pick && this.pick.phase !== 'leave' && this.pick.phase !== 'delivering';
-      void busy;
-      if (this.hit(S.deliveryBox, lx, y, 70)) {
-        const phoneSlots = this.open.filter((s) => s.cu.phone);
-        const s =
-          this.target !== null
-            ? (phoneSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(phoneSlots))
-            : this.pickSlotFromList(phoneSlots);
-        if (s && !this.delivery) {
-          this.bowlPos = {
-            x: S.deliveryBox.x + S.deliveryBox.w / 2,
-            y: S.deliveryBox.y + S.deliveryBox.h / 2,
-          };
-          this.serve(s, true);
-          return;
-        }
-        this.showToast(s ? T('g.counterBusy') : T('g.noOrder'));
-      } else if (Math.abs(lx - S.customer.x) < v.W * 0.35 && y < S.counterTop + 140) {
-        const walkSlots = this.open.filter((s) => !s.cu.phone);
-        const s =
-          this.target !== null
-            ? (walkSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(walkSlots))
-            : this.pickSlotFromList(walkSlots);
-        if (s && (!this.pick || this.pick.phase === 'leave')) {
-          this.bowlPos = { x: this.pickupX() + S.customer.size * 0.42, y: S.counterTop + 30 };
-          this.serve(s, false);
-          return;
-        }
-        this.showToast(s ? T('g.counterBusy') : this.ringing ? T('g.ringFirst') : T('g.noOrder'));
-      }
-    }
-    this.bowlAt = 'prep';
-    this.bowlPos = { x: v.W + this.prepL.bowl.x, y: this.prepL.bowl.y };
     sfx('place');
-    this.notify();
+    this.bump();
   }
 
-  private pickSlotFromList(list: Slot[]): Slot | null {
-    const saved = this.open;
-    this.open = list;
-    const s = this.pickSlotFor(this.bowl);
-    this.open = saved;
-    return s;
+  boardFish(fish: IngId) {
+    if (this.board.m !== 'idle') return;
+    this.board = { m: 'sashimi', fish, n: 3, cutT: 0 };
+    sfx('place');
+    this.bump();
   }
 
-  // ---------- cat ----------
-  private updateCat(dt: number) {
-    const c = this.cat;
-    c.timer -= dt;
-    if (c.pose === 'walk') {
-      const dir = Math.sign(c.tx - c.x);
-      c.x += dir * 70 * dt;
-      c.flip = dir < 0;
-      if (Math.abs(c.tx - c.x) < 4) {
-        c.x = c.tx;
-        c.pose = (['sit', 'loaf', 'sleep', 'sit', 'stretch'] as CatPose[])[
-          Math.floor(Math.random() * 5)
-        ];
-        c.timer = 4 + Math.random() * 7;
-      }
-    } else if (c.timer <= 0) {
-      const spots = this.salL.catSpots;
-      const i = Math.floor(Math.random() * spots.length);
-      const s = spots[i];
-      if (i !== c.spot && (i === 0 || c.spot === 0)) {
-        c.x = s.x;
-        c.y = s.y;
-        c.tx = s.x;
-        c.spot = i;
-        c.pose = 'sit';
-        c.timer = 5 + Math.random() * 6;
-        sfx('cat');
+  boardStyle(s: MakiStyle) {
+    const b = this.board;
+    if (b.m !== 'maki' || b.stage === 'rolling' || b.stage === 'cut') return;
+    b.style = s;
+    if (s !== 'ura') b.coat = undefined;
+    if (s === 'hoso') b.n = 6;
+    else b.n = 8;
+    sfx('tap');
+    this.bump();
+  }
+
+  availableStyles(): MakiStyle[] {
+    return (['hoso', 'ura', 'futo'] as MakiStyle[]).filter((s) => this.n >= STYLE_DAY[s]);
+  }
+
+  /** fillings shown as chips on the board */
+  fillChips(): IngId[] {
+    const all: IngId[] = [
+      'cucumber',
+      'avocado',
+      'salmon',
+      'tuna',
+      'crab',
+      'creamcheese',
+      'tamago',
+      'tempura',
+      'unagi',
+    ];
+    return all.filter((i) => this.have.has(i));
+  }
+  coatChips(): IngId[] {
+    return (['sesame', 'tobiko'] as IngId[]).filter((i) => this.have.has(i));
+  }
+
+  private riceHold = false;
+  boardRiceStart() {
+    const b = this.board;
+    if ((b.m === 'maki' || b.m === 'temaki') && b.stage === 'rice') {
+      this.riceHold = true;
+      this.bump();
+    }
+  }
+  boardRiceEnd() {
+    const b = this.board;
+    if (!this.riceHold) return;
+    this.riceHold = false;
+    if ((b.m === 'maki' || b.m === 'temaki') && b.stage === 'rice') {
+      if (b.rice < 0.15) {
+        this.toast(
+          tx({ tr: 'Pirinci yaymak için basılı tut', en: 'Press and hold to spread the rice' })
+        );
         return;
       }
-      c.spot = i;
-      c.tx = s.x;
-      c.y = s.y;
-      c.pose = 'walk';
+      b.riceQ = riceQuality(b.rice);
+      b.stage = 'fill';
+      this.spend(ING.rice.cost);
+      sfx('pour');
+      this.bump();
+    }
+  }
+  get riceHolding() {
+    return this.riceHold;
+  }
+
+  toggleFill(i: IngId) {
+    const b = this.board;
+    if ((b.m !== 'maki' && b.m !== 'temaki') || b.stage !== 'fill') return;
+    if (b.fill.includes(i)) {
+      b.fill = b.fill.filter((x) => x !== i);
+      sfx('tap');
+    } else {
+      if (b.fill.length >= 4) return;
+      if (ING[i].cookedFrom && this.stock(i) <= 0) {
+        this.toast(
+          getLang() === 'tr'
+            ? `Önce ${tx(ING[i].name).toLowerCase()} pişir`
+            : `Cook ${tx(ING[i].name).toLowerCase()} first`
+        );
+        return;
+      }
+      b.fill.push(i);
+      sfx('place');
+    }
+    this.bump();
+  }
+
+  setCoat(i: IngId) {
+    const b = this.board;
+    if (b.m !== 'maki' || b.style !== 'ura' || b.stage !== 'fill') return;
+    b.coat = b.coat === i ? undefined : i;
+    sfx('pop');
+    this.bump();
+  }
+
+  setCount(n: number) {
+    const b = this.board;
+    if (b.m === 'maki' && (n === 6 || n === 8)) b.n = n;
+    if (b.m === 'sashimi' && (n === 3 || n === 5)) b.n = n;
+    if (b.m === 'temaki' && (n === 1 || n === 2)) b.n = n;
+    sfx('tap');
+    this.bump();
+  }
+
+  private rollDrag: {
+    lastY: number;
+    lastT: number;
+    dist: number;
+    time: number;
+    hold: boolean;
+  } | null = null;
+  rollStart(y: number, hold: boolean) {
+    const b = this.board;
+    if (b.m !== 'maki' || b.stage !== 'fill') return false;
+    if (!b.fill.length) {
+      this.toast(tx({ tr: 'Önce iç malzeme koy', en: 'Add a filling first' }));
+      return false;
+    }
+    b.stage = 'rolling';
+    b.prog = 0;
+    b.speed = 0;
+    this.rollDrag = { lastY: y, lastT: this.t, dist: 0, time: 0, hold };
+    // cooked fillings are taken from stock now
+    let worst: Done | undefined;
+    for (const f of b.fill) {
+      this.spend(ING[f].cookedFrom ? 0 : ING[f].cost);
+      if (ING[f].cookedFrom) {
+        const d = this.takeStock(f);
+        if (d === 'raw' || (d === 'over' && worst !== 'raw')) worst = d;
+        else if (!worst) worst = d;
+      }
+    }
+    b.done = worst;
+    if (b.coat) this.spend(ING[b.coat].cost);
+    this.bump();
+    return true;
+  }
+  /** y in board-local units: 1 = full mat height; dragging up decreases y */
+  rollMove(y: number) {
+    const b = this.board;
+    const d = this.rollDrag;
+    if (b.m !== 'maki' || b.stage !== 'rolling' || !d) return;
+    const dy = d.lastY - y;
+    d.lastY = y;
+    if (Math.abs(dy) > 0.004) d.hold = false; // the finger is dragging now
+    if (dy > 0) {
+      b.prog = Math.min(1, b.prog + dy);
+      d.dist += dy;
+    }
+    if (b.prog >= 1) this.rollFinish();
+  }
+  rollEnd() {
+    const b = this.board;
+    const d = this.rollDrag;
+    if (b.m !== 'maki' || b.stage !== 'rolling' || !d) return;
+    if (!d.hold) {
+      d.hold = true; // let go mid-roll: the mat keeps rolling slowly by itself
+    }
+  }
+  private rollFinish() {
+    const b = this.board;
+    const d = this.rollDrag;
+    if (b.m !== 'maki' || !d) return;
+    const avg = d.time > 0 ? 1 / d.time : 1;
+    b.speed = avg;
+    b.roll = avg > 2.6 ? 'loose' : avg < 0.32 ? 'squashed' : 'tight';
+    b.stage = 'cut';
+    b.cutT = 0;
+    this.rollDrag = null;
+    sfx('whoosh');
+    if (b.roll === 'loose')
+      this.toast(
+        tx({ tr: 'Çok hızlı sardın, rulo gevşek!', en: 'Rolled too fast, it’s loose!' }),
+        'bad'
+      );
+    else if (b.roll === 'squashed')
+      this.toast(
+        tx({ tr: 'Çok yavaş, rulo ezildi', en: 'Too slow, the roll got squashed' }),
+        'bad'
+      );
+    this.bump();
+  }
+
+  /** live roll speed for the meter (progress per second) */
+  get rollSpeed() {
+    const d = this.rollDrag;
+    if (!d || d.time <= 0) return 0;
+    const b = this.board;
+    return b.m === 'maki' ? b.prog / d.time : 0;
+  }
+
+  temakiMake() {
+    const b = this.board;
+    if (b.m !== 'temaki' || b.stage !== 'fill') return;
+    if (!b.fill.length) {
+      this.toast(tx({ tr: 'Önce iç malzeme koy', en: 'Add a filling first' }));
+      return;
+    }
+    if (this.hand && this.hand.k !== 'plate') this.dropHand();
+    const pieces: PieceBody[] = [];
+    for (let i = 0; i < b.n; i++) {
+      let done: Done | undefined;
+      for (const f of b.fill) {
+        if (ING[f].cookedFrom) {
+          const d = this.takeStock(f);
+          if (d && (!done || d === 'raw')) done = d;
+        } else this.spend(ING[f].cost * 0.5);
+      }
+      if (i > 0) this.spend(ING.nori.cost * 0.5 + ING.rice.cost * 0.5);
+      pieces.push({ kind: 'temaki', fill: [...b.fill], rice: b.riceQ ?? 'just', done });
+    }
+    this.hand = { k: 'batch', pieces, label: 'temaki' };
+    this.board = { m: 'idle' };
+    sfx('whoosh');
+    this.goStation(1);
+    this.bump();
+  }
+
+  cutTap() {
+    const b = this.board;
+    if (b.m === 'maki' && b.stage === 'cut') {
+      const pos = cutMarker(b.cutT, 1.5);
+      const cut: CutQ = pos >= MAKI_GREEN.a && pos <= MAKI_GREEN.b ? 'clean' : 'crooked';
+      const pieces: PieceBody[] = [];
+      for (let i = 0; i < b.n; i++)
+        pieces.push({
+          kind: 'maki',
+          style: b.style,
+          fill: [...b.fill],
+          coat: b.coat,
+          rice: b.riceQ ?? 'just',
+          roll: b.roll ?? 'tight',
+          cut,
+          done: b.done,
+          idx: i,
+        });
+      this.giveBatch(pieces, 'maki', cut);
+      return;
+    }
+    if (b.m === 'sashimi') {
+      const pos = cutMarker(b.cutT, 1.9);
+      const z = SASHIMI_ZONES.find((z) => pos >= z.a && pos <= z.b)!;
+      let thick: Thick;
+      let cut: CutQ = 'clean';
+      if (z.q) thick = z.q;
+      else {
+        cut = 'crooked';
+        thick = pos < 0.34 ? 'thin' : pos < 0.66 ? 'normal' : 'thick';
+      }
+      this.spend(ING[b.fish].cost * 0.5 * b.n);
+      const pieces: PieceBody[] = [];
+      for (let i = 0; i < b.n; i++)
+        pieces.push({ kind: 'sashimi', fish: b.fish, thick, cut, idx: i });
+      this.giveBatch(pieces, b.fish, cut);
     }
   }
 
-  // ---------- hints (days 1–2) ----------
-  private currentHint(): Hint | null {
-    if (this.level.id > 1) return null; // guidance only on day 1
-    const v = this.engine.view;
-    if (this.ringing)
+  private giveBatch(pieces: PieceBody[], label: IngId | 'maki', cut: CutQ) {
+    if (this.hand && this.hand.k !== 'plate') this.dropHand();
+    this.hand = { k: 'batch', pieces, label };
+    this.board = { m: 'idle' };
+    sfx(cut === 'clean' ? 'perfect' : 'fail');
+    buzz(cut === 'clean' ? 10 : 30);
+    this.toast(
+      cut === 'clean' ? t2('perfectCut') : t2('crooked'),
+      cut === 'clean' ? 'good' : 'bad'
+    );
+    this.goStation(1);
+    this.bump();
+  }
+
+  boardReset() {
+    const b = this.board;
+    if (b.m === 'idle') return;
+    let c = 0;
+    if (b.m === 'maki') c = ING.nori.cost + (b.riceQ ? ING.rice.cost : 0);
+    if (b.m === 'temaki') c = ING.nori.cost * 0.5;
+    this.waste(c);
+    this.board = { m: 'idle' };
+    sfx('trash');
+    this.bump();
+  }
+
+  private tickBoard(dt: number) {
+    const b = this.board;
+    if ((b.m === 'maki' || b.m === 'temaki') && b.stage === 'rice' && this.riceHold) {
+      b.rice = Math.min(RICE_MAX, b.rice + dt * 0.6);
+      if (Math.random() < dt * 6) sfx('pour');
+    }
+    if (b.m === 'maki' && b.stage === 'rolling' && this.rollDrag) {
+      this.rollDrag.time += dt;
+      if (this.rollDrag.hold) {
+        b.prog = Math.min(1, b.prog + dt * 0.62);
+        if (b.prog >= 1) this.rollFinish();
+      }
+    }
+    if (b.m === 'maki' && b.stage === 'cut') b.cutT += dt;
+    if (b.m === 'sashimi') b.cutT += dt;
+  }
+
+  // ---------- heat station ----------
+
+  heatStart(dev: 'fryer' | 'grill') {
+    if (this.heat[dev]) return;
+    const ing: IngId = dev === 'fryer' ? 'shrimp' : 'eel';
+    if (!this.have.has(ing)) return;
+    this.heat[dev] = { ing, t: 0 };
+    this.spend(ING[ing].cost * 2);
+    sfx('sizzle');
+    this.bump();
+  }
+
+  heatTake(dev: 'fryer' | 'grill') {
+    const c = this.heat[dev];
+    if (!c) return;
+    const d = doneness(c.t);
+    const out: IngId = c.ing === 'shrimp' ? 'tempura' : 'unagi';
+    this.heat[dev] = null;
+    if (d === 'burnt') {
+      this.waste(ING[c.ing].cost * 2);
+      this.toast(tx({ tr: 'Yandı! Çöpe gitti.', en: 'Burnt! Into the bin.' }), 'bad');
+      sfx('trash');
+    } else {
+      const list = (this.prepared[out] ??= []);
+      for (let i = 0; i < 4; i++) list.push(d);
+      if (out === 'unagi' && d !== 'raw')
+        this.toast(
+          getLang() === 'tr'
+            ? 'Unagi tezgâhta ve tahtada hazır'
+            : 'Eel is ready on the counter and board',
+          'good'
+        );
+      if (d === 'raw')
+        this.toast(tx({ tr: 'Daha pişmemişti…', en: 'It wasn’t cooked yet…' }), 'bad');
+      else if (d === 'done') this.toast(t2('perfectCut'), 'good');
+      sfx(d === 'done' ? 'perfect' : 'pop');
+    }
+    this.bump();
+  }
+
+  private tickHeat(dt: number) {
+    for (const dev of ['fryer', 'grill'] as const) {
+      const c = this.heat[dev];
+      if (!c) continue;
+      const before = c.t;
+      c.t = Math.min(1.05, c.t + dt / 11);
+      if (before < DIAL.done && c.t >= DIAL.done) sfx('ding');
+      if (Math.random() < dt * (c.t > DIAL.burnt ? 10 : 3))
+        this.addFx(c.t > DIAL.burnt ? 'smoke' : 'steam', dev === 'fryer' ? 0.62 : 0.86, 0.5, 2);
+    }
+  }
+
+  // ---------- fx ----------
+
+  addFx(kind: Fx['kind'], x: number, y: number, station: number) {
+    if (this.fx.length > 120) return;
+    const r = Math.random;
+    this.fx.push({
+      kind,
+      x,
+      y,
+      vx: (r() - 0.5) * (kind === 'grain' ? 0.25 : 0.06),
+      vy:
+        kind === 'smoke' || kind === 'steam' || kind === 'heart'
+          ? -0.08 - r() * 0.05
+          : -0.2 - r() * 0.2,
+      t: 0,
+      life: kind === 'grain' ? 0.5 : kind === 'smoke' ? 2.2 : 1.4,
+      s: 0.6 + r() * 0.6,
+      station,
+    });
+  }
+  private tickFx(dt: number) {
+    for (const f of this.fx) {
+      f.t += dt;
+      f.x += f.vx * dt;
+      f.y += f.vy * dt;
+      if (f.kind === 'grain') f.vy += dt * 1.6;
+    }
+    this.fx = this.fx.filter((f) => f.t < f.life);
+  }
+
+  private dropCoins(n: number) {
+    for (let i = 0; i < n; i++)
+      this.coins.push({
+        x: (Math.random() - 0.5) * 0.6,
+        y: -1.2 - i * 0.35,
+        vy: 0,
+        rest: false,
+        kind: Math.floor(Math.random() * 3),
+        rot: Math.random() * Math.PI,
+      });
+    if (this.coins.length > 60) this.coins.splice(0, this.coins.length - 60);
+  }
+  private tickCoins(dt: number) {
+    // coins fall into the jar and settle on the pile; settled coins never move again
+    const rested = this.coins.filter((c) => c.rest);
+    for (const c of this.coins) {
+      if (c.rest) continue;
+      c.vy += dt * 6;
+      c.y += c.vy * dt;
+      const floor =
+        1 - Math.min(0.9, rested.filter((o) => Math.abs(o.x - c.x) < 0.3).length * 0.09);
+      if (c.y >= floor) {
+        c.y = floor;
+        c.rest = true;
+        rested.push(c);
+      }
+    }
+  }
+
+  // ---------- results ----------
+
+  get net() {
+    const l = this.ledger;
+    return (
+      l.sales + l.tips + l.bonus - l.ing - l.waste - l.overpaid - this.day.rent - this.day.bills
+    );
+  }
+  get avgSat() {
+    return this.ledger.satN ? Math.round(this.ledger.satSum / this.ledger.satN) : 0;
+  }
+  get stars() {
+    const a = this.avgSat;
+    const served = this.ledger.served;
+    if (!served) return 1;
+    if (a >= 82 && this.net > 0 && this.ledger.walkouts === 0) return 3;
+    if (a >= 60) return 2;
+    return 1;
+  }
+
+  // ---------- day-1 hints ----------
+
+  hint(): { text: L; target?: string } | null {
+    if (!this.tutorial || this.over) return null;
+    const c = this.counter;
+    if (this.drawer.open && c?.state === 'pay')
       return {
-        station: 0,
-        x: this.salL.phone.x + this.salL.phone.w / 2,
-        y: this.salL.phone.y,
-        text: T('g.hintRing'),
+        text: {
+          tr: 'Çekmeceden para üstünü seç, sonra “Ver”e bas.',
+          en: 'Pick the change from the drawer, then tap “Give”.',
+        },
+        target: 'drawer',
       };
-    const s = this.open[0];
-    if (!s) return null;
-    const o = s.cu.members[s.mi].order;
-    const Lp = this.prepL;
-    const thickName = (tk: Thick) => L(THICK_LABEL[tk]);
-    if (this.bowlAt === 'prep') {
-      if (!this.bowl.noodle) {
-        const i = Math.max(0, this.noods.indexOf(o.noodle ?? 'ramen'));
-        const t = Lp.trays[i];
+    if (c?.state === 'complain')
+      return {
+        text: {
+          tr: 'Hata olmuş. “Özür dile”ye bas.',
+          en: 'Something went wrong. Tap “Apologize”.',
+        },
+        target: 'apologize',
+      };
+    if (!c || c.state === 'enter' || c.state === 'queue')
+      return { text: { tr: 'Müşteri geliyor…', en: 'A customer is coming…' } };
+    if (c.state === 'order')
+      return {
+        text: {
+          tr: 'Müşteriyi dinle. Sipariş fişe yazılıyor.',
+          en: 'Listen to the customer. The order goes on the ticket.',
+        },
+      };
+    if (c.state !== 'wait') return null;
+    if (this.station === 0 && this.hand?.k !== 'plate')
+      return {
+        text: {
+          tr: 'Tezgâha geç: sola kaydır ya da yukarıdaki düğmeye bas.',
+          en: 'Go to the counter: swipe or tap the button on top.',
+        },
+        target: 'st1',
+      };
+    if (this.hand?.k === 'plate')
+      return {
+        text: {
+          tr: 'Tabağı müşterinin önüne bırak: “Servis et”.',
+          en: 'Put the plate in front of the customer: “Serve”.',
+        },
+        target: 'serve',
+      };
+    const o = c.order;
+    const nig = this.plate.pieces.filter((p) => p.kind === 'nigiri');
+    const want = o.lines.reduce((a, l) => a + (l.k === 'nigiri' ? l.n : 0), 0);
+    if (nig.length < want) {
+      if (this.hand?.k === 'rice')
         return {
-          station: 1,
-          x: v.W + t.x + t.w / 2,
-          y: t.y + t.h / 2,
-          text: T('g.hintNoodle', {
-            n: `${o.thick ? thickName(o.thick) + ' ' : ''}${L(INGREDIENTS[o.noodle ?? 'ramen'].name)}`,
-          }),
-        };
-      }
-      if (o.thick && this.bowl.thick !== o.thick)
-        return {
-          station: 1,
-          x: v.W + Lp.thickChips.x + Lp.thickChips.w / 2,
-          y: Lp.thickChips.y + Lp.thickChips.h / 2,
-          text: T('g.hintThick', { n: thickName(o.thick) }),
-        };
-      if (!this.bowl.broth || this.bowl.fill < 0.72) {
-        const i = Math.max(0, this.liqs.indexOf(o.broth ?? 'shoyu'));
-        const p = Lp.pots[i];
-        return {
-          station: 1,
-          x: v.W + p.x + p.w / 2,
-          y: p.y + p.h / 2,
-          text:
-            this.bowl.fill > 0
-              ? T('g.hintFillMore')
-              : T('g.hintFill', { n: L(INGREDIENTS[o.broth ?? 'shoyu'].name) }),
-        };
-      }
-      const cnt = new Map<string, number>();
-      for (const p of this.bowl.pieces) cnt.set(p.id, (cnt.get(p.id) ?? 0) + 1);
-      for (const r of o.reqs) {
-        const have = cnt.get(r.id) ?? 0;
-        const need = r.mode === 'exact' ? (r.n ?? 1) : r.mode === 'bol' ? 5 : 1;
-        if (have < need) {
-          if (this.held === r.id)
-            return { station: 1, x: this.bowlPos.x, y: this.bowlPos.y, text: T('g.hintPlace') };
-          const tb = Lp.tubs[Math.max(0, this.tops.indexOf(r.id))];
-          const nm = L(INGREDIENTS[r.id].name);
-          return {
-            station: 1,
-            x: v.W + tb.x + tb.w / 2,
-            y: tb.y + tb.h / 2,
-            text:
-              r.mode === 'exact'
-                ? T('g.hintTopExact', { n: nm, a: have, b: need })
-                : T('g.hintTop', { n: (r.mode === 'bol' ? T('g.hintLots') : '') + nm }),
-          };
-        }
-      }
-      return { station: 1, x: this.bowlPos.x, y: this.bowlPos.y, text: T('g.hintCarry') };
-    }
-    if (this.bowlAt === 'stove') {
-      const cs = cookOf(this.bowl);
-      const want = o.cook;
-      if (cs === want || (cs === 'soft' && want !== 'soft') || cs === 'burnt')
-        return {
-          station: 2,
-          x: this.bowlPos.x,
-          y: this.bowlPos.y,
-          text: cs === want ? T('g.hintTake') : T('g.hintTakeNow'),
+          text: {
+            tr: 'Tabakta istediğin yere dokun: her dokunuş bir pirinç topu.',
+            en: 'Tap the plate where you want it: each tap is one rice ball.',
+          },
+          target: 'plate',
         };
       return {
-        station: 2,
-        x: 2 * v.W + this.kamL.timer.x,
-        y: this.kamL.timer.y,
-        text: T('g.hintWait', { n: L(COOK_LABEL[want]) }),
+        text: {
+          tr: 'Pirinç kabını basılı tut, gösterge “tam”dayken bırak.',
+          en: 'Hold the rice tub, let go when the gauge says “just right”.',
+        },
+        target: 'tub:rice',
       };
     }
-    if (this.bowlAt === 'hand' && this.bowl.noodle && cookOf(this.bowl) !== 'raw') {
-      return s.cu.phone
-        ? {
-            station: 0,
-            x: this.salL.deliveryBox.x + this.salL.deliveryBox.w / 2,
-            y: this.salL.deliveryBox.y,
-            text: T('g.hintBox'),
-          }
-        : {
-            station: 0,
-            x: this.salL.customer.x,
-            y: this.salL.counterTop + 30,
-            text: T('g.hintServe'),
-          };
+    const bare = nig.filter((p) => !p.neta);
+    if (bare.length) {
+      const fish = o.lines.find((l) => l.k === 'nigiri');
+      const f = fish && fish.k === 'nigiri' ? fish.fish : 'salmon';
+      if (this.hand?.k === 'tub' && this.hand.ing === f)
+        return {
+          text: {
+            tr: 'Şimdi her pirinç topuna dokun, balık üstüne konsun.',
+            en: 'Now tap each rice ball to lay the fish on top.',
+          },
+          target: 'plate',
+        };
+      return {
+        text: { tr: 'Balık kabına bir kez dokun.', en: 'Tap the fish tub once.' },
+        target: 'tub:' + f,
+      };
     }
-    return null;
-  }
-
-  // ---------- frame ----------
-  private frame(c: Ctx, v: View, t: number, dt: number) {
-    this.update(dt, t);
-    const e = this.engine;
-    c.fillStyle = PAL.paper;
-    c.fillRect(0, 0, v.W, v.H);
-    c.save();
-    c.translate(-e.camX, 0);
-    const vis = (i: number) => e.camX < (i + 1) * v.W && e.camX + v.W > i * v.W;
-    if (vis(0)) this.drawSalon(c, v, t);
-    if (vis(1)) this.drawPrep(c, v, t);
-    if (vis(2)) this.drawStove(c, v, t);
-    const d = this.drag;
-    if (d && d.kind === 'tub' && d.moved) {
-      const k = this.prepL.bowl.size / BOWL_SPACE;
-      c.save();
-      c.translate(d.x, d.y - 16);
-      c.scale(k * 1.12 * BOWL_PIECE_SCALE, k * 1.12 * BOWL_PIECE_SCALE);
-      drawPiece(c, d.id, d.v, 1, d.rot);
-      c.restore();
+    const sides = new Set(
+      this.plate.pieces.filter((p) => p.kind === 'side').map((p) => (p as { ing: IngId }).ing)
+    );
+    const miss = o.sides.find((s) => !sides.has(s));
+    if (miss) {
+      if (this.hand?.k === 'tub' && this.hand.ing === miss)
+        return {
+          text: { tr: 'Tabağın boş bir köşesine dokun.', en: 'Tap an empty corner of the plate.' },
+          target: 'plate',
+        };
+      return {
+        text: {
+          tr: `Yan ürün: ${ING[miss].name.tr} kabına dokun.`,
+          en: `Side: tap the ${ING[miss].name.en.toLowerCase()} tub.`,
+        },
+        target: 'tub:' + miss,
+      };
     }
-    if (this.bowlAt === 'hand')
-      this.drawTheBowl(c, t, this.prepL.bowl.size * (1 + 0.08 * this.bowlLift), 0.5);
-    this.fx.draw(c);
-    c.restore();
-  }
-
-  private update(dt: number, t: number) {
-    const v = this.engine.view;
-    this.phaseT += dt;
-    this.fx.update(dt);
-    this.updateCat(dt);
-    if (this.intro > 0) {
-      this.intro -= dt;
-      const v2 = this.engine.view;
-      const k = clamp(1 - this.intro / INTRO_LEN, 0, 1);
-      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      this.engine.camTarget = null;
-      this.engine.camX = lerp(this.engine.maxCam, 0, e);
-      if (this.intro <= 0) {
-        this.engine.camX = 0;
-        this.notify();
-      }
-      void v2;
-    } else if (!this.dayOver) this.clock += dt;
-    if (this.toastT > 0) {
-      this.toastT -= dt;
-      if (this.toastT <= 0) {
-        this.toast = null;
-        this.notify();
-      }
-    }
-    this.bowlLift = lerp(this.bowlLift, this.bowlAt === 'hand' ? 1 : 0, Math.min(1, dt * 12));
-    if (this.drag && this.drag.kind === 'bowl') {
-      const edge = v.cssW * 0.13;
-      const sx = this.pointer.sx;
-      let dir = 0;
-      if (sx < edge) dir = -1 - (edge - sx) / edge;
-      else if (sx > v.cssW - edge) dir = 1 + (sx - (v.cssW - edge)) / edge;
-      if (dir) {
-        const before = this.engine.camX;
-        this.engine.camTarget = null;
-        this.engine.camX = clamp(this.engine.camX + dir * 520 * dt, 0, this.engine.maxCam);
-        const moved = this.engine.camX - before;
-        this.bowlPos.x += moved;
-        this.pointer.x += moved;
-      }
-    }
-    if (this.drag && this.drag.kind === 'hold' && this.bowlAt === 'prep') {
-      const before = this.bowl.fill;
-      this.bowl.fill = Math.min(1.22, this.bowl.fill + FILL_RATE * dt);
-      if (Math.floor(before * 10) !== Math.floor(this.bowl.fill * 10)) {
-        sfx('pour');
-        this.notify();
-      }
-      if (this.bowl.fill >= 1.2 && before < 1.2) this.showToast(T('g.overflow'));
-    }
-    if (this.bowlAt === 'stove' && this.bowl.noodle) {
-      this.bowl.progress = Math.min(120, this.bowl.progress + COOK_RATE * dt);
-      const cs = cookOf(this.bowl);
-      if (cs !== this.lastCook) {
-        this.lastCook = cs;
-        sfx(cs === 'burnt' ? 'fail' : 'bubble');
-        if (cs === 'perfect') buzz(12);
-        this.notify();
-      }
-      if (Math.random() < dt * 6)
-        this.fx.emit(
-          'steam',
-          this.bowlPos.x + (Math.random() - 0.5) * 80,
-          this.bowlPos.y - 40,
-          1,
-          10
-        );
-    }
-    this.heat = lerp(this.heat, this.bowlAt === 'stove' ? 1 : 0.18, Math.min(1, dt * 2));
-    // typewriter
-    if (this.bubble && this.bubble.shown < this.bubble.text.length) {
-      this.typeT += dt;
-      const n = Math.min(this.bubble.text.length, Math.floor(this.typeT * 34));
-      if (n !== this.bubble.shown) {
-        this.bubble.shown = n;
-        if (n % 3 === 0) sfx('type');
-        this.notify();
-      }
-    }
-    // spawning
-    if (!this.dayOver && this.intro <= 0 && this.clock < this.dayLen) {
-      this.spawnT -= dt;
-      if (this.spawnT <= 0) {
-        this.spawn();
-        this.spawnT = this.spawnGap();
-      }
-    }
-    // patience of open orders & the ringing tablet & the queue
-    let tick = false;
-    for (const s of [...this.open]) {
-      s.waitT += dt;
-      if (Math.floor(s.waitT) !== Math.floor(s.waitT - dt)) tick = true;
-      if (s.waitT >= s.cu.patience) this.giveUp(s);
-    }
-    if (this.ringing) {
-      this.ringT += dt;
-      this.ringing.waitT += dt * 0.6;
-      if (this.ringT > 2.4) {
-        this.ringT = 0;
-        sfx('phone');
-      }
-      if (this.ringing.waitT >= this.ringing.cu.patience) {
-        this.lost++;
-        this.scores.push(0);
-        this.ringing = null;
-        this.showToast(T('g.waitedPhone'));
-      }
-    }
-    for (const q of this.queue) q.patience -= dt * 0.35; // waiting in line eats a little patience
-    if (tick) this.notify();
-    this.tryRing();
-    // counter flow
-    this.updateCounter(dt);
-    // pickup flow
-    this.updatePickup(dt);
-    this.updateDelivery(dt);
-    // diners
-    for (const d of this.diners) {
-      d.leaveT -= dt;
-      d.bob = Math.sin(t * 2 + d.seed) * 3;
-    }
-    this.diners = this.diners.filter((d) => d.leaveT > 0);
-    if (Math.random() < dt / 60) this.seatExtra(50 + Math.random() * 50);
-    // end of day
-    if (this.clock >= this.dayLen && !this.dayOver) {
-      const nothingLeft = !this.counter && !this.pick && !this.open.length && !this.ringing;
-      if (nothingLeft || this.clock > this.dayLen + 120) {
-        for (const s of this.open) {
-          this.scores.push(0);
-          this.lost++;
-          void s;
-        }
-        this.queue = [];
-        this.endDay();
-      } else if (this.queue.length) this.queue = []; // the line goes home
-    }
-  }
-
-  private updateCounter(dt: number) {
-    switch (this.phase) {
-      case 'idle':
-        if (
-          !this.counter &&
-          (!this.pick || this.pick.phase === 'delivering') &&
-          this.queue.length &&
-          !this.open.some((o) => !o.cu.phone) &&
-          !this.ringing &&
-          !(this.calls.length && this.phaseT < 2.5) &&
-          this.phaseT > 0.8
-        ) {
-          this.counter = this.queue.shift()!;
-          this.mi = 0;
-          this.counterY = 0;
-          this.phase = 'enter';
-          this.phaseT = 0;
-          this.notify();
-        }
-        break;
-      case 'enter':
-        this.counterY = Math.min(1, this.counterY + dt * 1.1);
-        if (this.phaseT > 1.0 && this.counter) {
-          this.phase = 'greet';
-          this.phaseT = 0;
-          this.setBubble(this.counter.members[0].name, this.counter.greet, 'counter');
-        }
-        break;
-      case 'greet':
-        if (
-          this.phaseT > 1.6 &&
-          (!this.bubble ||
-            this.bubble.at !== 'counter' ||
-            this.bubble.shown >= this.bubble.text.length)
-        )
-          this.startOrder();
-        break;
-      case 'order':
-        if (
-          this.phaseT > 1.2 &&
-          (!this.bubble ||
-            this.bubble.at !== 'counter' ||
-            this.bubble.shown >= this.bubble.text.length)
-        ) {
-          const cu = this.counter!;
-          this.placeOrder(cu, this.mi);
-          if (this.mi + 1 < cu.members.length) {
-            this.mi++;
-            this.startOrder();
-          } else {
-            this.phase = 'waiting';
-            this.phaseT = 0;
-          }
-          this.notify();
-        }
-        break;
-      case 'waiting':
-        break; // stands at the counter until the bowl arrives (serve() takes over)
-      case 'toTable':
-        this.counterY = Math.max(0, this.counterY - dt * 1.4);
-        if (this.phaseT > 0.8 && this.counter) {
-          this.seatGroup(this.counter);
-          this.counter = null;
-          this.phase = 'idle';
-          this.phaseT = 0;
-          this.notify();
-        }
-        break;
-    }
-  }
-
-  private updatePickup(dt: number) {
-    const pk = this.pick;
-    if (!pk) return;
-    pk.t += dt;
-    const m = pk.cu.members[pk.mi];
-    switch (pk.phase) {
-      case 'pickup':
-        if (!this.counter) {
-          pk.phase = 'served';
-          pk.t = 0;
-        }
-        break;
-      case 'served':
-        this.pickY = Math.min(1, this.pickY + dt * 1.3);
-        if (pk.t > 2.4) {
-          const sc = pk.score;
-          const complaint = pk.score < 70 && pk.notes.length > 0;
-          pk.phase = complaint ? 'complain' : 'react';
-          pk.t = 0;
-          const notes = pk.notes
-            .slice(0, 2)
-            .map((n) => L(n))
-            .join(' · ');
-          if (complaint) {
-            this.setBubble(m.name, T('g.complain', { notes }), 'pickup', 'bad');
-            sfx('angry');
-          } else {
-            this.setBubble(
-              m.name,
-              reactionLine(pk.cu, sc) + (notes ? `  (${notes})` : ''),
-              'pickup',
-              pk.tone
-            );
-            if (sc >= 85) {
-              sfx('perfect');
-              this.fx.emit(
-                'heart',
-                this.pickupX(),
-                this.salL.customer.y - this.salL.customer.size,
-                5,
-                30
-              );
-            } else sfx('ding');
-          }
-          this.notify();
-        }
-        break;
-      case 'complain':
-        break; // waits for apologize()
-      case 'react':
-        if (
-          this.pendingSorryReply &&
-          pk.t > 2.0 &&
-          this.bubble &&
-          this.bubble.shown >= this.bubble.text.length
-        ) {
-          this.setBubble(this.pendingSorryReply, T('g.sorryReply'), 'pickup', 'neutral');
-          this.pendingSorryReply = null;
-          pk.t = 0;
-          break;
-        }
-        if (pk.t > 2.0 && this.bubble && this.bubble.shown >= this.bubble.text.length)
-          this.afterReaction();
-        break;
-      case 'pay':
-        break; // cash UI
-      case 'leave':
-        if (pk.t > 1.0) {
-          for (const d of this.diners) if (d.cuId === pk.cu.id) d.hidden = false;
-          this.pick = null;
-          this.bubble = this.bubble?.at === 'pickup' ? null : this.bubble;
-          this.notify();
-        }
-        break;
-      case 'delivering':
-        break; // handled by updateDelivery
-    }
-  }
-
-  private updateDelivery(dt: number) {
-    const d = this.delivery;
-    if (!d) return;
-    d.t += dt;
-    if (this.scooter) {
-      this.scooter.t += dt;
-      this.scooter.x += dt * 420;
-    }
-    if (d.t > 1.4 && d.t - dt <= 1.4)
-      this.setBubble(
-        L('Rüzgar'),
-        T('g.onTheWay') +
-          `${T('g.app')}: "${reactionLine(d.cu, d.score)}" ★${(d.score / 20).toFixed(1)}`,
-        'phone',
-        d.tone
-      );
-    if (d.t > 4.2) {
-      this.scooter = null;
-      this.delivery = null;
-      this.notify();
-    }
-  }
-
-  private spawnGap() {
-    const busy = this.level.customers / this.level.minutes;
-    return clamp(16 / busy, 3, 12) * (0.6 + Math.random() * 0.8);
-  }
-
-  private memberX(base: number, i: number, n: number) {
-    const spread = this.salL.customer.size * 0.7;
-    return base + (i - (n - 1) / 2) * spread;
-  }
-
-  // ---------- drawing ----------
-  private drawTheBowl(c: Ctx, t: number, size: number, shadow = 0) {
-    const { x, y } = this.bowlPos;
-    c.save();
-    c.translate(x, y - this.bowlLift * 22);
-    if (shadow) {
-      c.save();
-      c.globalAlpha = 0.25 * this.bowlLift;
-      c.fillStyle = '#3a2a22';
-      c.beginPath();
-      c.ellipse(0, size * 0.52 + 20, size * 0.5, size * 0.16, 0, 0, Math.PI * 2);
-      c.fill();
-      c.restore();
-    }
-    drawBowlTop(c, this.bowl, size, t, {
-      steam: this.bowlAt === 'stove' ? 1 : cookOf(this.bowl) !== 'raw' ? 0.5 : 0,
-    });
-    c.restore();
-  }
-
-  private drawSalon(c: Ctx, v: View, t: number) {
-    const S = this.salL;
-    const tod = this.level.time;
-    const opts = {
-      rain: !!this.level.rain,
-      diners: this.diners.filter((d) => d.seat >= 0 && !d.hidden),
-      phoneRinging: !!this.ringing,
-      boxOpen: this.open.some((s) => s.cu.phone),
-      tipCoins: this.tipCoins,
-      cashOnCounter: this.pick?.phase === 'pay',
-      lampsOn: TOD_LIGHT[tod].lamp > 0,
-    };
-    drawSalonBack(c, v.W, v.H, this.decor, tod, t, opts);
-    // standing-and-waiting diners (no free seat) + the queue, behind the counter people
-    const nAtCounter = this.counter ? this.counter.members.length : 1;
-    const qshift =
-      (nAtCounter - 1) * S.customer.size * 0.32 +
-      (this.pick && this.counter ? S.customer.size * 0.4 : 0);
-    const qs = this.queueSpots().map((q) => ({ ...q, x: q.x + qshift }));
-    const standing = this.diners.filter((d) => d.seat < 0);
-    standing.slice(0, 3).forEach((d, i) => {
-      const sp = qs[Math.min(2, i)];
-      drawAvatar(c, d.look, 'neutral', sp.x + 40 * i, sp.y - 60, sp.size * 0.9, {
-        pose: 'queue',
-        bob: d.bob,
-      });
-    });
-    this.queue.slice(0, 0).forEach((cu, i) => {
-      const sp = qs[Math.min(qs.length - 1, i)];
-      cu.members.forEach((m, k) => {
-        drawAvatar(
-          c,
-          m.look,
-          'neutral',
-          sp.x + k * sp.size * 0.45,
-          sp.y + k * 4,
-          sp.size * (m.look.kid ? 0.82 : 1),
-          { pose: 'queue', bob: Math.sin(t * 1.5 + i + k) * 2 }
-        );
-      });
-    });
-    // ordering customer(s)
-    if (this.counter && this.counterY > 0) {
-      const cu = this.counter;
-      const n = cu.members.length;
-      const base = this.counterX();
-      const order = cu.members
-        .map((_, i) => i)
-        .sort((a, b) => (a === this.mi ? 1 : b === this.mi ? -1 : 0));
-      for (const i of order) {
-        const m = cu.members[i];
-        const active = i === this.mi;
-        const size = S.customer.size * (m.look.kid ? 0.82 : 1) * (n > 1 ? 0.86 : 1);
-        c.save();
-        const k = this.counterY;
-        const ease = 1 - Math.pow(1 - k, 3);
-        let px = this.memberX(base, i, n);
-        let py = S.customer.y + (active ? 0 : 10);
-        let psize = size;
-        if (this.phase === 'enter') {
-          // walks in from the door (left), bobbing
-          px = lerp(-size * 0.7, px, ease);
-          py += Math.abs(Math.sin(k * 14)) * -6;
-        } else if (this.phase === 'toTable' && this.leaveTo) {
-          const g = 1 - k;
-          const ge = g * g;
-          px = lerp(px, this.leaveTo.x, ge);
-          py = lerp(py, this.leaveTo.y + 10, ge);
-          psize = lerp(size, size * 0.55, ge);
-          c.globalAlpha = 1 - Math.max(0, (ge - 0.75) * 4);
-        }
-        drawAvatar(
-          c,
-          m.look,
-          active ? 'neutral' : i < this.mi ? 'happy' : 'neutral',
-          px,
-          py,
-          psize,
-          {
-            pose: 'stand',
-            talking:
-              active &&
-              this.phase === 'order' &&
-              !!this.bubble &&
-              this.bubble.shown < this.bubble.text.length,
-            bob: Math.sin(t * 2 + i) * 2,
-          }
-        );
-        c.restore();
-      }
-    }
-    // pickup customer
-    const pk = this.pick;
-    if (pk && pk.phase !== 'delivering' && this.pickY > 0) {
-      const m = pk.cu.members[pk.mi];
-      const mood: Mood =
-        pk.phase === 'served'
-          ? 'happy'
-          : pk.score >= 85
-            ? 'love'
-            : pk.score >= 70
-              ? 'happy'
-              : pk.score >= 45
-                ? 'worried'
-                : 'angry';
-      const size = S.customer.size * (m.look.kid ? 0.82 : 1);
-      c.save();
-      let px = this.pickupX();
-      let py = S.customer.y + (1 - this.pickY) * 60;
-      let psize = size;
-      if (pk.phase === 'leave' && pk.t > 0 && this.leaveTo) {
-        // walks off to the table, shrinking into the room
-        const g = Math.min(1, pk.t / 0.9);
-        const ge = g * g;
-        px = lerp(px, this.leaveTo.x, ge);
-        py = lerp(py, this.leaveTo.y + 10, ge);
-        psize = lerp(size, size * 0.55, ge);
-        c.globalAlpha = 1 - Math.max(0, (ge - 0.75) * 4);
-      } else c.globalAlpha = this.pickY;
-      drawAvatar(
-        c,
-        m.look,
-        pk.phase === 'pay' || pk.phase === 'leave'
-          ? this.groups.get(pk.cu.id)?.complained
-            ? 'neutral'
-            : 'happy'
-          : mood,
-        px,
-        py,
-        psize,
-        { pose: 'stand', eating: pk.phase === 'served', bob: Math.sin(t * 2) * 2 }
-      );
-      c.restore();
-    }
-    if (this.cat.spot !== 0)
-      drawCat(c, this.cat.x, this.cat.y, 64, this.cat.pose, t, this.cat.flip);
-    drawSalonFront(c, v.W, v.H, this.decor, tod, t, opts);
-    if (this.cat.spot === 0)
-      drawCat(c, this.cat.x, this.cat.y, 56, this.cat.pose, t, this.cat.flip);
-    if (
-      pk &&
-      pk.bowl &&
-      (pk.phase === 'served' || pk.phase === 'react' || pk.phase === 'complain')
-    ) {
-      c.save();
-      c.translate(this.servedPos.x, this.servedPos.y);
-      const eaten = pk.phase !== 'served' ? 1 : Math.min(1, pk.t / 2.4);
-      drawBowlTop(
-        c,
-        eaten > 0.6 ? { ...pk.bowl, pieces: [], fill: pk.bowl.fill * 0.2 } : pk.bowl,
-        S.customer.size * 0.4,
-        t,
-        { steam: 0.6 }
-      );
-      c.restore();
-    }
-    if (this.scooter)
-      drawScooter(c, this.scooter.x, S.counterTop + 40, 120, t, { rider: true, box: true });
-    drawSalonLight(c, v.W, v.H, this.decor, tod);
-    const h = this.currentHint();
-    if (h && h.station === 0) drawPointerHint(c, h.x, h.y, t);
-  }
-
-  private drawPrep(c: Ctx, v: View, t: number) {
-    const Lp = this.prepL;
-    c.save();
-    c.translate(v.W, 0);
-    drawPrepBack(c, v.W, v.H, this.level.time, t, Lp);
-    Lp.shelf.slots.forEach((s, i) => {
-      const b = BOWLS[i];
-      if (!b || b.unlock > this.level.id) return;
-      c.save();
-      c.translate(s.x, s.y);
-      drawBowlIcon(c, b.id, 54);
-      if (this.bowl.style === b.id) {
-        c.strokeStyle = rgba(PAL.coral, 0.9);
-        c.lineWidth = 3;
-        c.beginPath();
-        c.ellipse(0, 6, 32, 20, 0, 0, Math.PI * 2);
-        c.stroke();
-      }
-      c.restore();
-    });
-    Lp.trays.forEach((r, i) => {
-      const id = this.noods[i];
-      if (!id) return;
-      c.save();
-      c.translate(r.x, r.y);
-      drawNoodleTray(c, id, this.bowl.thick, r.w, r.h);
-      c.restore();
-      if (this.bowl.noodle === id) this.ringSlot(c, r);
-      this.slotLabel(c, L(INGREDIENTS[id].name), r);
-    });
-    {
-      const r = Lp.thickChips;
-      const vertical = r.h > r.w * 0.8;
-      const cw = vertical ? r.w : r.w / 3;
-      const ch = vertical ? r.h / 3 : r.h;
-      (['ince', 'orta', 'kalin'] as Thick[]).forEach((tk, i) => {
-        const x = vertical ? r.x : r.x + i * cw;
-        const y = vertical ? r.y + i * ch : r.y;
-        const on = this.bowl.thick === tk;
-        c.fillStyle = on ? PAL.coral : rgba(PAL.white, 0.75);
-        c.strokeStyle = rgba(PAL.walnut, 0.35);
-        c.lineWidth = 1.5;
-        c.beginPath();
-        c.roundRect(x + 3, y + 2, cw - 6, ch - 4, (ch - 4) / 2);
-        c.fill();
-        c.stroke();
-        const label = L(THICK_LABEL[tk]);
-        let fs = Math.round((ch - 4) * 0.5);
-        c.font = `800 ${fs}px "Baloo 2", system-ui`;
-        while (fs > 10 && c.measureText(label).width > cw - 18) {
-          fs--;
-          c.font = `800 ${fs}px "Baloo 2", system-ui`;
-        }
-        c.textAlign = 'center';
-        c.textBaseline = 'middle';
-        c.fillStyle = on ? '#fff' : PAL.ink;
-        c.fillText(label, x + cw / 2, y + ch / 2 + 1);
-      });
-    }
-    Lp.pots.forEach((r, i) => {
-      const id = this.liqs[i];
-      if (!id) return;
-      c.save();
-      c.translate(r.x, r.y);
-      drawPot(c, id, r.w, r.h, t);
-      c.restore();
-      if (this.bowl.broth === id) this.ringSlot(c, r);
-      this.slotLabel(c, L(INGREDIENTS[id].name), r);
-    });
-    Lp.tubs.forEach((r, i) => {
-      const id = this.tops[i];
-      if (!id) return;
-      c.save();
-      c.translate(r.x, r.y);
-      drawTub(c, id, r.w, r.h);
-      c.restore();
-      const n = this.bowl.pieces.filter((p) => p.id === id).length;
-      if (n) this.countBadge(c, r, n);
-      if (this.held === id) {
-        c.save();
-        c.strokeStyle = rgba(PAL.coral, 0.95);
-        c.lineWidth = 4;
-        c.setLineDash([10, 6]);
-        c.lineDashOffset = -t * 30;
-        c.beginPath();
-        c.roundRect(r.x - 6, r.y - 6, r.w + 12, r.h + 12, 18);
-        c.stroke();
-        c.restore();
-      }
-    });
-    if (this.bowl.broth || this.bowl.fill > 0) {
-      const g = Lp.gauge;
-      drawGauge(
-        c,
-        g.x,
-        g.y,
-        g.w,
-        g.h,
-        this.bowl.fill,
-        this.bowl.broth ? INGREDIENTS[this.bowl.broth].color : PAL.honey,
-        [0.72, 1.0]
-      );
-    }
-    c.restore();
-    if (this.bowlAt === 'prep') this.drawTheBowl(c, t, Lp.bowl.size);
-    if (this.held && this.bowlAt === 'prep') {
-      // the picked topping hovers above the bowl so the player knows what the next tap places
-      const k = Lp.bowl.size / BOWL_SPACE;
-      c.save();
-      c.globalAlpha = 0.9;
-      c.translate(
-        this.bowlPos.x + Lp.bowl.size * 0.36,
-        this.bowlPos.y - Lp.bowl.size * 0.46 + Math.sin(t * 3) * 4
-      );
-      c.scale(k * 1.1 * BOWL_PIECE_SCALE, k * 1.1 * BOWL_PIECE_SCALE);
-      drawPiece(c, this.held, 0, 1, 0);
-      c.restore();
-    }
-    const h = this.currentHint();
-    if (h && h.station === 1) drawPointerHint(c, h.x, h.y, t);
-  }
-
-  private ringSlot(c: Ctx, r: { x: number; y: number; w: number; h: number }) {
-    c.save();
-    c.strokeStyle = rgba(PAL.coral, 0.9);
-    c.lineWidth = 3;
-    c.beginPath();
-    c.roundRect(r.x - 4, r.y - 4, r.w + 8, r.h + 8, 16);
-    c.stroke();
-    c.restore();
-  }
-
-  private slotLabel(c: Ctx, text: string, r: { x: number; y: number; w: number; h: number }) {
-    c.save();
-    c.font = `700 12px "Nunito", system-ui`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    const w = c.measureText(text).width + 12;
-    c.fillStyle = rgba(PAL.white, 0.85);
-    c.beginPath();
-    c.roundRect(r.x + r.w / 2 - w / 2, r.y + r.h - 9, w, 18, 9);
-    c.fill();
-    c.fillStyle = PAL.ink;
-    c.fillText(text, r.x + r.w / 2, r.y + r.h);
-    c.restore();
-  }
-
-  private countBadge(c: Ctx, r: { x: number; y: number; w: number; h: number }, n: number) {
-    c.save();
-    c.fillStyle = PAL.coral;
-    c.strokeStyle = '#fff';
-    c.lineWidth = 2;
-    c.beginPath();
-    c.arc(r.x + r.w - 6, r.y + 6, 12, 0, Math.PI * 2);
-    c.fill();
-    c.stroke();
-    c.font = `800 13px "Baloo 2", system-ui`;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillStyle = '#fff';
-    c.fillText(String(n), r.x + r.w - 6, r.y + 7);
-    c.restore();
-  }
-
-  private drawStove(c: Ctx, v: View, t: number) {
-    const K = this.kamL;
-    c.save();
-    c.translate(2 * v.W, 0);
-    drawKamadoBack(c, v.W, v.H, this.level.time, t, { heat: this.heat });
-    c.restore();
-    if (this.bowlAt === 'stove') this.drawTheBowl(c, t, K.bowl.size);
-    c.save();
-    c.translate(2 * v.W, 0);
-    drawKamadoFront(c, v.W, v.H, this.level.time, t, {
-      heat: this.heat,
-      cooking: this.bowlAt === 'stove' && !!this.bowl.noodle,
-    });
-    if (this.bowlAt === 'stove' && this.bowl.noodle)
-      drawCookRing(c, K.timer.x, K.timer.y, K.timer.r, this.bowl.progress);
-    c.restore();
-    const h = this.currentHint();
-    if (h && h.station === 2) drawPointerHint(c, h.x, h.y, t);
+    return { text: { tr: 'Hazır! “Servis et”e bas.', en: 'Ready! Tap “Serve”.' }, target: 'serve' };
   }
 }
 
-export type { Look, Member };
+function bodyCost(p: PieceBody): number {
+  switch (p.kind) {
+    case 'maki':
+      return 0.6;
+    case 'sashimi':
+      return ING[p.fish].cost * 0.5;
+    case 'temaki':
+      return 1.5;
+    default:
+      return 0;
+  }
+}
 
-export const NOODLES = ['ramen', 'udon', 'soba', 'pirinc'];
-export const LIQUIDS = [
-  'shoyu',
-  'miso',
-  'tavuk',
-  'acili',
-  'kori',
-  'tonkotsu',
-  'teriyaki',
-  'fistik',
-  'tatliaci',
-  'yakisoba',
-];
-export const TOPPINGS = [
-  'yesil',
-  'yumurta',
-  'chashu',
-  'pakchoi',
-  'nori',
-  'filiz',
-  'misir',
-  'mantar',
-  'aciyag',
-  'biber',
-  'tofu',
-  'kimchi',
-  'karides',
-  'naruto',
-  'lime',
-  'bambu',
-  'citir',
-  'susam',
-];
+function summaryOf(o: Order): L {
+  const tr = o.lines.map((l) => `${l.n}× ${l.k}`).join(', ');
+  return { tr, en: tr };
+}
+
+function t2(k: Parameters<typeof tt>[0]) {
+  return tt(k);
+}

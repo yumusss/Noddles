@@ -1,16 +1,19 @@
-name: Deploy to GitHub Pages
+name: Deploy sushi game to GitHub Pages
 
+# The sushi game lives on its own branch and is published to /sushi/ on gh-pages,
+# next to the noodle game that `main` publishes at the root.
 on:
   push:
-    branches: [main]
+    branches: [sushi]
   pull_request:
+    branches: [sushi]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: pages-sushi-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,3 +35,5 @@ jobs:
         with:
           branch: gh-pages
           folder: dist
+          target-folder: sushi
+          clean: true

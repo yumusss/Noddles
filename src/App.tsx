@@ -1,227 +1,171 @@
-import { useCallback, useEffect, useState } from 'react';
-import { LEVELS } from './game/data';
-import { setMusic, setSfx, sfx, startMusic, stopMusic, unlockAudio } from './game/audio';
-import { DEFAULT_DECOR, DEFAULT_OWNED, withDefaults, type DecorState } from './game/decor';
-import type { DayResult, Review } from './game/session';
+// Screen flow: title → map → day intro → (how-to on day 1) → play → ledger → day outro → map.
+
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { DAYS, dayDef, PLAYABLE_DAYS, TOTAL_DAYS } from './game/data';
+import { getLang, onLang } from './game/i18n';
+import { loadSave, type Save, tipBonus, writeSave } from './game/save';
+import { setMusic, setSfx, startMusic, unlockAudio } from './game/audio';
+import type { Session } from './game/session';
 import Title from './ui/Title';
-import LevelMap from './ui/LevelMap';
+import MapScreen from './ui/MapScreen';
 import Story from './ui/Story';
-import Unlock from './ui/Unlock';
+import HowTo from './ui/HowTo';
 import Play from './ui/Play';
-import Results from './ui/Results';
+import Ledger from './ui/Ledger';
 import DecorShop from './ui/DecorShop';
-import Ending from './ui/Ending';
-import { T, setLang, type Lang } from './game/i18n';
-
-export interface Save {
-  reached: number; // highest unlocked level (1..LEVELS.length+1)
-  cash: number;
-  decor: DecorState;
-  owned: string[];
-  stars: number[];
-  best: number[];
-  tipCoins: number;
-  sfx: boolean;
-  music: boolean;
-  lang: Lang;
-  reviews: Review[]; // last 40 customer reviews (tablet app)
-}
-
-const KEY = 'noddles-save-v2'; // keep the old key so saved progress survives the rename
-const fresh: Save = {
-  reached: 1,
-  cash: 600,
-  decor: DEFAULT_DECOR,
-  owned: DEFAULT_OWNED,
-  stars: Array(LEVELS.length).fill(0),
-  best: Array(LEVELS.length).fill(0),
-  tipCoins: 0,
-  sfx: true,
-  music: true,
-  lang: 'tr',
-  reviews: [],
-};
-
-function load(): Save {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (raw) {
-      const s = { ...fresh, ...JSON.parse(raw) } as Save;
-      s.decor = withDefaults(s.decor);
-      // older saves had 10 days — pad to the current number of levels
-      const pad = (a: number[] | undefined) =>
-        Array.from({ length: LEVELS.length }, (_, i) => a?.[i] ?? 0);
-      s.stars = pad(s.stars);
-      s.best = pad(s.best);
-      return s;
-    }
-  } catch {
-    /* storage unavailable */
-  }
-  return fresh;
-}
 
 type Screen =
-  | { s: 'title' }
-  | { s: 'map' }
-  | { s: 'intro'; level: number }
-  | { s: 'unlock'; level: number }
-  | { s: 'play'; level: number; key: number }
-  | { s: 'results'; level: number; result: DayResult }
-  | { s: 'outro'; level: number }
-  | { s: 'ending' }
-  | { s: 'decor' };
+  | { k: 'title' }
+  | { k: 'map' }
+  | { k: 'intro'; day: number }
+  | { k: 'howto'; day: number }
+  | { k: 'play'; day: number; key: number }
+  | { k: 'ledger'; day: number; s: Session }
+  | { k: 'outro'; day: number }
+  | { k: 'decor' };
+
+export function useLang() {
+  return useSyncExternalStore(
+    (f) => onLang(f),
+    () => getLang()
+  );
+}
 
 export default function App() {
-  const [save, setSave] = useState<Save>(() => {
-    const s = load();
-    setLang(s.lang);
-    return s;
-  });
-  const [screen, setScreen] = useState<Screen>({ s: 'title' });
-  useEffect(() => setLang(save.lang), [save.lang]);
+  useLang();
+  const [save, setSave] = useState<Save>(() => loadSave());
+  const [screen, setScreen] = useState<Screen>({ k: 'title' });
 
   useEffect(() => {
-    try {
-      localStorage.setItem(KEY, JSON.stringify(save));
-    } catch {
-      /* ignore */
-    }
     setSfx(save.sfx);
     setMusic(save.music);
-  }, [save]);
+  }, [save.sfx, save.music]);
 
-  const toggle = useCallback((k: 'sfx' | 'music') => {
-    setSave((s) => {
-      const n = { ...s, [k]: !s[k] };
-      if (k === 'music') {
-        setMusic(n.music);
-        if (n.music) startMusic();
-        else stopMusic();
-      }
-      return n;
+  const update = useCallback((f: (s: Save) => Save) => {
+    setSave((prev) => {
+      const next = f(prev);
+      writeSave(next);
+      return next;
     });
   }, []);
 
-  const toggleLang = () => {
-    const next: Lang = save.lang === 'tr' ? 'en' : 'tr';
-    setLang(next);
-    setSave((s) => ({ ...s, lang: next }));
-  };
-
-  const startLevel = (level: number) => {
+  const startDay = (day: number) => {
     unlockAudio();
-    if (save.music) startMusic();
-    setScreen({ s: 'intro', level });
+    startMusic();
+    setScreen({ k: 'intro', day });
   };
 
-  const finishDay = (level: number, result: DayResult, tipCoins: number) => {
-    setSave((s) => {
-      const stars = [...s.stars];
-      const best = [...s.best];
-      stars[level - 1] = Math.max(stars[level - 1], result.stars);
-      best[level - 1] = Math.max(best[level - 1], Math.round(result.avg));
-      let reached = s.reached;
-      if (result.stars > 0) reached = Math.max(reached, Math.min(LEVELS.length + 1, level + 1));
-      const reviews = [...(s.reviews ?? []), ...result.reviews].slice(-40);
-      return { ...s, cash: result.cashAfter, stars, best, reached, tipCoins, reviews };
+  const finishDay = (s: Session) => {
+    const day = s.n;
+    update((sv) => {
+      const stars = [...sv.stars];
+      stars[day] = Math.max(stars[day] ?? 0, s.stars);
+      return {
+        ...sv,
+        stars,
+        wallet: Math.max(0, Math.round(sv.wallet + s.net)),
+        unlocked: Math.min(PLAYABLE_DAYS, Math.max(sv.unlocked, day + 1), TOTAL_DAYS),
+        reviews: [...sv.reviews, ...s.reviews].slice(-40),
+        deliveries: [
+          ...sv.deliveries,
+          ...s.online
+            .filter((o) => o.status === 'delivered' && o.stars)
+            .map((o) => ({ day, name: s.name(o), summary: '', stars: o.stars ?? 0 })),
+        ].slice(-40),
+      };
     });
-    setScreen({ s: 'results', level, result });
+    setScreen({ k: 'ledger', day, s });
   };
 
-  const reset = () => {
-    setSave(fresh);
-    setScreen({ s: 'title' });
-  };
-
-  return (
-    <div className="app">
-      {screen.s === 'title' && (
-        <Title
-          hasSave={save.reached > 1 || save.stars[0] > 0}
-          onLang={toggleLang}
-          onPlay={() => {
-            unlockAudio();
-            sfx('door');
-            if (save.music) startMusic();
-            if (save.reached === 1 && save.stars[0] === 0) startLevel(1);
-            else setScreen({ s: 'map' });
-          }}
-        />
-      )}
-      {screen.s === 'map' && (
-        <LevelMap
-          save={save}
-          onPick={startLevel}
-          onBack={() => setScreen({ s: 'title' })}
-          onToggle={toggle}
-          onReset={reset}
-          onLang={toggleLang}
-          onEnding={() => setScreen({ s: 'ending' })}
-          onDecor={() => setScreen({ s: 'decor' })}
-        />
-      )}
-      {screen.s === 'decor' && (
-        <DecorShop
-          save={save}
-          onChange={(cash, decor, owned) => setSave((s) => ({ ...s, cash, decor, owned }))}
-          onBack={() => setScreen({ s: 'map' })}
-        />
-      )}
-      {screen.s === 'intro' && (
-        <Story
-          key={'i' + screen.level}
-          heading={T('story.dayHead', { n: screen.level })}
-          title={LEVELS[screen.level - 1].title}
-          lines={LEVELS[screen.level - 1].intro}
-          decor={save.decor}
-          tod={LEVELS[screen.level - 1].time}
-          rain={LEVELS[screen.level - 1].rain}
-          onDone={() => setScreen({ s: 'unlock', level: screen.level })}
-        />
-      )}
-      {screen.s === 'unlock' && (
-        <Unlock
-          level={LEVELS[screen.level - 1]}
-          onDone={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
-        />
-      )}
-      {screen.s === 'play' && (
-        <Play
-          key={screen.key}
-          levelId={screen.level}
-          save={save}
-          onToggle={toggle}
-          onLang={toggleLang}
-          onDone={(r, coins) => finishDay(screen.level, r, coins)}
-          onQuit={() => setScreen({ s: 'map' })}
-          onRestart={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
-        />
-      )}
-      {screen.s === 'results' && (
-        <Results
-          level={LEVELS[screen.level - 1]}
-          result={screen.result}
-          onRetry={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
-          onNext={() => setScreen({ s: 'outro', level: screen.level })}
-          onMap={() => setScreen({ s: 'map' })}
-        />
-      )}
-      {screen.s === 'outro' && (
-        <Story
-          key={'o' + screen.level}
-          heading={T('story.dayEnd')}
-          title={LEVELS[screen.level - 1].title}
-          lines={LEVELS[screen.level - 1].outro}
-          decor={save.decor}
-          tod="gunbatimi"
-          onDone={() => {
-            if (screen.level === LEVELS.length) setScreen({ s: 'ending' });
-            else setScreen({ s: 'map' });
-          }}
-        />
-      )}
-      {screen.s === 'ending' && <Ending save={save} onMap={() => setScreen({ s: 'map' })} />}
-    </div>
-  );
+  switch (screen.k) {
+    case 'title':
+      return (
+        <div className="app">
+          <Title onPlay={() => setScreen({ k: 'map' })} save={save} />
+        </div>
+      );
+    case 'map':
+      return (
+        <div className="app">
+          <MapScreen
+            save={save}
+            onDay={startDay}
+            onDecor={() => setScreen({ k: 'decor' })}
+            onTitle={() => setScreen({ k: 'title' })}
+            onToggle={(k) => update((s) => ({ ...s, [k]: !s[k] }))}
+          />
+        </div>
+      );
+    case 'decor':
+      return (
+        <div className="app">
+          <DecorShop save={save} update={update} onBack={() => setScreen({ k: 'map' })} />
+        </div>
+      );
+    case 'intro': {
+      const d = dayDef(screen.day);
+      return (
+        <div className="app">
+          <Story
+            day={d}
+            lines={d.intro}
+            mode="intro"
+            onDone={() =>
+              setScreen(
+                screen.day === 1
+                  ? { k: 'howto', day: 1 }
+                  : { k: 'play', day: screen.day, key: Date.now() }
+              )
+            }
+          />
+        </div>
+      );
+    }
+    case 'howto':
+      return (
+        <div className="app">
+          <HowTo
+            onDone={() => {
+              update((s) => ({ ...s, seenHowTo: true }));
+              setScreen({ k: 'play', day: screen.day, key: Date.now() });
+            }}
+          />
+        </div>
+      );
+    case 'play':
+      return (
+        <div className="app">
+          <Play
+            key={screen.key}
+            day={dayDef(screen.day)}
+            save={save}
+            tipBonus={tipBonus(save)}
+            onDone={finishDay}
+            onQuit={() => setScreen({ k: 'map' })}
+            onRestart={() => setScreen({ k: 'play', day: screen.day, key: Date.now() })}
+            onToggle={(k) => update((s) => ({ ...s, [k]: !s[k] }))}
+          />
+        </div>
+      );
+    case 'ledger':
+      return (
+        <div className="app">
+          <Ledger
+            s={screen.s}
+            wallet={save.wallet}
+            onNext={() => setScreen({ k: 'outro', day: screen.day })}
+          />
+        </div>
+      );
+    case 'outro': {
+      const d = dayDef(screen.day);
+      return (
+        <div className="app">
+          <Story day={d} lines={d.outro} mode="outro" onDone={() => setScreen({ k: 'map' })} />
+        </div>
+      );
+    }
+  }
 }
+
+export const _days = DAYS;

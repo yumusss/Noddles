@@ -1,1063 +1,713 @@
-// Customers, their spoken orders, and how a served bowl is judged.
+// Order generation, the words customers say, the paper ticket, and plate scoring.
+
 import {
-  BOWLS,
-  INGREDIENTS,
-  LEVELS,
-  MEAT,
-  ONLINE_NAMES,
-  THICK_LABEL,
-  bowlStyle,
-  unlockedUpTo,
-  type Thick,
+  ING,
+  type IngId,
+  type PlateId,
+  PLATES,
+  unlockedIngs,
+  unlockedPlates,
+  type Day,
 } from './data';
-import { BOWL_C, cookOf, type BowlState, type CookState, COOK_LABEL } from './bowl';
-import { isFeminine, randomLook, type Look } from '../art/avatar';
-import { L, getLang } from './i18n';
+import { getLang, tx, type L } from './i18n';
+import type { MakiStyle, Piece, PieceBody, Thick } from './plate';
+import { sameSet } from './plate';
 
-const en = () => getLang() === 'en';
-
-// ---------- order model ----------
-
-export type Mode = 'exact' | 'bol' | 'biraz' | 'var';
-export interface Req {
-  id: string;
-  mode: Mode;
-  n?: number;
-}
-export type Rule =
-  | { t: 'no'; id: string }
-  | { t: 'spicy' }
-  | { t: 'veg' }
-  | { t: 'variety'; n: number }
-  | { t: 'free' };
-export type CookPref = 'dente' | 'perfect' | 'soft';
+export type OLine =
+  | { k: 'nigiri'; fish: IngId; n: number; less: boolean; tops: IngId[] }
+  | { k: 'maki'; style: MakiStyle; fill: IngId[]; coat?: IngId; n: 6 | 8; tops: IngId[] }
+  | { k: 'sashimi'; fish: IngId; n: 3 | 5; thick: Thick }
+  | { k: 'temaki'; fill: IngId[]; n: number; tops: IngId[] };
 
 export interface Order {
-  noodle: string | null;
-  broth: string | null; // broth (soup) or sauce (dry)
-  thick: Thick | null;
-  bowl: string | null;
-  reqs: Req[];
-  rules: Rule[];
-  cook: CookPref;
+  lines: OLine[];
+  sides: IngId[];
+  forbid: IngId[];
+  plate?: PlateId;
+  veg?: boolean;
+  variety?: number;
+  online?: boolean;
 }
 
-export interface Member {
-  name: string;
-  look: Look;
-  order: Order;
-  text: string; // the spoken order
-}
+// ---------- helpers ----------
 
-export interface Customer {
-  id: number;
-  phone: boolean;
-  special?: 'hana' | 'baron' | 'lezzetova';
-  members: Member[]; // 1 = single customer, 2–3 = a group of friends ordering together
-  greet: string;
-  patience: number; // seconds before they give up
-  bonus: number; // ₺ bonus for a great bowl (specials)
-  reactions?: { great: string; ok: string; bad: string };
-}
+export const STYLE_DAY: Record<MakiStyle, number> = { hoso: 3, ura: 6, futo: 10 };
+const SASHIMI_DAY = 4;
+const TEMAKI_DAY = 8;
 
-const FEMALE_EN = [
-  'Emma',
-  'Olivia',
-  'Ava',
-  'Mia',
-  'Lily',
-  'Chloe',
-  'Grace',
-  'Ruby',
-  'Zoe',
-  'Hannah',
-  'Ella',
-  'Nora',
-  'Maya',
-  'Sophie',
-  'Yuki',
-  'Aiko',
-  'Isla',
-  'Luna',
-];
-const MALE_EN = [
-  'Liam',
-  'Noah',
-  'Oliver',
-  'Jack',
-  'Leo',
-  'Ethan',
-  'Lucas',
-  'Max',
-  'Sam',
-  'Ben',
-  'Henry',
-  'Owen',
-  'Kenji',
-  'Hiro',
-  'Theo',
-  'Finn',
-  'Omar',
-  'Daniel',
-];
-const FEMALE = [
-  'Ayşe',
-  'Elif',
-  'Zeynep',
-  'Ece',
-  'Selin',
-  'Defne',
-  'Melis',
-  'Nil',
-  'İpek',
-  'Lale',
-  'Asya',
-  'Nehir',
-  'Ada',
-  'Duru',
-  'Yuki',
-  'Mia',
-  'Sara',
-  'Deniz',
-];
-const MALE = [
-  'Mehmet',
-  'Can',
-  'Burak',
-  'Kaan',
-  'Emre',
-  'Ozan',
-  'Yusuf',
-  'Arda',
-  'Kerem',
-  'Tolga',
-  'Barış',
-  'Cem',
-  'Mert',
-  'Efe',
-  'Kenji',
-  'Leo',
-  'Omar',
-  'Deniz',
-];
-
-const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
-const shuffle = <T>(a: T[]) => [...a].sort(() => Math.random() - 0.5);
-
-const UNIT: Record<string, string> = {
-  chashu: 'dilim chashu',
-  yumurta: 'yumurta',
-  nori: 'yaprak nori',
-  karides: 'tempura karides',
-  naruto: 'dilim naruto',
-  mantar: 'shiitake',
-  tofu: 'parça tofu',
-  bambu: 'bambu filizi',
-  pakchoi: 'pak choi',
-  kimchi: 'parça kimchi',
-  lime: 'dilim limon',
-  misir: 'tutam mısır',
-};
-// English counting units: [singular, plural]
-const UNIT_EN: Record<string, [string, string]> = {
-  chashu: ['slice of chashu', 'slices of chashu'],
-  yumurta: ['egg', 'eggs'],
-  nori: ['sheet of nori', 'sheets of nori'],
-  karides: ['tempura shrimp', 'tempura shrimp'],
-  naruto: ['slice of naruto', 'slices of naruto'],
-  mantar: ['shiitake', 'shiitake'],
-  tofu: ['piece of tofu', 'pieces of tofu'],
-  bambu: ['bamboo shoot', 'bamboo shoots'],
-  pakchoi: ['pak choi', 'pak choi'],
-  kimchi: ['piece of kimchi', 'pieces of kimchi'],
-  lime: ['lime wedge', 'lime wedges'],
-  misir: ['pinch of corn', 'pinches of corn'],
-};
-const COUNTABLE = new Set(Object.keys(UNIT));
-/** Translated ingredient name. */
-const name = (id: string) => L(INGREDIENTS[id].name);
-/** Translated ingredient name, lower-cased for use mid-sentence. */
-const lower = (id: string) =>
-  en() ? name(id).toLowerCase() : INGREDIENTS[id].name.toLocaleLowerCase('tr');
-const capFirst = (s: string) =>
-  (en() ? s[0].toUpperCase() : s[0].toLocaleUpperCase('tr')) + s.slice(1);
-
-function reqText(r: Req): string {
-  if (en()) {
-    if (r.mode === 'exact') {
-      const n = r.n ?? 1;
-      const u = UNIT_EN[r.id];
-      return `${n} ${u ? u[n === 1 ? 0 : 1] : lower(r.id)}`;
-    }
-    if (r.mode === 'bol') return `lots of ${lower(r.id)}`;
-    if (r.mode === 'biraz') {
-      const lo = lower(r.id);
-      return `${/[^s]s$/.test(lo) ? 'a few' : 'a little'} ${lo}`; // "a few bean sprouts"
-    }
-    return lower(r.id);
-  }
-  if (r.mode === 'exact') return `${r.n} ${UNIT[r.id] ?? lower(r.id)}`;
-  if (r.mode === 'bol') return `bol ${lower(r.id)}`;
-  if (r.mode === 'biraz') return `biraz ${lower(r.id)}`;
-  return lower(r.id);
-}
-
-function joinList(parts: string[]) {
-  if (parts.length <= 1) return parts.join('');
-  return parts.slice(0, -1).join(', ') + (en() ? ' and ' : ' ve ') + parts[parts.length - 1];
-}
-
-const BROTH_TEXT: Record<string, string> = {
-  shoyu: 'soya suyuyla',
-  miso: 'miso suyuyla',
-  acili: 'acılı tantan suyuyla',
-  tonkotsu: 'kemik suyuyla',
-  tavuk: 'tavuk suyuyla',
-  kori: 'köri suyuyla',
-  teriyaki: 'teriyaki soslu, çorbasız',
-  fistik: 'fıstık soslu, çorbasız',
-  tatliaci: 'tatlı acı soslu, çorbasız',
-  yakisoba: 'yakisoba soslu, çorbasız',
-};
-const BROTH_TEXT_EN: Record<string, string> = {
-  shoyu: 'in soy broth',
-  miso: 'in miso broth',
-  acili: 'in spicy tantan broth',
-  tonkotsu: 'in bone broth',
-  tavuk: 'in chicken broth',
-  kori: 'in curry broth',
-  teriyaki: 'with teriyaki sauce, no broth',
-  fistik: 'with peanut sauce, no broth',
-  tatliaci: 'with sweet chili sauce, no broth',
-  yakisoba: 'with yakisoba sauce, no broth',
-};
-
-function orderTextEn(o: Order): string {
-  const tk = o.thick ? { ince: 'thin ', orta: 'medium ', kalin: 'thick ' }[o.thick] : '';
-  const plural = o.noodle === 'pirinc'; // "rice noodles"
-  const n = o.noodle ? tk + lower(o.noodle) : null;
-  const b = o.broth ? BROTH_TEXT_EN[o.broth] : null;
-  const article = (s: string) => (plural ? s : (/^[aeiou]/i.test(s) ? 'an ' : 'a ') + s);
-  let s: string;
-  if (n && b) s = `${article(n)} ${b}`;
-  else if (n) s = `${article(n)}, you pick the broth`;
-  else if (b) s = `a bowl ${b}, you pick the noodles`;
-  else s = 'a bowl of noodles, you pick the noodles and the broth';
-  s = capFirst(s);
-  if (o.reqs.length) s += `. On top: ${joinList(o.reqs.map(reqText))}`;
-  s += '.';
-  for (const r of o.rules) {
-    if (r.t === 'no') s += ` But no ${lower(r.id)}!`;
-    if (r.t === 'spicy') s += ' Make it spicy, I want my eyes to water!';
-    if (r.t === 'veg') s += ' I don’t eat meat or seafood.';
-    if (r.t === 'variety')
-      s += ` The rest is up to you, chef, but at least ${r.n} different toppings.`;
-    if (r.t === 'free') s += ' Decorate the rest however you like, chef!';
-  }
-  if (o.bowl) s += ` In the ${L(bowlStyle(o.bowl).name).toLowerCase()} bowl, please.`;
-  if (o.cook === 'dente') s += ' Keep the noodles firm.';
-  if (o.cook === 'soft') s += ' Make the noodles nice and soft.';
-  return s;
-}
-
-export function orderText(o: Order): string {
-  if (en()) return orderTextEn(o);
-  const tk = o.thick ? { ince: 'ince ', orta: 'orta kalınlıkta ', kalin: 'kalın ' }[o.thick] : '';
-  const n = o.noodle ? tk + INGREDIENTS[o.noodle].name.toLocaleLowerCase('tr') : null;
-  const b = o.broth ? BROTH_TEXT[o.broth] : null;
-  let s: string;
-  if (n && b) s = `${b} bir ${n}`;
-  else if (n) s = `bir ${n}, çorbası sizden`;
-  else if (b) s = `${b} bir kase, erişte sizden`;
-  else s = 'bir kase noodle, erişte de çorba da sizden';
-  s = capFirst(s);
-  if (o.reqs.length) s += `. Üstüne ${joinList(o.reqs.map(reqText))}`;
-  s += '.';
-  for (const r of o.rules) {
-    if (r.t === 'no') s += ` Ama ${lower(r.id)} olmasın!`;
-    if (r.t === 'spicy') s += ' Acı olsun, gözümden yaş gelsin!';
-    if (r.t === 'veg') s += ' Et ve deniz ürünü yemiyorum.';
-    if (r.t === 'variety') s += ` Gerisi sende şef, ama en az ${r.n} çeşit malzeme olsun.`;
-    if (r.t === 'free') s += ' Gerisini sen süsle şef!';
-  }
-  if (o.bowl) s += ` ${bowlStyle(o.bowl).name} kasede olsun lütfen.`;
-  if (o.cook === 'dente') s += ' Erişte diri kalsın.';
-  if (o.cook === 'soft') s += ' Erişte iyice yumuşak olsun.';
-  return s;
-}
-
-/** Short ticket lines for the order card (what the player can re-read). */
-export function orderLines(o: Order): string[] {
-  const out: string[] = [];
-  const tk = o.thick ? L(THICK_LABEL[o.thick]) + ' ' : '';
-  out.push(o.noodle ? `${tk}${name(o.noodle)}` : L('Erişte: sen seç'));
-  out.push(o.broth ? name(o.broth) : L('Çorba: sen seç'));
-  for (const r of o.reqs) out.push(capFirst(reqText(r)));
-  for (const r of o.rules) {
-    if (r.t === 'no') out.push(en() ? `No ${lower(r.id)}` : `${name(r.id)} olmasın`);
-    if (r.t === 'spicy') out.push(L('Acı olsun'));
-    if (r.t === 'veg') out.push(L('Et yok'));
-    if (r.t === 'variety') out.push(en() ? `At least ${r.n} kinds` : `En az ${r.n} çeşit`);
-    if (r.t === 'free') out.push(L('Sen süsle'));
-  }
-  if (o.bowl) out.push(`${en() ? 'Bowl' : 'Kase'}: ${L(bowlStyle(o.bowl).name)}`);
-  if (o.cook !== 'perfect') out.push(L(o.cook === 'dente' ? 'Erişte diri' : 'Erişte yumuşak'));
-  return out;
-}
-
-export function randomOrder(levelId: number): Order {
-  const lv = LEVELS[levelId - 1];
-  const cx = lv.complexity;
-  const un = unlockedUpTo(levelId);
-  const fresh = lv.unlock;
-  const noodles = un.filter((i) => INGREDIENTS[i].cat === 'noodle');
-  const broths = un.filter((i) => INGREDIENTS[i].cat === 'broth');
-  const sauces = un.filter((i) => INGREDIENTS[i].cat === 'sauce');
-  const tops = un.filter((i) => INGREDIENTS[i].cat === 'topping');
-  const favour = (list: string[]) => {
-    const f = list.filter((x) => fresh.includes(x));
-    return f.length && Math.random() < 0.45 ? pick(f) : pick(list);
+type Rng = () => number;
+export function mulberry(seed: number): Rng {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  const o: Order = {
-    noodle: cx >= 3 && Math.random() < 0.1 ? null : favour(noodles),
-    broth:
-      cx >= 3 && Math.random() < 0.08
-        ? null
-        : sauces.length && Math.random() < 0.28
-          ? favour(sauces)
-          : favour(broths),
-    thick: pick<Thick>(levelId === 1 ? ['orta'] : ['ince', 'orta', 'kalin']),
-    bowl: null,
-    reqs: [],
-    rules: [],
-    cook: 'perfect',
-  };
-  const bowlsNow = BOWLS.filter((b) => b.unlock <= levelId);
-  if (levelId >= 3 && Math.random() < 0.2) o.bowl = pick(bowlsNow).id;
-  if (levelId >= 4 && Math.random() < 0.3) o.cook = Math.random() < 0.5 ? 'dente' : 'soft';
+}
+const pick = <T>(r: Rng, a: T[]): T => a[Math.floor(r() * a.length)];
+const chance = (r: Rng, p: number) => r() < p;
 
-  const roll = Math.random();
-  if (cx >= 3 && roll < 0.12) {
-    o.rules.push({ t: 'variety', n: 3 + Math.floor(Math.random() * 2) });
-    return o;
-  }
-  const count = Math.min(
-    tops.length,
-    cx === 1
-      ? 1 + Math.floor(Math.random() * 2)
-      : 2 + Math.floor(Math.random() * (cx >= 3 ? 2 : 1.6))
+// ---------- generation ----------
+
+/** builds a random order that only uses what is unlocked on this day */
+export function makeOrder(day: Day, r: Rng, opts: { kid?: boolean; online?: boolean } = {}): Order {
+  const n = day.n;
+  const tier = day.tier;
+  const have = unlockedIngs(n);
+  const has = (i: IngId) => have.has(i);
+  const veg = tier >= 4 && chance(r, 0.18);
+
+  const netaPool = (['salmon', 'tuna', 'tamago', 'unagi'] as IngId[]).filter(
+    (i) => has(i) && (!veg || !ING[i].fish)
   );
-  const chosen: string[] = [];
-  const freshTops = tops.filter((t) => fresh.includes(t));
-  if (freshTops.length && Math.random() < 0.55) chosen.push(pick(freshTops));
-  for (const t of shuffle(tops)) {
-    if (chosen.length >= count) break;
-    if (!chosen.includes(t)) chosen.push(t);
+  const fillPool = (
+    [
+      'cucumber',
+      'avocado',
+      'salmon',
+      'tuna',
+      'crab',
+      'creamcheese',
+      'tempura',
+      'tamago',
+      'unagi',
+    ] as IngId[]
+  ).filter((i) => has(i) && (!veg || !ING[i].fish));
+  const topPool = (['sesame', 'tobiko', 'scallion', 'spicymayo'] as IngId[]).filter(
+    (i) => has(i) && (!veg || !ING[i].fish)
+  );
+  const fishPool = (['salmon', 'tuna'] as IngId[]).filter(has);
+
+  const kinds: OLine['k'][] = [];
+  if (netaPool.length) kinds.push('nigiri');
+  if (n >= STYLE_DAY.hoso && fillPool.length) kinds.push('maki');
+  if (n >= SASHIMI_DAY && !veg && fishPool.length) kinds.push('sashimi');
+  if (n >= TEMAKI_DAY && fillPool.length) kinds.push('temaki');
+
+  let lineCount = 1;
+  let variety: number | undefined;
+  if (tier >= 2 && chance(r, tier >= 4 ? 0.4 : 0.22)) lineCount = 2;
+  if (tier >= 5 && chance(r, 0.25) && kinds.length >= 3) {
+    lineCount = 3;
+    variety = 3;
   }
-  const veg = cx >= 3 && Math.random() < 0.15;
-  for (const id of chosen) {
-    if (veg && MEAT.includes(id)) continue;
-    let mode: Mode;
-    if (COUNTABLE.has(id)) mode = Math.random() < 0.75 ? 'exact' : 'var';
-    else mode = cx === 1 ? pick<Mode>(['var', 'bol']) : pick<Mode>(['var', 'bol', 'biraz']);
-    const r: Req = { id, mode };
-    if (mode === 'exact') r.n = 1 + Math.floor(Math.random() * (cx === 1 ? 3 : 4));
-    o.reqs.push(r);
-  }
-  if (veg) o.rules.push({ t: 'veg' });
-  if (cx >= 2 && Math.random() < 0.22) {
-    const no = tops.filter((t) => !chosen.includes(t));
-    if (no.length) o.rules.push({ t: 'no', id: pick(no) });
-  }
-  if (cx >= 3 && un.includes('acili') && Math.random() < 0.15 && o.broth !== 'acili')
-    o.rules.push({ t: 'spicy' });
-  if (cx >= 2 && Math.random() < 0.12) o.rules.push({ t: 'free' });
-  if (!o.reqs.length && !o.rules.length) o.reqs.push({ id: pick(tops), mode: 'var' });
-  return o;
-}
+  if (opts.kid) lineCount = 1;
+  if (opts.online) lineCount = Math.min(2, Math.max(lineCount, 1));
 
-const GREETS = [
-  'Merhaba şef!',
-  'Selam! Kokusu sokağın başından geliyordu.',
-  'İyi günler!',
-  'Açlıktan bayılmak üzereyim.',
-  'Arkadaşım burayı çok övdü.',
-  'Uzun bir gündü…',
-  'Bugün kendimi şımartıyorum.',
-  'Sınavdan çıktım, hak ettim.',
-  'İlk defa geliyorum, heyecanlıyım!',
-  'Annem burayı anlata anlata bitiremedi.',
-];
-const RAIN_GREETS = ['Yağmurda en iyisi sıcak bir kase!', 'Sırılsıklam oldum, ısınmam lazım.'];
-const PHONE_GREETS = [
-  'Alo, Noodles mı?',
-  'Alo! Paket servis var mı?',
-  'Merhaba, sipariş vermek istiyorum.',
-];
-
-interface SpecialDef {
-  at: number;
-  look: 'hana' | 'baron' | 'lezzetova';
-  name: string;
-  greet: string;
-  text: string;
-  order: Order;
-  bonus: number;
-  reactions: { great: string; ok: string; bad: string };
-}
-
-const SPECIALS: Record<number, SpecialDef[]> = {
-  6: [
-    {
-      at: 3,
-      look: 'baron',
-      name: 'Silindir Şapkalı Bey',
-      greet: 'Hmph. Burası mı meşhur dükkân?',
-      text: 'Acılı tantan suyuyla bir ince ramen. Tam 3 dilim chashu, bol acı yağ ve yeşil soğan. Bakalım bu “efsane” neymiş.',
-      order: {
-        thick: 'ince',
-        noodle: 'ramen',
-        broth: 'acili',
-        bowl: null,
-        reqs: [
-          { id: 'chashu', mode: 'exact', n: 3 },
-          { id: 'aciyag', mode: 'bol' },
-          { id: 'yesil', mode: 'var' },
-        ],
-        rules: [],
-        cook: 'perfect',
-      },
-      bonus: 60,
-      reactions: {
-        great: '…Fena değil. Hiç de fena değil. (Şapkasını indirip yüzünü saklar.)',
-        ok: 'Hmph. MegaNoodle bundan iyisini yapar.',
-        bad: 'İşte! Ben demiştim, bu dükkân bitmiş!',
-      },
-    },
-  ],
-  7: [
-    {
-      at: 4,
-      look: 'lezzetova',
-      name: 'Madam Lezzetova',
-      greet: 'Not defterim hazır, şekerim.',
-      text: 'Miso suyuyla bir ince soba. Tam 4 parça tofu, 3 shiitake ve biraz yeşil soğan. Erişte diri kalsın. Kusursuz olsun.',
-      order: {
-        thick: 'ince',
-        noodle: 'soba',
-        broth: 'miso',
-        bowl: null,
-        reqs: [
-          { id: 'tofu', mode: 'exact', n: 4 },
-          { id: 'mantar', mode: 'exact', n: 3 },
-          { id: 'yesil', mode: 'biraz' },
-        ],
-        rules: [],
-        cook: 'dente',
-      },
-      bonus: 100,
-      reactions: {
-        great: 'Dürüst bir kase. Ruhu olan bir mutfak. Beş yıldız!',
-        ok: 'İyi… ama unutulmaz değil. Üç yıldız.',
-        bad: 'Hayal kırıklığı. Bunu yazmak zorundayım.',
-      },
-    },
-  ],
-  9: [
-    {
-      at: 2,
-      look: 'hana',
-      name: 'Hana Nine',
-      greet: 'Bu sefer müşteri benim evladım.',
-      text: 'Kemik suyuyla bir orta kalınlıkta ramen. 2 dilim chashu, 2 yumurta, bambu filizi ve bol yeşil soğan. Tam kıvamında. Sınav gibi düşün!',
-      order: {
-        thick: 'orta',
-        noodle: 'ramen',
-        broth: 'tonkotsu',
-        bowl: null,
-        reqs: [
-          { id: 'chashu', mode: 'exact', n: 2 },
-          { id: 'yumurta', mode: 'exact', n: 2 },
-          { id: 'bambu', mode: 'var' },
-          { id: 'yesil', mode: 'bol' },
-        ],
-        rules: [],
-        cook: 'perfect',
-      },
-      bonus: 100,
-      reactions: {
-        great: 'İşte bu… benim kasem. Hayır, artık senin kasen.',
-        ok: 'Güzel, ama bir şey eksik. Tekrar dene, sen yaparsın.',
-        bad: 'Evladım… Defteri bir daha okumalısın.',
-      },
-    },
-  ],
-  18: [
-    {
-      at: 4,
-      look: 'baron',
-      name: 'Bıyıklı Turist',
-      greet: 'Bonjour! Ben… çok uzaklardan gelen bir turistim. Kesinlikle Baron değilim. Hmph.',
-      text: 'Fıstık soslu, çorbasız bir kalın udon. Tam 2 dilim chashu, bol fasulye filizi ve biraz kırmızı biber. Erişte diri kalsın.',
-      order: {
-        thick: 'kalin',
-        noodle: 'udon',
-        broth: 'fistik',
-        bowl: null,
-        reqs: [
-          { id: 'chashu', mode: 'exact', n: 2 },
-          { id: 'filiz', mode: 'bol' },
-          { id: 'biber', mode: 'biraz' },
-        ],
-        rules: [],
-        cook: 'dente',
-      },
-      bonus: 80,
-      reactions: {
-        great: 'Magnifique! Yani… Hmph. İdare eder. (Bıyığı titrer.)',
-        ok: 'Hmph. Turistler daha iyisini hak eder.',
-        bad: 'Ha! Bunu bütün turist arkadaşlarıma anlatacağım!',
-      },
-    },
-  ],
-  23: [
-    {
-      at: 5,
-      look: 'lezzetova',
-      name: 'Peçeli Hanım',
-      greet: 'Bir masa lütfen. Ve… soru sormayın, şekerim.',
-      text: 'Köri suyuyla bir kalın udon. Tam 2 tempura karides, 3 pak choi, biraz çıtır soğan ve 2 dilim limon. Erişte iyice yumuşak olsun.',
-      order: {
-        thick: 'kalin',
-        noodle: 'udon',
-        broth: 'kori',
-        bowl: null,
-        reqs: [
-          { id: 'karides', mode: 'exact', n: 2 },
-          { id: 'pakchoi', mode: 'exact', n: 3 },
-          { id: 'citir', mode: 'biraz' },
-          { id: 'lime', mode: 'exact', n: 2 },
-        ],
-        rules: [],
-        cook: 'soft',
-      },
-      bonus: 120,
-      reactions: {
-        great: 'Hmm. (Not defterine uzun uzun bir şey yazar ve gülümser.)',
-        ok: 'Hmm. (Not defterine kısa bir şey yazar.)',
-        bad: 'Hmm. (Not defterini sertçe kapatır.)',
-      },
-    },
-  ],
-  27: [
-    {
-      at: 3,
-      look: 'baron',
-      name: 'Baron Kraker',
-      greet: 'Hmph! Hâlâ açık mısınız? İnatçı dükkân.',
-      text: 'Tatlı acı soslu, çorbasız bir ince soba. Tam 3 parça kimchi, 2 parça tofu ve bol yeşil soğan. Ama mısır olmasın! Hmph.',
-      order: {
-        thick: 'ince',
-        noodle: 'soba',
-        broth: 'tatliaci',
-        bowl: null,
-        reqs: [
-          { id: 'kimchi', mode: 'exact', n: 3 },
-          { id: 'tofu', mode: 'exact', n: 2 },
-          { id: 'yesil', mode: 'bol' },
-        ],
-        rules: [{ t: 'no', id: 'misir' }],
-        cook: 'perfect',
-      },
-      bonus: 90,
-      reactions: {
-        great: 'Hmph… Bu da nesi? Neden bu kadar güzel?! (Hızla kaşığını bırakır.)',
-        ok: 'Hmph. Görüyorsunuz, sonunuz yakın.',
-        bad: 'Ha! Fabrikam bundan iyisini uykusunda yapar!',
-      },
-    },
-  ],
-  29: [
-    {
-      at: 4,
-      look: 'hana',
-      name: 'Hana Nine',
-      greet: 'Önlüğümü getirdim. Bakalım hak edecek misin?',
-      text: 'Kemik suyuyla bir kalın ramen. Tam 3 dilim chashu, 2 yumurta, 2 yaprak nori, biraz bambu filizi ve bol yeşil soğan. Erişte diri kalsın. Bir usta gibi!',
-      order: {
-        thick: 'kalin',
-        noodle: 'ramen',
-        broth: 'tonkotsu',
-        bowl: null,
-        reqs: [
-          { id: 'chashu', mode: 'exact', n: 3 },
-          { id: 'yumurta', mode: 'exact', n: 2 },
-          { id: 'nori', mode: 'exact', n: 2 },
-          { id: 'bambu', mode: 'biraz' },
-          { id: 'yesil', mode: 'bol' },
-        ],
-        rules: [],
-        cook: 'dente',
-      },
-      bonus: 150,
-      reactions: {
-        great: 'İşte gerçek bir şef! Önlük senin, evladım.',
-        ok: 'Neredeyse… Bir dahakine kesin olacak.',
-        bad: 'Acele etme. Usta olmak zaman ister.',
-      },
-    },
-  ],
-  35: [
-    {
-      at: 2,
-      look: 'hana',
-      name: 'Hana Nine',
-      greet: 'Bakalım ben yokken neler öğrendin, evladım?',
-      text: 'Tavuk suyuyla bir orta kalınlıkta udon. 1 yumurta, 2 pak choi, biraz susam ve yeşil soğan. Erişte iyice yumuşak olsun; dişlerim eskisi gibi değil.',
-      order: {
-        thick: 'orta',
-        noodle: 'udon',
-        broth: 'tavuk',
-        bowl: null,
-        reqs: [
-          { id: 'yumurta', mode: 'exact', n: 1 },
-          { id: 'pakchoi', mode: 'exact', n: 2 },
-          { id: 'susam', mode: 'biraz' },
-          { id: 'yesil', mode: 'var' },
-        ],
-        rules: [],
-        cook: 'soft',
-      },
-      bonus: 100,
-      reactions: {
-        great: 'Mmm… Şifa gibi. Ben yokken büyümüşsün sen.',
-        ok: 'Güzel evladım. Biraz daha sevgi ekle.',
-        bad: 'Olsun. Yorgunsun, biliyorum. Yarın daha iyi olur.',
-      },
-    },
-  ],
-  42: [
-    {
-      at: 4,
-      look: 'lezzetova',
-      name: 'Madam Lezzetova',
-      greet: 'Jüri başkanı olmadan önce bir kez daha tatmalıyım, şekerim.',
-      text: 'Miso suyuyla bir kalın soba. Tam 3 shiitake, 2 parça tofu, 2 tutam mısır, biraz çıtır soğan ve bol fasulye filizi. Seladon yeşil kasede olsun lütfen. Erişte diri kalsın.',
-      order: {
-        thick: 'kalin',
-        noodle: 'soba',
-        broth: 'miso',
-        bowl: 'seladon',
-        reqs: [
-          { id: 'mantar', mode: 'exact', n: 3 },
-          { id: 'tofu', mode: 'exact', n: 2 },
-          { id: 'misir', mode: 'exact', n: 2 },
-          { id: 'citir', mode: 'biraz' },
-          { id: 'filiz', mode: 'bol' },
-        ],
-        rules: [],
-        cook: 'dente',
-      },
-      bonus: 150,
-      reactions: {
-        great: 'Mükemmel. Festivalde de böyle şaşırt beni.',
-        ok: 'İyi… ama festivalde “iyi” yetmez.',
-        bad: 'Endişeliyim şekerim. Çok endişeliyim.',
-      },
-    },
-  ],
-  46: [
-    {
-      at: 5,
-      look: 'baron',
-      name: 'Sahte Balıkçı',
-      greet: 'Ahoy! Ben… balıkçıyım. Gerçek bir balıkçı. Hmph.',
-      text: 'Tavuk suyuyla bir ince ramen. Tam 2 tempura karides, 2 dilim naruto, 1 dilim limon ve bol yeşil soğan. Siyah mat kasede olsun lütfen.',
-      order: {
-        thick: 'ince',
-        noodle: 'ramen',
-        broth: 'tavuk',
-        bowl: 'siyah',
-        reqs: [
-          { id: 'karides', mode: 'exact', n: 2 },
-          { id: 'naruto', mode: 'exact', n: 2 },
-          { id: 'lime', mode: 'exact', n: 1 },
-          { id: 'yesil', mode: 'bol' },
-        ],
-        rules: [],
-        cook: 'perfect',
-      },
-      bonus: 100,
-      reactions: {
-        great: '(Takma sakalı düşer.) …Bunu da mı beceriyorsunuz? Hmph. Çok lezzetli.',
-        ok: 'Hmph. Bir balıkçı bundan fazlasını bekler.',
-        bad: 'Ha! Karides bile üzgün görünüyor!',
-      },
-    },
-  ],
-  49: [
-    {
-      at: 3,
-      look: 'hana',
-      name: 'Hana Nine',
-      greet: 'Sıra bende! Festivalde nineler de acıkır.',
-      text: 'Köri suyuyla bir orta kalınlıkta pirinç eriştesi. Tam 2 tempura karides, 2 dilim limon, bol fasulye filizi, biraz kırmızı biber ve susam. Sakura desenli kasede olsun lütfen.',
-      order: {
-        thick: 'orta',
-        noodle: 'pirinc',
-        broth: 'kori',
-        bowl: 'sakura',
-        reqs: [
-          { id: 'karides', mode: 'exact', n: 2 },
-          { id: 'lime', mode: 'exact', n: 2 },
-          { id: 'filiz', mode: 'bol' },
-          { id: 'biber', mode: 'biraz' },
-          { id: 'susam', mode: 'var' },
-        ],
-        rules: [],
-        cook: 'perfect',
-      },
-      bonus: 120,
-      reactions: {
-        great: 'Mmm… Bu kaseyle festival kazanılır, evladım!',
-        ok: 'Güzel. Yarın biraz daha dikkat, olur mu?',
-        bad: 'Yorgunsun. Derin bir nefes al; yarın büyük gün.',
-      },
-    },
-  ],
-  50: [
-    {
-      at: 3,
-      look: 'lezzetova',
-      name: 'Madam Lezzetova',
-      greet: 'Jüri başkanı olarak buradayım.',
-      text: 'Kemik suyuyla bir kalın udon. Tam 2 tempura karides, 3 dilim naruto ve 2 yaprak nori. Şaşırt beni.',
-      order: {
-        thick: 'kalin',
-        noodle: 'udon',
-        broth: 'tonkotsu',
-        bowl: null,
-        reqs: [
-          { id: 'karides', mode: 'exact', n: 2 },
-          { id: 'naruto', mode: 'exact', n: 3 },
-          { id: 'nori', mode: 'exact', n: 2 },
-        ],
-        rules: [],
-        cook: 'perfect',
-      },
-      bonus: 150,
-      reactions: {
-        great: 'Jüri notu: on üzerinden on!',
-        ok: 'Jüri notu: yedi. Fena değil.',
-        bad: 'Jüri notu: üç. Üzgünüm.',
-      },
-    },
-    {
-      at: 8,
-      look: 'baron',
-      name: 'Baron Kraker',
-      greet: '…Merhaba. Bu sefer kılık yok.',
-      text: 'Soya suyuyla bir ince pirinç eriştesi. 1 yumurta, bol susam, biraz yeşil soğan ve 2 shiitake. Annemin yaptığı gibi. Sade. Lütfen.',
-      order: {
-        thick: 'ince',
-        noodle: 'pirinc',
-        broth: 'shoyu',
-        bowl: null,
-        reqs: [
-          { id: 'yumurta', mode: 'exact', n: 1 },
-          { id: 'susam', mode: 'bol' },
-          { id: 'yesil', mode: 'biraz' },
-          { id: 'mantar', mode: 'exact', n: 2 },
-        ],
-        rules: [],
-        cook: 'perfect',
-      },
-      bonus: 200,
-      reactions: {
-        great: 'Annem… tam böyle yapardı. (Gözlerini siler.)',
-        ok: 'Güzel. Ama anneminki daha sıcaktı.',
-        bad: 'Sanırım bazı tatlar geri gelmiyor.',
-      },
-    },
-  ],
-};
-
-const GROUP_GREETS = [
-  'Selam şef! Arkadaşlarımla geldik, hepimiz açız.',
-  'Üç kişiyiz, masa var mı? Siparişleri sırayla verelim.',
-  'Ekip olarak geldik! Herkes kendi kasesini söylesin.',
-];
-
-/** Builds the i-th customer of a day on demand (the day is time-based, so there is no fixed list). */
-export function makeCustomer(levelId: number, i: number): Customer {
-  const lv = LEVELS[levelId - 1];
-  const specials = SPECIALS[levelId] ?? [];
-  const sp = specials.find((s) => s.at === i);
-  const basePatience = Math.max(70, 150 - levelId * 6);
-  if (sp) {
-    return {
-      id: i,
-      phone: false,
-      special: sp.look,
-      members: [
-        {
-          name: L(sp.name),
-          look: { seed: 7, special: sp.look },
-          order: sp.order,
-          text: L(sp.text),
-        },
-      ],
-      greet: L(sp.greet),
-      patience: basePatience + 40,
-      bonus: sp.bonus,
-      reactions: {
-        great: L(sp.reactions.great),
-        ok: L(sp.reactions.ok),
-        bad: L(sp.reactions.bad),
-      },
-    };
-  }
-  const phoneRatio = lv.phone / lv.customers;
-  const phone = levelId >= 10 && i > 0 && Math.random() < phoneRatio; // online orders start on day 10
-  const force = (globalThis as { __forceGroup?: boolean }).__forceGroup === true; // test hook
-  const group = !phone && levelId >= 5 && force; // friends arriving together is off for now (customers come one by one)
-  const n = group ? 2 + (Math.random() < 0.5 ? 1 : 0) : 1;
-  const members: Member[] = [];
-  for (let k = 0; k < n; k++) {
-    const order = randomOrder(levelId);
-    const look = randomLook(Math.floor(Math.random() * 1e9));
-    members.push({
-      name: phone
-        ? L(pick(ONLINE_NAMES))
-        : pick(
-            getLang() === 'en'
-              ? isFeminine(look)
-                ? FEMALE_EN
-                : MALE_EN
-              : isFeminine(look)
-                ? FEMALE
-                : MALE
-          ),
-      look,
-      order,
-      text: orderText(order),
+  const lines: OLine[] = [];
+  const used = new Set<string>();
+  let budget = 12;
+  let guard = 0;
+  // the newest dish of the day shows up more often so the new thing gets practiced
+  const fresh = newestKind(n);
+  while (lines.length < lineCount && guard++ < 30) {
+    const k =
+      lines.length === 0 && fresh && kinds.includes(fresh) && chance(r, 0.5)
+        ? fresh
+        : pick(r, kinds);
+    if (variety && used.has(k)) continue;
+    const line = makeLine(k, n, tier, r, {
+      netaPool,
+      fillPool,
+      topPool,
+      fishPool,
+      kid: !!opts.kid,
     });
+    if (!line) continue;
+    const key = lineKey(line);
+    if (used.has(key)) continue;
+    const size = line.n;
+    if (size > budget) continue;
+    budget -= size;
+    used.add(key);
+    if (variety) used.add(k);
+    lines.push(line);
+  }
+  if (!lines.length) lines.push({ k: 'nigiri', fish: 'salmon', n: 2, less: false, tops: [] });
+
+  // sides
+  const sides: IngId[] = [];
+  const forbid: IngId[] = [];
+  if (chance(r, 0.6)) sides.push('soy');
+  if (has('ginger') && chance(r, 0.45)) sides.push('ginger');
+  if (tier >= 3 && chance(r, 0.3) && !opts.kid) forbid.push('wasabi');
+  else if (chance(r, opts.kid ? 0.1 : 0.5)) sides.push('wasabi');
+
+  let plate: PlateId | undefined;
+  const plates = unlockedPlates(n);
+  if (!opts.online && tier >= 3 && plates.length > 1 && chance(r, 0.3)) plate = pick(r, plates);
+
+  return { lines, sides, forbid, plate, veg: veg || undefined, variety, online: opts.online };
+}
+
+function newestKind(n: number): OLine['k'] | null {
+  if (n === STYLE_DAY.hoso || n === STYLE_DAY.ura || n === STYLE_DAY.futo) return 'maki';
+  if (n === SASHIMI_DAY) return 'sashimi';
+  if (n === TEMAKI_DAY) return 'temaki';
+  return null;
+}
+
+function lineKey(l: OLine) {
+  switch (l.k) {
+    case 'nigiri':
+      return 'n:' + l.fish;
+    case 'sashimi':
+      return 's:' + l.fish;
+    case 'maki':
+      return 'm:' + l.style + [...l.fill].sort().join();
+    case 'temaki':
+      return 't:' + [...l.fill].sort().join();
+  }
+}
+
+function makeLine(
+  k: OLine['k'],
+  day: number,
+  tier: number,
+  r: Rng,
+  p: { netaPool: IngId[]; fillPool: IngId[]; topPool: IngId[]; fishPool: IngId[]; kid: boolean }
+): OLine | null {
+  const tops = (max: number, pool = p.topPool): IngId[] => {
+    if (tier < 3 || !pool.length) return [];
+    const out: IngId[] = [];
+    if (chance(r, 0.35)) out.push(pick(r, pool));
+    if (max > 1 && tier >= 5 && chance(r, 0.15)) {
+      const b = pick(r, pool);
+      if (!out.includes(b)) out.push(b);
+    }
+    return out;
+  };
+  switch (k) {
+    case 'nigiri': {
+      if (!p.netaPool.length) return null;
+      const fish = pick(r, p.netaPool);
+      const n = p.kid ? 2 : pick(r, tier <= 1 ? [2, 2, 3, 4] : [2, 3, 4, 4]);
+      const t =
+        fish === 'tamago'
+          ? ['noriband' as IngId]
+          : fish === 'unagi'
+            ? ['unagisauce' as IngId]
+            : tops(1);
+      return { k: 'nigiri', fish, n, less: tier >= 2 && chance(r, 0.15), tops: t };
+    }
+    case 'maki': {
+      const styles = (['hoso', 'ura', 'futo'] as MakiStyle[]).filter((s) => day >= STYLE_DAY[s]);
+      const style = pick(r, styles);
+      const pool = [...p.fillPool];
+      const fill: IngId[] = [];
+      const want = style === 'hoso' ? 1 : style === 'ura' ? 2 : 3;
+      if (pool.length < want) return null;
+      while (fill.length < want) {
+        const f = pick(r, pool);
+        if (!fill.includes(f)) fill.push(f);
+      }
+      let coat: IngId | undefined;
+      if (style === 'ura') {
+        const coats = (['sesame', 'tobiko'] as IngId[]).filter((c) => p.topPool.includes(c));
+        coat = coats.length ? pick(r, coats) : undefined;
+      }
+      const n: 6 | 8 = style === 'hoso' ? 6 : chance(r, 0.6) ? 8 : 6;
+      const t =
+        tier >= 4
+          ? tops(
+              1,
+              p.topPool.filter((x) => x === 'spicymayo' || x === 'scallion')
+            )
+          : [];
+      return { k: 'maki', style, fill, coat, n, tops: t };
+    }
+    case 'sashimi': {
+      const fish = pick(r, p.fishPool);
+      const thick = pick(r, ['normal', 'normal', 'thin', 'thick'] as Thick[]);
+      return { k: 'sashimi', fish, n: chance(r, 0.6) ? 3 : 5, thick };
+    }
+    case 'temaki': {
+      const fill: IngId[] = [pick(r, p.fillPool)];
+      if (chance(r, 0.5)) {
+        const b = pick(r, p.fillPool);
+        if (!fill.includes(b)) fill.push(b);
+      }
+      return { k: 'temaki', fill, n: p.kid ? 1 : chance(r, 0.5) ? 1 : 2, tops: tops(1) };
+    }
+  }
+}
+
+/** hand-written orders for special guests */
+export function specialOrder(id: string): Order {
+  switch (id) {
+    case 'tuna-sashimi':
+      return {
+        lines: [{ k: 'sashimi', fish: 'tuna', n: 3, thick: 'thin' }],
+        sides: ['soy'],
+        forbid: [],
+      };
+    case 'stranger-ura':
+      return {
+        lines: [
+          { k: 'maki', style: 'ura', fill: ['crab', 'avocado'], coat: 'sesame', n: 8, tops: [] },
+        ],
+        sides: ['soy', 'ginger'],
+        forbid: [],
+      };
+    case 'gleam-temaki':
+      return {
+        lines: [{ k: 'temaki', fill: ['salmon'], n: 2, tops: ['spicymayo'] }],
+        sides: [],
+        forbid: [],
+      };
+    case 'critic-plate':
+      return {
+        lines: [
+          { k: 'nigiri', fish: 'salmon', n: 2, less: false, tops: [] },
+          { k: 'nigiri', fish: 'tamago', n: 2, less: false, tops: ['noriband'] },
+        ],
+        sides: ['ginger'],
+        forbid: ['wasabi'],
+        plate: 'porcelain',
+      };
   }
   return {
-    id: i,
-    phone,
-    members,
-    greet: L(
-      phone
-        ? pick(PHONE_GREETS)
-        : group
-          ? pick(GROUP_GREETS)
-          : lv.rain && Math.random() < 0.5
-            ? pick(RAIN_GREETS)
-            : pick(GREETS)
-    ),
-    patience: phone ? basePatience + 60 : basePatience * (group ? 1.6 : 1),
-    bonus: 0,
+    lines: [{ k: 'nigiri', fish: 'salmon', n: 2, less: false, tops: [] }],
+    sides: [],
+    forbid: [],
   };
 }
 
-// ---------- judging ----------
+// ---------- words ----------
 
-export interface Verdict {
-  score: number; // 0..100
-  notes: string[];
-  praise: string[];
+const ADJ: Partial<Record<IngId, L>> = {
+  salmon: { tr: 'somonlu', en: 'salmon' },
+  tuna: { tr: 'ton balıklı', en: 'tuna' },
+  cucumber: { tr: 'salatalıklı', en: 'cucumber' },
+  avocado: { tr: 'avokadolu', en: 'avocado' },
+  crab: { tr: 'yengeçli', en: 'crab' },
+  creamcheese: { tr: 'krem peynirli', en: 'cream cheese' },
+  tempura: { tr: 'tempuralı', en: 'tempura' },
+  tamago: { tr: 'tamagolu', en: 'tamago' },
+  unagi: { tr: 'unagili', en: 'eel' },
+  sesame: { tr: 'susamlı', en: 'sesame' },
+  tobiko: { tr: 'tobikolu', en: 'tobiko' },
+  scallion: { tr: 'taze soğanlı', en: 'scallion' },
+  spicymayo: { tr: 'acı mayolu', en: 'spicy mayo' },
+  unagisauce: { tr: 'unagi soslu', en: 'eel sauce' },
+  noriband: { tr: 'nori kuşaklı', en: 'nori belt' },
+};
+const NOUN: Partial<Record<IngId, L>> = {
+  salmon: { tr: 'somon', en: 'salmon' },
+  tuna: { tr: 'ton balığı', en: 'tuna' },
+  tamago: { tr: 'tamago', en: 'tamago' },
+  unagi: { tr: 'unagi', en: 'eel' },
+};
+const THICK: Record<Thick, L> = {
+  thin: { tr: 'ince', en: 'thin' },
+  normal: { tr: 'normal', en: 'regular' },
+  thick: { tr: 'kalın', en: 'thick' },
+};
+const STYLE: Record<MakiStyle, L> = {
+  hoso: { tr: 'hoso maki', en: 'hosomaki' },
+  futo: { tr: 'futo maki', en: 'futomaki' },
+  ura: { tr: 'ura maki', en: 'uramaki' },
+};
+
+function joinWords(a: string[]) {
+  const and = getLang() === 'tr' ? ' ve ' : ' and ';
+  if (a.length <= 1) return a.join('');
+  return a.slice(0, -1).join(', ') + and + a[a.length - 1];
 }
+const adj = (i: IngId) => tx(ADJ[i] ?? ING[i].name);
+const noun = (i: IngId) => tx(NOUN[i] ?? ING[i].name);
+const suffix6 = (n: number) => (n === 6 ? "6'lık" : "8'lik");
 
-function countOf(b: BowlState) {
-  const m = new Map<string, number>();
-  for (const p of b.pieces) m.set(p.id, (m.get(p.id) ?? 0) + 1);
-  return m;
-}
-
-/** Templated judge notes: [tr, en] with {name}/{n}/{have}/{list} placeholders. */
-const NOTE = {
-  wanted: ['{name} istemiştim', 'I asked for {name}'],
-  wantedThick: ['{name} erişte istemiştim', 'I asked for {name} noodles'],
-  wantedBowl: ['{name} kase istemiştim', 'I asked for the {name} bowl'],
-  none: ['{name} yok', 'No {name}'],
-  missing: ['{name} eksik ({have}/{n})', '{name} missing ({have}/{n})'],
-  tooMany: ['{name} fazla ({have}/{n})', 'Too much {name} ({have}/{n})'],
-  moreOf: ['Daha bol {name} olmalıydı', 'Should have had more {name}'],
-  bitMuch: ['{name} biraz fazla', 'A bit too much {name}'],
-  unwanted: ['İstemediğim şeyler var ({list})', 'There are things I didn’t want ({list})'],
-  saidNo: ['{name} olmasın demiştim!', 'I said no {name}!'],
-  kinds: ['{n} çeşit istemiştim', 'I asked for {n} kinds'],
-  cooked: ['Erişte {name} olmuş', 'The noodles came out {name}'],
-} as const;
-
-function note(key: keyof typeof NOTE, vars: Record<string, string | number>): string {
-  let s: string = NOTE[key][en() ? 1 : 0];
-  for (const [k, v] of Object.entries(vars)) s = s.replace(`{${k}}`, String(v));
-  return s;
-}
-
-export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
-  const notes: string[] = [];
-  const praise: string[] = [];
-  let score = 0;
-  // noodle 20
-  if (!b.noodle) notes.push(L('Erişte yok!'));
-  else if (o.noodle && b.noodle !== o.noodle) notes.push(note('wanted', { name: name(o.noodle) }));
-  else score += 20;
-  if (b.noodle && o.thick && b.thick !== o.thick) {
-    score -= 8;
-    const t = L(THICK_LABEL[o.thick]);
-    notes.push(note('wantedThick', { name: en() ? t.toLowerCase() : t }));
-  }
-  if (o.bowl && b.style !== o.bowl) {
-    score -= 8;
-    const bn = L(bowlStyle(o.bowl).name);
-    notes.push(note('wantedBowl', { name: en() ? bn.toLowerCase() : bn }));
-  }
-  // broth 15 + fill 10
-  const wantCat = o.broth ? INGREDIENTS[o.broth].cat : 'broth';
-  if (!b.broth || b.fill < 0.15) notes.push(L(wantCat === 'sauce' ? 'Sos yok!' : 'Çorba yok!'));
-  else if (o.broth && b.broth !== o.broth) notes.push(note('wanted', { name: name(o.broth) }));
-  else score += 15;
-  if (b.broth) {
-    const sauce = INGREDIENTS[b.broth].cat === 'sauce';
-    if (b.fill >= 0.72 && b.fill <= 1.03) score += 10;
-    else if (b.fill > 1.03) {
-      score += 3;
-      notes.push(L(sauce ? 'Sos çok fazla' : 'Çorba taşmış'));
-    } else if (b.fill >= 0.45) {
-      score += 5;
-      notes.push(L(sauce ? 'Sos az kalmış' : 'Çorba az kalmış'));
-    } else notes.push(L('Neredeyse çorba yok'));
-  }
-  // toppings 35
-  const cnt = countOf(b);
-  const reqIds = new Set(o.reqs.map((r) => r.id));
-  let topScore = 0;
-  if (o.reqs.length) {
-    let sum = 0;
-    for (const r of o.reqs) {
-      const have = cnt.get(r.id) ?? 0;
-      const nm = name(r.id);
-      const lo = lower(r.id);
-      let v = 0;
-      if (r.mode === 'exact') {
-        const n = r.n ?? 1;
-        v = have === n ? 1 : Math.max(0, 1 - Math.abs(have - n) / n);
-        if (have === 0) notes.push(note('none', { name: en() ? lo : nm }));
-        else if (have < n) notes.push(note('missing', { name: nm, have, n }));
-        else if (have > n) notes.push(note('tooMany', { name: en() ? lo : nm, have, n }));
-      } else if (r.mode === 'bol') {
-        v = Math.min(1, have / 5);
-        if (have === 0) notes.push(note('none', { name: en() ? lo : nm }));
-        else if (have < 5) notes.push(note('moreOf', { name: lo }));
-      } else if (r.mode === 'biraz') {
-        v = have === 0 ? 0 : have <= 3 ? 1 : Math.max(0.4, 1 - (have - 3) * 0.15);
-        if (have === 0) notes.push(note('none', { name: en() ? lo : nm }));
-        else if (have > 3) notes.push(note('bitMuch', { name: en() ? lo : nm }));
-      } else {
-        v = have > 0 ? 1 : 0;
-        if (!have) notes.push(note('none', { name: en() ? lo : nm }));
+export function linePhrase(l: OLine): string {
+  const tr = getLang() === 'tr';
+  switch (l.k) {
+    case 'nigiri': {
+      if (tr) {
+        const a = [...(l.less ? ['az pirinçli'] : []), ...l.tops.map(adj)];
+        return `${l.n} ${a.length ? a.join(', ') + ' ' : ''}${noun(l.fish)} nigiri`;
       }
-      sum += v;
+      const w = l.tops.length ? ' with ' + joinWords(l.tops.map(adj)) : '';
+      return `${l.n} ${noun(l.fish)} nigiri${l.less ? ', light on rice' : ''}${w}`;
     }
-    topScore = (35 * sum) / o.reqs.length;
-  } else topScore = cnt.size >= 2 ? 35 : cnt.size * 15;
-  const allowExtra = o.rules.some((r) => r.t === 'free' || r.t === 'variety');
-  if (!allowExtra) {
-    const extras = [...cnt.keys()].filter((k) => !reqIds.has(k));
-    if (extras.length) {
-      topScore -= Math.min(24, extras.length * 8);
-      notes.push(note('unwanted', { list: extras.map((e) => name(e)).join(', ') }));
+    case 'maki': {
+      if (tr) {
+        const a = [...l.fill.map(adj)];
+        const coat = l.coat ? `, dışı ${l.coat === 'sesame' ? 'susamlı' : 'tobikolu'}` : '';
+        const t = l.tops.length ? `, üstü ${l.tops.map(adj).join(' ve ')}` : '';
+        return `${suffix6(l.n)} ${a.join(' ')} ${tx(STYLE[l.style])}${coat}${t}`;
+      }
+      const coat = l.coat ? `, ${l.coat === 'sesame' ? 'sesame' : 'tobiko'} outside` : '';
+      const t = l.tops.length ? ' with ' + joinWords(l.tops.map(adj)) + ' on top' : '';
+      return `${l.n}-piece ${joinWords(l.fill.map(adj))} ${tx(STYLE[l.style])}${coat}${t}`;
     }
-  }
-  score += Math.max(0, topScore);
-  for (const r of o.rules) {
-    if (r.t === 'no' && (cnt.get(r.id) ?? 0) > 0) {
-      score -= 30;
-      notes.push(note('saidNo', { name: en() ? lower(r.id) : name(r.id) }));
-    }
-    if (r.t === 'veg' && MEAT.some((m) => cnt.has(m))) {
-      score -= 30;
-      notes.push(L('Et yemiyorum demiştim!'));
-    }
-    if (r.t === 'spicy') {
-      const spicy =
-        b.broth === 'acili' || cnt.has('aciyag') || cnt.has('biber') || cnt.has('kimchi');
-      if (!spicy) {
-        score -= 20;
-        notes.push(L('Hiç acı değil!'));
-      } else praise.push(L('Tam istediğim gibi acı!'));
-    }
-    if (r.t === 'variety') {
-      if (cnt.size < r.n) {
-        score -= 10 * (r.n - cnt.size);
-        notes.push(note('kinds', { n: r.n }));
-      } else praise.push(L('Rengârenk olmuş!'));
+    case 'sashimi':
+      return tr
+        ? `${l.n} ${tx(THICK[l.thick])} ${noun(l.fish)} sashimi`
+        : `${l.n} ${tx(THICK[l.thick])} ${noun(l.fish)} sashimi`;
+    case 'temaki': {
+      if (tr) {
+        const t = l.tops.length ? l.tops.map(adj).join(', ') + ' ' : '';
+        return `${l.n} ${t}${l.fill.map(adj).join(' ')} temaki`;
+      }
+      const t = l.tops.length ? ' with ' + joinWords(l.tops.map(adj)) : '';
+      return `${l.n} ${joinWords(l.fill.map(adj))} temaki${t}`;
     }
   }
-  // cook 20
-  const cs = cookOf(b);
-  const want: CookState = o.cook;
-  const seq: CookState[] = ['raw', 'dente', 'perfect', 'soft', 'burnt'];
-  const d = Math.abs(seq.indexOf(cs) - seq.indexOf(want));
-  if (!b.noodle) {
-    /* already noted */
-  } else if (cs === 'burnt') notes.push(L('Erişte lapa olmuş'));
-  else if (cs === 'raw') notes.push(L('Erişte çiğ kalmış'));
-  else if (d === 0) {
-    score += 20;
-    praise.push(L(want === 'perfect' ? 'Erişte tam kıvamında!' : 'Erişte tam istediğim gibi!'));
-  } else if (d === 1) {
-    score += 10;
-    const cl = L(COOK_LABEL[cs]);
-    notes.push(
-      want === 'dente'
-        ? L('Erişte biraz fazla pişmiş')
-        : want === 'soft'
-          ? L('Biraz daha yumuşak olmalıydı')
-          : note('cooked', { name: en() ? cl.toLowerCase() : cl.toLocaleLowerCase('tr') })
-    );
-  }
-  // distribution
-  const tp = b.pieces;
-  if (tp.length >= 4) {
-    const cx = tp.reduce((s, p) => s + p.x, 0) / tp.length;
-    const cy = tp.reduce((s, p) => s + p.y, 0) / tp.length;
-    const off = Math.hypot(cx - BOWL_C, cy - BOWL_C);
-    if (off > 55) {
-      score -= 5;
-      notes.push(L('Malzemeler bir kenara yığılmış'));
-    } else if (off < 25) praise.push(L('Malzemeler çok güzel dağılmış'));
-  }
-  if (waitFrac > 0.55) {
-    score -= Math.min(18, Math.round((waitFrac - 0.55) * 40));
-    notes.push(L(waitFrac > 0.85 ? 'Çok bekledim!' : 'Biraz uzun sürdü'));
-  } else if (waitFrac < 0.3) praise.push(L('Çok hızlıydı!'));
-  score = Math.round(Math.max(0, Math.min(100, score)));
-  if (score >= 95 && !praise.length) praise.push(L('Kusursuz!'));
-  return { score, notes, praise };
 }
 
-export function reactionLine(c: Customer, score: number): string {
-  if (c.reactions)
-    return score >= 85 ? c.reactions.great : score >= 55 ? c.reactions.ok : c.reactions.bad;
-  if (score >= 95)
-    return L(
-      pick([
-        'Bu hayatımda yediğim en iyi noodle!',
-        'Aşık oldum! Her gün geleceğim!',
-        'Mükemmel! Ellerine sağlık şef!',
-      ])
+const GREET_TR = ['Merhaba!', 'Selam!', 'İyi günler!', 'Kolay gelsin!', 'Merhabalar!'];
+const GREET_EN = ['Hi there!', 'Hello!', 'Good day!', 'Hey!', 'Hiya!'];
+const KID_TR = ['Merhabaaa!', 'Selam şef!', 'Ben de sushi istiyorum!'];
+const KID_EN = ['Hiii!', 'Hey chef!', 'I want sushi too!'];
+
+/** what the customer says out loud — complete and unambiguous */
+export function orderSpeech(o: Order, r: Rng, kid = false, greet?: string): string {
+  const tr = getLang() === 'tr';
+  const parts: string[] = [];
+  parts.push(greet ?? (kid ? pick(r, tr ? KID_TR : KID_EN) : pick(r, tr ? GREET_TR : GREET_EN)));
+  if (o.veg) parts.push(tr ? 'Balık yemiyorum.' : 'I don’t eat fish.');
+  const items = o.lines.map(linePhrase);
+  if (o.variety)
+    parts.push(
+      tr
+        ? `Karışık bir tabak, en az ${o.variety} çeşit: ${joinWords(items)}.`
+        : `A mixed plate, at least ${o.variety} kinds: ${joinWords(items)}.`
     );
-  if (score >= 80)
-    return L(pick(['Çok lezzetli, teşekkürler!', 'Harika olmuş!', 'Tam aradığım tat!']));
-  if (score >= 55) return L(pick(['Fena değil.', 'İdare eder.', 'Güzel ama…']));
-  if (score >= 30) return L(pick(['Hmm… ben bunu istememiştim.', 'Bu biraz farklı olmuş.']));
-  return L(pick(['Bu ne böyle?!', 'Bir daha gelmem!', 'Ciddi misin şef?']));
+  else parts.push(tr ? `${joinWords(items)} alayım.` : `I’ll have ${joinWords(items)}.`);
+  if (o.sides.length) {
+    const s = joinWords(o.sides.map((i) => tx(ING[i].name).toLowerCase()));
+    parts.push(tr ? `Yanında ${s} olsun.` : `With ${s} on the side.`);
+  }
+  if (o.forbid.length) {
+    const s = joinWords(o.forbid.map((i) => tx(ING[i].name)));
+    parts.push(tr ? `${s} olmasın lütfen!` : `No ${s.toLowerCase()}, please!`);
+  }
+  if (o.plate) {
+    const p = PLATES.find((x) => x.id === o.plate)!;
+    parts.push(tr ? `${tx(p.name)} tabakta olsun.` : `On the ${tx(p.name).toLowerCase()} plate.`);
+  }
+  if (o.lines.some((l) => 'tops' in l && l.tops.includes('spicymayo')))
+    parts.push(tr ? 'Acı olsun!' : 'Make it spicy!');
+  return parts.join(' ');
 }
 
-export function starsFor(avg: number) {
-  return avg >= 90 ? 3 : avg >= 75 ? 2 : avg >= 55 ? 1 : 0;
+/** compact rows for the paper ticket */
+export interface TicketRow {
+  text: string;
+  sub?: string;
+  ok: boolean;
+  bad?: boolean;
+}
+export function ticketRows(o: Order, pieces: Piece[], plateId?: PlateId): TicketRow[] {
+  const tr = getLang() === 'tr';
+  const rows: TicketRow[] = [];
+  const res = matchLines(o, pieces);
+  o.lines.forEach((l, i) => {
+    const subs: string[] = [];
+    let head = '';
+    switch (l.k) {
+      case 'nigiri':
+        head = `${l.n}× ${cap(noun(l.fish))} nigiri`;
+        if (l.less) subs.push(tr ? 'az pirinç' : 'light rice');
+        l.tops.forEach((t) => subs.push(tx(ING[t].name).toLowerCase()));
+        break;
+      case 'maki':
+        head = `${l.n}× ${cap(tx(STYLE[l.style]))}`;
+        subs.push(l.fill.map((f) => tx(ING[f].name).toLowerCase()).join(' + '));
+        if (l.coat) subs.push((tr ? 'dışı ' : 'outside: ') + tx(ING[l.coat].name).toLowerCase());
+        l.tops.forEach((t) => subs.push((tr ? 'üstü ' : 'top: ') + tx(ING[t].name).toLowerCase()));
+        break;
+      case 'sashimi':
+        head = `${l.n}× ${cap(noun(l.fish))} sashimi`;
+        subs.push(tx(THICK[l.thick]));
+        break;
+      case 'temaki':
+        head = `${l.n}× Temaki`;
+        subs.push(l.fill.map((f) => tx(ING[f].name).toLowerCase()).join(' + '));
+        l.tops.forEach((t) => subs.push(tx(ING[t].name).toLowerCase()));
+        break;
+    }
+    rows.push({ text: head, sub: subs.join(' · '), ok: res.lineOk[i] });
+  });
+  if (o.sides.length) {
+    const have = new Set(
+      pieces.filter((p) => p.kind === 'side').map((p) => (p as { ing: IngId }).ing)
+    );
+    rows.push({
+      text: o.sides.map((s) => tx(ING[s].name)).join(' · '),
+      ok: o.sides.every((s) => have.has(s)),
+    });
+  }
+  o.forbid.forEach((f) => {
+    const bad = pieces.some((p) => p.kind === 'side' && p.ing === f);
+    rows.push({
+      text: tr ? `${tx(ING[f].name)} YOK` : `NO ${tx(ING[f].name).toUpperCase()}`,
+      ok: !bad,
+      bad,
+    });
+  });
+  if (o.plate) {
+    const p = PLATES.find((x) => x.id === o.plate)!;
+    rows.push({ text: (tr ? 'Tabak: ' : 'Plate: ') + tx(p.name), ok: plateId === o.plate });
+  }
+  return rows;
+}
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// ---------- matching & scoring ----------
+
+function identity(l: OLine, p: PieceBody): boolean {
+  switch (l.k) {
+    case 'nigiri':
+      return p.kind === 'nigiri' && p.neta === l.fish;
+    case 'maki':
+      return (
+        p.kind === 'maki' &&
+        p.style === l.style &&
+        sameSet(p.fill, l.fill) &&
+        (p.coat ?? null) === (l.coat ?? null)
+      );
+    case 'sashimi':
+      return p.kind === 'sashimi' && p.fish === l.fish;
+    case 'temaki':
+      return p.kind === 'temaki' && sameSet(p.fill, l.fill);
+  }
+}
+
+interface MatchResult {
+  assigned: Piece[][];
+  extra: Piece[];
+  lineOk: boolean[];
+}
+
+export function matchLines(o: Order, pieces: Piece[]): MatchResult {
+  const pool = pieces.filter((p) => p.kind !== 'side');
+  const taken = new Set<number>();
+  const assigned: Piece[][] = o.lines.map((l) => {
+    const got: Piece[] = [];
+    for (const p of pool) {
+      if (got.length >= l.n) break;
+      if (taken.has(p.uid)) continue;
+      if (identity(l, p)) {
+        got.push(p);
+        taken.add(p.uid);
+      }
+    }
+    return got;
+  });
+  const extra = pool.filter((p) => !taken.has(p.uid));
+  const lineOk = o.lines.map(
+    (l, i) => assigned[i].length === l.n && assigned[i].every((p) => pieceRight(l, p))
+  );
+  return { assigned, extra, lineOk };
+}
+
+const topsEq = (want: IngId[], p: Piece) => {
+  const have = p.kind === 'nigiri' && p.band ? [...p.tops, 'noriband' as IngId] : p.tops;
+  return sameSet(want, have);
+};
+
+function pieceRight(l: OLine, p: Piece): boolean {
+  switch (l.k) {
+    case 'nigiri':
+      return (
+        p.kind === 'nigiri' &&
+        p.rice === (l.less ? 'less' : 'just') &&
+        topsEq(l.tops, p) &&
+        p.done !== 'raw'
+      );
+    case 'maki':
+      return p.kind === 'maki' && p.roll === 'tight' && p.cut === 'clean' && topsEq(l.tops, p);
+    case 'sashimi':
+      return p.kind === 'sashimi' && p.thick === l.thick && p.cut === 'clean';
+    case 'temaki':
+      return p.kind === 'temaki' && topsEq(l.tops, p) && p.rice !== 'more';
+  }
+}
+
+export type Reason =
+  | 'missing'
+  | 'extra'
+  | 'rice'
+  | 'tops'
+  | 'loose'
+  | 'crooked'
+  | 'thick'
+  | 'raw'
+  | 'over'
+  | 'forbid'
+  | 'plate'
+  | 'side'
+  | 'empty';
+
+export interface Score {
+  score: number;
+  complaint: boolean;
+  reasons: Reason[];
+}
+
+export function scorePlate(o: Order, pieces: Piece[], plate: PlateId): Score {
+  const reasons = new Set<Reason>();
+  let s = 100;
+  let complaint = false;
+  const m = matchLines(o, pieces);
+  if (!pieces.some((p) => p.kind !== 'side'))
+    return { score: 0, complaint: true, reasons: ['empty'] };
+
+  o.lines.forEach((l, i) => {
+    const got = m.assigned[i];
+    const miss = l.n - got.length;
+    if (miss > 0) {
+      s -= 12 * miss;
+      reasons.add('missing');
+      complaint = true;
+    }
+    let topsBad = 0;
+    let thickBad = 0;
+    for (const p of got) {
+      if (p.kind === 'nigiri') {
+        if (p.rice !== (l.k === 'nigiri' && l.less ? 'less' : 'just')) {
+          s -= 4;
+          reasons.add('rice');
+        }
+      }
+      if (p.kind === 'temaki' && p.rice === 'more') {
+        s -= 4;
+        reasons.add('rice');
+      }
+      if ('tops' in l && !topsEq(l.tops, p)) {
+        topsBad++;
+        s -= 5;
+      }
+      if (p.kind === 'maki') {
+        if (p.roll === 'loose') s -= 9;
+        if (p.roll === 'squashed') s -= 4;
+        if (p.cut === 'crooked') s -= 4;
+        if (p.rice !== 'just') s -= 1;
+      }
+      if (p.kind === 'sashimi') {
+        if (l.k === 'sashimi' && p.thick !== l.thick) {
+          thickBad++;
+          s -= 6;
+        }
+        if (p.cut === 'crooked') s -= 5;
+      }
+      const done = 'done' in p ? p.done : undefined;
+      if (done === 'raw') {
+        s -= 10;
+        reasons.add('raw');
+        complaint = true;
+      } else if (done === 'over') {
+        s -= 4;
+        reasons.add('over');
+      }
+    }
+    if (topsBad && topsBad * 2 >= got.length) {
+      reasons.add('tops');
+      complaint = true;
+    }
+    if (got.some((p) => p.kind === 'maki' && p.roll === 'loose')) {
+      reasons.add('loose');
+      complaint = true;
+    }
+    if (got.some((p) => (p.kind === 'maki' || p.kind === 'sashimi') && p.cut === 'crooked')) {
+      reasons.add('crooked');
+      if (got.filter((p) => 'cut' in p && p.cut === 'crooked').length * 2 >= got.length)
+        complaint = true;
+    }
+    if (thickBad && thickBad * 2 >= got.length) {
+      reasons.add('thick');
+      complaint = true;
+    }
+  });
+  if (m.extra.length) {
+    s -= 6 * m.extra.length;
+    reasons.add('extra');
+    complaint = true;
+  }
+  const sides = pieces.filter((p) => p.kind === 'side').map((p) => (p as { ing: IngId }).ing);
+  for (const f of o.forbid)
+    if (sides.includes(f)) {
+      s -= 25;
+      reasons.add('forbid');
+      complaint = true;
+    }
+  for (const want of o.sides)
+    if (!sides.includes(want)) {
+      s -= 6;
+      reasons.add('side');
+    }
+  const extraSides = new Set(sides.filter((x) => !o.sides.includes(x) && !o.forbid.includes(x)));
+  s -= 3 * extraSides.size;
+  if (o.plate && plate !== o.plate) {
+    s -= 15;
+    reasons.add('plate');
+    complaint = true;
+  }
+  return { score: Math.max(0, Math.min(100, Math.round(s))), complaint, reasons: [...reasons] };
+}
+
+/** what a complaining customer says */
+export const REASON_TEXT: Record<Reason, L> = {
+  missing: {
+    tr: 'Eksik var! Ben daha fazlasını istemiştim.',
+    en: 'Something’s missing! I ordered more than this.',
+  },
+  extra: {
+    tr: 'Bunu ben istemedim, tabakta fazlalık var.',
+    en: 'I didn’t order this, there’s extra on the plate.',
+  },
+  rice: { tr: 'Pirinç tam olmamış.', en: 'The rice isn’t quite right.' },
+  tops: { tr: 'Üstü dediğim gibi değil!', en: 'The topping isn’t what I asked for!' },
+  loose: { tr: 'Rulo dağılıyor!', en: 'The roll is falling apart!' },
+  crooked: { tr: 'Dilimler eğri kesilmiş.', en: 'The slices are cut crooked.' },
+  thick: { tr: 'Kalınlığı istediğim gibi değil.', en: 'That’s not the thickness I asked for.' },
+  raw: { tr: 'Bu pişmemiş!', en: 'This isn’t cooked!' },
+  over: { tr: 'Biraz fazla pişmiş.', en: 'A bit overcooked.' },
+  forbid: { tr: 'Wasabi koyma dedim!', en: 'I said no wasabi!' },
+  plate: { tr: 'Başka tabakta istemiştim.', en: 'I asked for a different plate.' },
+  side: { tr: 'Yan ürünü unutmuşsun.', en: 'You forgot the side.' },
+  empty: { tr: 'Tabak bomboş!', en: 'The plate is empty!' },
+};
+
+// ---------- price & cost ----------
+
+const NETA_PRICE: Partial<Record<IngId, number>> = { salmon: 8, tuna: 9, tamago: 6, unagi: 11 };
+export function orderPrice(o: Order): number {
+  let p = 0;
+  for (const l of o.lines) {
+    switch (l.k) {
+      case 'nigiri':
+        p += (NETA_PRICE[l.fish] ?? 7) * l.n;
+        break;
+      case 'maki':
+        p += (l.style === 'hoso' ? 3 : l.style === 'ura' ? 4 : 5) * l.n + l.fill.length * 2;
+        break;
+      case 'sashimi':
+        p += (l.fish === 'tuna' ? 9 : 8) * l.n;
+        break;
+      case 'temaki':
+        p += 14 * l.n + l.fill.length * 2;
+        break;
+    }
+    if ('tops' in l) p += l.tops.length * 2;
+  }
+  return Math.max(10, Math.round(p));
+}
+
+export function pieceCost(p: PieceBody, tops: IngId[]): number {
+  let c = tops.reduce((a, t) => a + ING[t].cost, 0);
+  switch (p.kind) {
+    case 'nigiri':
+      c += ING.rice.cost * 0.5 + (p.neta ? ING[p.neta].cost * 0.5 : 0) + (p.band ? 0.2 : 0);
+      break;
+    case 'side':
+      c += ING[p.ing].cost;
+      break;
+    default:
+      break; // maki/sashimi/temaki costs are paid when the roll/block is made
+  }
+  return c;
 }
