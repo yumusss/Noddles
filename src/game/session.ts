@@ -937,7 +937,11 @@ export class DaySession {
         }
       }
       if (this.hit(Lp.thickChips, lx, y, 4)) {
-        const k = Math.floor(((lx - Lp.thickChips.x) / Lp.thickChips.w) * 3);
+        const tc = Lp.thickChips;
+        const k =
+          tc.h > tc.w * 0.8
+            ? Math.floor(((y - tc.y) / tc.h) * 3)
+            : Math.floor(((lx - tc.x) / tc.w) * 3);
         this.drag = {
           kind: 'tap',
           target: 'thick:' + (['ince', 'orta', 'kalin'] as Thick[])[clamp(k, 0, 2)],
@@ -1915,22 +1919,31 @@ export class DaySession {
     });
     {
       const r = Lp.thickChips;
-      const cw = r.w / 3;
+      const vertical = r.h > r.w * 0.8;
+      const cw = vertical ? r.w : r.w / 3;
+      const ch = vertical ? r.h / 3 : r.h;
       (['ince', 'orta', 'kalin'] as Thick[]).forEach((tk, i) => {
-        const x = r.x + i * cw;
+        const x = vertical ? r.x : r.x + i * cw;
+        const y = vertical ? r.y + i * ch : r.y;
         const on = this.bowl.thick === tk;
         c.fillStyle = on ? PAL.coral : rgba(PAL.white, 0.75);
         c.strokeStyle = rgba(PAL.walnut, 0.35);
         c.lineWidth = 1.5;
         c.beginPath();
-        c.roundRect(x + 3, r.y, cw - 6, r.h, r.h / 2);
+        c.roundRect(x + 3, y + 2, cw - 6, ch - 4, (ch - 4) / 2);
         c.fill();
         c.stroke();
-        c.font = `800 ${Math.round(r.h * 0.5)}px "Baloo 2", system-ui`;
+        const label = L(THICK_LABEL[tk]);
+        let fs = Math.round((ch - 4) * 0.5);
+        c.font = `800 ${fs}px "Baloo 2", system-ui`;
+        while (fs > 10 && c.measureText(label).width > cw - 18) {
+          fs--;
+          c.font = `800 ${fs}px "Baloo 2", system-ui`;
+        }
         c.textAlign = 'center';
         c.textBaseline = 'middle';
         c.fillStyle = on ? '#fff' : PAL.ink;
-        c.fillText(L(THICK_LABEL[tk]), x + cw / 2, r.y + r.h / 2 + 1);
+        c.fillText(label, x + cw / 2, y + ch / 2 + 1);
       });
     }
     Lp.pots.forEach((r, i) => {

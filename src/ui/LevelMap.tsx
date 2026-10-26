@@ -5,7 +5,7 @@ import SceneCanvas from './SceneCanvas';
 import { salonScene } from './scenes';
 import { fmt } from '../game/money';
 import { sfx } from '../game/audio';
-import { L, T, getLang, setLang } from '../game/i18n';
+import { L, T } from '../game/i18n';
 
 const TOD_ICON = { sabah: '🌅', ogle: '☀️', gunbatimi: '🌇', aksam: '🌙' } as const;
 
@@ -50,12 +50,7 @@ export default function LevelMap({
           <button className="btn ghost small" onClick={() => onToggle('music')}>
             {save.music ? '🎵' : '🎵̸'}
           </button>
-          <button
-            className="btn ghost small"
-            onClick={() => {
-              setLang(getLang() === 'tr' ? 'en' : 'tr');
-              onLang();
-            }}>
+          <button className="btn ghost small" onClick={onLang}>
             {T('map.lang')}
           </button>
         </div>

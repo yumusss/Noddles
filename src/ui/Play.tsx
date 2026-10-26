@@ -5,7 +5,7 @@ import { LEVELS } from '../game/data';
 import { DENOMS, fmt, sum } from '../game/money';
 import { COOK_LABEL } from '../game/bowl';
 import { sfx } from '../game/audio';
-import { L, T, getLang, setLang } from '../game/i18n';
+import { L, T } from '../game/i18n';
 
 export default function Play({
   levelId,
@@ -73,12 +73,7 @@ export default function Play({
               <button className="btn ghost" onClick={() => onToggle('music')}>
                 {save.music ? T('play.musicOn') : T('play.musicOff')}
               </button>
-              <button
-                className="btn ghost"
-                onClick={() => {
-                  setLang(getLang() === 'tr' ? 'en' : 'tr');
-                  onLang();
-                }}>
+              <button className="btn ghost" onClick={onLang}>
                 {T('map.lang')}
               </button>
             </div>

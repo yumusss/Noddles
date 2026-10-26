@@ -5,7 +5,7 @@ import { DEFAULT_DECOR } from '../game/decor';
 import { drawBowlTop } from '../art/food';
 import type { BowlState } from '../game/bowl';
 import Fullscreen from './Fullscreen';
-import { T, getLang, setLang } from '../game/i18n';
+import { T } from '../game/i18n';
 
 const HERO: BowlState = {
   style: 'kirmizi',
@@ -49,12 +49,7 @@ export default function Title({
       <SceneCanvas draw={scene} className="bg" />
       <div className="title-veil" />
       <Fullscreen />
-      <button
-        className="btn ghost small lang-btn"
-        onClick={() => {
-          setLang(getLang() === 'tr' ? 'en' : 'tr');
-          onLang();
-        }}>
+      <button className="btn ghost small lang-btn" onClick={onLang}>
         {T('map.lang')}
       </button>
       <div className="title-body">

@@ -98,8 +98,39 @@ function pickRows(all: Rect[], n: number): Rect[] {
 function landscape(W: number, H: number): PrepLayout {
   const cx = W / 2;
   const wallH = 150;
-  const tub = 104;
+  const m = 24; // outer margin
+  const narrow = W < 1200; // 4:3 tablets
+  // trays: 2×2 on wide screens, a single column of 4 on narrow ones
+  const trW = narrow ? 100 : 110;
+  const trH = narrow ? 66 : 74;
+  const trCols = narrow ? 1 : 2;
+  const traysW = trCols * trW + (trCols - 1) * 14;
+  // pots: always 2 columns × 5
+  const pot = narrow ? 82 : 100;
+  const pgap = 8;
+  const potsW = 2 * pot + pgap;
+  // middle region for the bowl + tubs
+  const mx0 = m + traysW + 14;
+  const mx1 = W - m - potsW - 14;
+  const M = mx1 - mx0;
+  const bowlSize = narrow ? 280 : 300;
+  const gaugeW = 64;
+  const trashW = 72;
   const gap = 10;
+  // vertical budget: top row + side column (3 tubs) + bottom row must fit between the wall and the bottom edge
+  const vertMax = (H - 14 - (wallH + 16) - 4 * gap) / 5;
+  const tub = Math.round(
+    Math.max(
+      80,
+      Math.min(
+        110,
+        vertMax,
+        (M - 5 * gap) / 6,
+        (M - bowlSize - 44 - (gaugeW + 20) - (narrow ? 0 : trashW + 26)) / 2
+      )
+    )
+  );
+  const mcx = (mx0 + mx1) / 2;
   // shelf with 6 bowl slots
   const slotSp = 100;
   const shelfW = 6 * slotSp + 20;
@@ -110,44 +141,40 @@ function landscape(W: number, H: number): PrepLayout {
     h: 14,
     slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 114 })),
   };
-  // top & bottom tub rows (6 each)
+  // top & bottom tub rows (6 each), centred on the middle region
   const rowW = 6 * tub + 5 * gap;
-  const rowX = cx - rowW / 2;
+  const rowX = mcx - rowW / 2;
   const topY = wallH + 16;
   const botY = H - 14 - tub;
   const tubs: Rect[] = [];
   for (let i = 0; i < 6; i++) tubs.push({ x: rowX + i * (tub + gap), y: topY, w: tub, h: tub });
-  // bowl between the rows
-  const bowlSize = 300;
   const bowlY = (topY + tub + botY) / 2;
-  const bowl = { x: cx, y: bowlY, size: bowlSize };
-  // side tub columns (3 each) flush with the bowl's vertical extent
+  const bowl = { x: mcx, y: bowlY, size: bowlSize };
   const colH = 3 * tub + 2 * gap;
   const colY = bowlY - colH / 2;
-  const lx = cx - bowlSize / 2 - 22 - tub;
-  const rx = cx + bowlSize / 2 + 22;
+  const lx = mcx - bowlSize / 2 - 22 - tub;
+  const rx = mcx + bowlSize / 2 + 22;
   for (let i = 0; i < 3; i++) tubs.push({ x: lx, y: colY + i * (tub + gap), w: tub, h: tub });
   for (let i = 0; i < 3; i++) tubs.push({ x: rx, y: colY + i * (tub + gap), w: tub, h: tub });
   for (let i = 0; i < 6; i++) tubs.push({ x: rowX + i * (tub + gap), y: botY, w: tub, h: tub });
-  // trays: 2×2 at the left
+  // trays at the left
   const trays: Rect[] = [];
-  const trW = 110;
-  const trH = 74;
-  const trX = 40;
+  const trX = m;
   const trY = wallH + 16;
   for (let i = 0; i < 4; i++)
     trays.push({
-      x: trX + (i % 2) * (trW + 14),
-      y: trY + Math.floor(i / 2) * (trH + 12),
+      x: trX + (i % trCols) * (trW + 14),
+      y: trY + Math.floor(i / trCols) * (trH + 12),
       w: trW,
       h: trH,
     });
-  const thickChips = { x: trX, y: trY + 2 * (trH + 12) + 2, w: 2 * trW + 14, h: 44 };
-  // pots: 2 columns × 5 at the right
+  const trRows = Math.ceil(4 / trCols);
+  const thickChips = narrow
+    ? { x: trX, y: trY + trRows * (trH + 12) + 2, w: traysW, h: 3 * 34 + 8 }
+    : { x: trX, y: trY + trRows * (trH + 12) + 2, w: traysW, h: 44 };
+  // pots at the right
   const pots: Rect[] = [];
-  const pot = 100;
-  const pgap = 10;
-  const px0 = W - 40 - 2 * pot - pgap;
+  const px0 = W - m - potsW;
   const py0 = wallH + 10;
   for (let i = 0; i < 10; i++)
     pots.push({
@@ -156,18 +183,16 @@ function landscape(W: number, H: number): PrepLayout {
       w: pot,
       h: pot,
     });
-  // gauge between trays and the left tub column
-  const gauge = { x: lx - 20 - 64, y: bowlY - 135, w: 64, h: 270 };
-  // trash between right tub column and pots
-  const trash = { x: rx + tub + 26, y: bowlY + 40, w: 72, h: 84 };
-  const props: Rect[] = [
-    {
-      x: 36,
-      y: thickChips.y + thickChips.h + 18,
-      w: lx - 100 - 36,
-      h: H - (thickChips.y + thickChips.h + 18) - 16,
-    },
-  ];
+  // gauge between the trays and the left tub column
+  const gauge = { x: lx - 20 - gaugeW, y: bowlY - 135, w: gaugeW, h: 270 };
+  // trash between the right tub column and the pots
+  const trash = narrow
+    ? { x: trX + (traysW - trashW) / 2, y: thickChips.y + thickChips.h + 16, w: trashW, h: 84 }
+    : { x: rx + tub + 26, y: bowlY + 40, w: trashW, h: 84 };
+  const propsY = thickChips.y + thickChips.h + 18;
+  const props: Rect[] = narrow
+    ? []
+    : [{ x: m, y: propsY, w: Math.max(0, gauge.x - 16 - m), h: H - propsY - 16 }];
   return { bowl, shelf, trays, thickChips, pots, tubs, gauge, trash, wallH, props };
 }
 
