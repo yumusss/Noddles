@@ -1331,3 +1331,196 @@ i.note {
   font-weight: 800;
   font-size: 20px;
 }
+
+/* ---------- tablet ---------- */
+.tablet {
+  width: min(92vw, 640px);
+  height: min(86vh, 460px);
+  background: #1d1b1f;
+  border-radius: 26px;
+  padding: 10px;
+  box-shadow:
+    0 0 0 2px #3a3538,
+    0 20px 50px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: popstar 0.25s;
+}
+.tablet-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px;
+  color: #ddd;
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.tablet-brand {
+  color: var(--coral);
+  font-size: 18px;
+}
+.tablet-clock {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.tablet-back,
+.tablet-close {
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+.tablet-screen {
+  flex: 1;
+  min-height: 0;
+  background: var(--cream);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+}
+.tablet-home {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  padding: 22px;
+  align-content: center;
+  background:
+    radial-gradient(circle at 30% 20%, #ffe9d6, transparent 55%),
+    radial-gradient(circle at 80% 90%, #fbd9e0, transparent 55%), var(--cream);
+}
+.tapp {
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  background: #fff;
+  padding: 16px 10px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 4px 0 var(--walnut);
+}
+.tapp i {
+  font-style: normal;
+  font-size: 34px;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  background: var(--honey);
+  margin-bottom: 4px;
+}
+.tapp.orders i {
+  background: var(--indigo);
+}
+.tapp.pantry i {
+  background: var(--moss);
+}
+.tapp strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+.tapp small {
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.tablet-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px 18px;
+}
+.tablet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.tablet-head h3,
+.tablet-list h4 {
+  margin: 0;
+  font-family: var(--font-display);
+}
+.tablet-list h4 {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.big-stars {
+  font-size: 20px;
+}
+.big-stars i,
+.review .stars i {
+  font-style: normal;
+  color: #f6b93b;
+}
+.big-stars i.off,
+.review .stars i.off {
+  color: rgba(0, 0, 0, 0.15);
+}
+.review {
+  background: #fff;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  box-shadow: 0 2px 0 rgba(60, 35, 20, 0.1);
+}
+.review.open-order {
+  border: 2px dashed var(--indigo);
+}
+.review-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+.review-top strong {
+  font-family: var(--font-display);
+}
+.review-top small {
+  margin-left: auto;
+  color: var(--ink-soft);
+}
+.review p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.pantry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.pantry-item {
+  background: #fff;
+  border-radius: 14px;
+  padding: 8px 6px;
+  text-align: center;
+  box-shadow: 0 2px 0 rgba(60, 35, 20, 0.1);
+}
+.pantry-item .icon {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 4px;
+}
+.pantry-item strong {
+  font-size: 12.5px;
+  line-height: 1.15;
+  display: block;
+}
+@media (orientation: portrait) {
+  .tablet {
+    height: min(80vh, 640px);
+  }
+  .tablet-home {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -9,19 +9,19 @@
 Tek bir dünya: **Salon · Tezgâh · Ocak** yan yana durur, parmakla sağa-sola kaydırılır.
 
 1. Müşteri tezgâha gelir, siparişini konuşarak söyler (erişte türü + kalınlığı, çorba ya da sos, malzemeler ve adetleri; bazen “X olmasın”, “acı olsun”, “şu kasede olsun”).
-2. Tezgâhta kaseyi seç, erişteyi ve kalınlığını koy, çorbayı **basılı tutarak** doldur (gösterge “tam” bandında dursun), malzemeleri **parmağınla sürükleyip** kaseye tek tek yerleştir.
+2. Tezgâhta kaseyi seç, erişteyi ve kalınlığını koy, çorbayı **basılı tutarak** doldur (gösterge “tam” bandında dursun), malzeme kabına **dokun**, sonra kasede istediğin yere **dokun** (her dokunuş bir parça).
 3. Kaseyi parmağınla tut, sağa kaydırıp kamado ocağına koy. Zamanlayıcıyı izle: çiğ → diri → tam kıvam → yumuşak → lapa.
 4. Kaseyi al, sola kaydırıp müşterinin önüne bırak (paket siparişi kapıdaki kutuya).
 5. Müşteri yer, tepki verir, memnuniyet puanı çıkar. Nakit öder ve para üstünü söyler; çekmeceden doğru parayı sen seçersin. Memnuniyete göre bahşiş kavanoza düşer.
-6. Her gün gerçek zamanda 5–10 dakika sürer; müşteriler durmadan gelir ve her birinin sabrı vardır (başının üstündeki çubuk). Hızlı servis = mutlu müşteri, çok bekleyen çeker gider. 5. günden itibaren 2–3 kişilik arkadaş grupları gelir; sırayla sipariş verirler, hesabı tek kişi öder.
+6. Her gün gerçek zamanda 5–10 dakika sürer; müşteriler teker teker gelir ve her birinin sabrı vardır (fişteki çubuk). Hızlı servis = mutlu müşteri, çok bekleyen çeker gider. Müşteri ödedikten sonra masasına geçip yemeye devam eder.
 7. Gün sonu defteri: satış, bahşiş, malzeme, israf, kira, faturalar → net kâr. Kazandığın parayla dükkânı dekore et.
 
 ## Özellikler
 
 - 10 günlük hikâye; her gün giriş/kapanış diyalogu ve tarif defterinden yeni bir sayfa
 - 4 erişte (3 kalınlık), 6 çorba, 4 sos, 18 malzeme, 6 Japon kasesi
+- Tezgâhtaki tablete dokununca üç uygulama: **Yorumlar** (müşteri puanları ve yorumları), **Siparişler** (hazırlanan/teslim edilen paketler), **Malzemeler** (açılmış tüm malzeme ve kaselerin resimli listesi)
 - Tabletten gelen paket siparişleri ve kurye Rüzgar; özel misafirler (eleştirmen, Baron, Hana Nine)
-- Kuyruk: müşteriler sırada bekler, aynı anda 3 açık sipariş alınabilir; sipariş verenler masada bekler, kaseleri gelince yemeye devam eder
 - Yanlış/eksik/fazla pişmiş kase → müşteri şikâyet eder, özür dilersin, bahşiş bırakmaz
 - Türkçe / İngilizce dil seçeneği (haritadaki 🌐 düğmesi)
 - Dükkânın kedisi Mochi (kahverengi-beyaz tekir) salonda dolaşır

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { LEVELS } from './game/data';
 import { setMusic, setSfx, sfx, startMusic, stopMusic, unlockAudio } from './game/audio';
 import { DEFAULT_DECOR, DEFAULT_OWNED, withDefaults, type DecorState } from './game/decor';
-import type { DayResult } from './game/session';
+import type { DayResult, Review } from './game/session';
 import Title from './ui/Title';
 import LevelMap from './ui/LevelMap';
 import Story from './ui/Story';
@@ -24,6 +24,7 @@ export interface Save {
   sfx: boolean;
   music: boolean;
   lang: Lang;
+  reviews: Review[]; // last 40 customer reviews (tablet app)
 }
 
 const KEY = 'noddles-save-v2'; // keep the old key so saved progress survives the rename
@@ -38,6 +39,7 @@ const fresh: Save = {
   sfx: true,
   music: true,
   lang: 'tr',
+  reviews: [],
 };
 
 function load(): Save {
@@ -116,7 +118,8 @@ export default function App() {
       best[level - 1] = Math.max(best[level - 1], Math.round(result.avg));
       let reached = s.reached;
       if (result.stars > 0) reached = Math.max(reached, Math.min(11, level + 1));
-      return { ...s, cash: result.cashAfter, stars, best, reached, tipCoins };
+      const reviews = [...(s.reviews ?? []), ...result.reviews].slice(-40);
+      return { ...s, cash: result.cashAfter, stars, best, reached, tipCoins, reviews };
     });
     setScreen({ s: 'results', level, result });
   };

@@ -5,6 +5,7 @@ import { LEVELS } from '../game/data';
 import { DENOMS, fmt, sum } from '../game/money';
 import { COOK_LABEL } from '../game/bowl';
 import { sfx } from '../game/audio';
+import Tablet from './Tablet';
 import { L, T } from '../game/i18n';
 
 export default function Play({
@@ -28,11 +29,13 @@ export default function Play({
   const worldRef = useRef<HTMLDivElement>(null);
   const [session, setSession] = useState<DaySession | null>(null);
   const [paused, setPaused] = useState(false);
+  const [tablet, setTablet] = useState(false);
   const level = LEVELS[levelId - 1];
 
   useEffect(() => {
     const s = new DaySession(canvasRef.current!, levelId, save.decor, save.cash, save.tipCoins);
     s.onDayEnd = (r) => onDone(r, s.tipJarCoins);
+    s.onOpenTablet = () => setTablet(true);
     (window as unknown as { __session?: DaySession }).__session = s; // for automated testing
     setSession(s);
     let raf = 0;
@@ -51,14 +54,26 @@ export default function Play({
 
   useEffect(() => {
     if (!session) return;
-    if (paused) session.engine.stop();
+    if (paused || tablet) session.engine.stop();
     else session.engine.start();
-  }, [paused, session]);
+  }, [paused, tablet, session]);
 
   return (
     <div className="screen play">
       <canvas ref={canvasRef} className="game-canvas" />
       {session && <Overlays s={session} worldRef={worldRef} onPause={() => setPaused(true)} />}
+      {tablet && session && (
+        <Tablet
+          levelId={levelId}
+          reviews={[...(save.reviews ?? []), ...session.reviews]}
+          openOrders={session.open.map((o) => ({
+            who: o.cu.members[o.mi].name,
+            lines: o.lines,
+            phone: o.cu.phone,
+          }))}
+          onClose={() => setTablet(false)}
+        />
+      )}
       {paused && session && (
         <div className="modal-veil">
           <div className="modal">

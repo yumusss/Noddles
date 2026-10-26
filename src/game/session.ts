@@ -107,6 +107,15 @@ export interface DayResult {
   served: number;
   lost: number;
   complaints: number;
+  reviews: Review[];
+}
+
+export interface Review {
+  name: string;
+  stars: number;
+  text: string;
+  delivery: boolean;
+  day: number;
 }
 
 export interface Hint {
@@ -287,6 +296,9 @@ export class DaySession {
   private tapHintShown = false;
   held: string | null = null; // topping picked from a tub, placed by tapping the bowl
   onDayEnd: ((r: DayResult) => void) | null = null;
+  onOpenTablet: (() => void) | null = null;
+  /** reviews collected today (name, stars 1–5, line, delivery?) */
+  reviews: Review[] = [];
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -579,6 +591,7 @@ export class DaySession {
       served: this.scores.length,
       lost: this.lost,
       complaints: this.complaints,
+      reviews: this.reviews,
     };
     this.notify();
     setTimeout(() => this.onDayEnd?.(r), 900);
@@ -650,6 +663,20 @@ export class DaySession {
     this.groups.set(cu.id, g);
     const served = this.bowl;
     this.bowl = newBowl(this.bowl.style);
+    this.reviews.push({
+      name: m.name,
+      stars: Math.max(1, Math.min(5, Math.round(v.score / 20))),
+      text: complaint
+        ? T('g.complain', {
+            notes: v.notes
+              .slice(0, 2)
+              .map((n) => L(n))
+              .join(' · '),
+          })
+        : reactionLine(cu, v.score),
+      delivery: viaBox,
+      day: this.level.id,
+    });
     const tone: Bubble['tone'] = v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad';
     this.bubble = null;
     if (v.score >= 85) this.fx.emit('sparkle', this.bowlPos.x, this.bowlPos.y - 40, 14, 60);
@@ -1141,7 +1168,10 @@ export class DaySession {
     }
     if (target === 'phone') {
       if (this.ringing) this.answerPhone();
-      else sfx('tap');
+      else {
+        sfx('tap');
+        this.onOpenTablet?.();
+      }
       return;
     }
     if (target === 'jar') {
