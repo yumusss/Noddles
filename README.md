@@ -9,10 +9,11 @@
 Tek bir dünya: **Salon · Tezgâh · Ocak** yan yana durur, parmakla sağa-sola kaydırılır.
 
 1. Müşteri tezgâha gelir, siparişini konuşarak söyler (erişte türü + kalınlığı, çorba ya da sos, malzemeler ve adetleri; bazen “X olmasın”, “acı olsun”, “şu kasede olsun”).
-2. Tezgâhta kaseyi seç, erişteyi ve kalınlığını koy, çorbayı **basılı tutarak** doldur (gösterge “tam” bandında dursun), malzemeleri **dokunarak** ya da **sürükleyerek** kaseye serp.
+2. Tezgâhta kaseyi seç, erişteyi ve kalınlığını koy, çorbayı **basılı tutarak** doldur (gösterge “tam” bandında dursun), malzemeleri **parmağınla sürükleyip** kaseye tek tek yerleştir.
 3. Kaseyi parmağınla tut, sağa kaydırıp kamado ocağına koy. Zamanlayıcıyı izle: çiğ → diri → tam kıvam → yumuşak → lapa.
 4. Kaseyi al, sola kaydırıp müşterinin önüne bırak (paket siparişi kapıdaki kutuya).
-5. Müşteri yer, tepki verir, memnuniyet puanı çıkar. Nakit öder; para üstünü çekmeceden sen seçersin. Memnuniyete göre bahşiş kavanoza düşer.
+5. Müşteri yer, tepki verir, memnuniyet puanı çıkar. Nakit öder ve para üstünü söyler; çekmeceden doğru parayı sen seçersin. Memnuniyete göre bahşiş kavanoza düşer.
+7. Her gün gerçek zamanda 5–10 dakika sürer; müşteriler durmadan gelir ve her birinin sabrı vardır (başının üstündeki çubuk). Hızlı servis = mutlu müşteri, çok bekleyen çeker gider. 5. günden itibaren 2–3 kişilik arkadaş grupları gelir; sırayla sipariş verirler, hesabı tek kişi öder.
 6. Gün sonu defteri: satış, bahşiş, malzeme, israf, kira, faturalar → net kâr. Kazandığın parayla dükkânı dekore et.
 
 ## Özellikler
