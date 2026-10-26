@@ -5,7 +5,7 @@ import { DEFAULT_DECOR } from '../game/decor';
 import { drawBowlTop } from '../art/food';
 import type { BowlState } from '../game/bowl';
 import Fullscreen from './Fullscreen';
-import { T } from '../game/i18n';
+import { T, getLang, setLang } from '../game/i18n';
 
 const HERO: BowlState = {
   style: 'kirmizi',
@@ -26,7 +26,15 @@ const HERO: BowlState = {
   ],
 };
 
-export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: () => void }) {
+export default function Title({
+  hasSave,
+  onPlay,
+  onLang,
+}: {
+  hasSave: boolean;
+  onPlay: () => void;
+  onLang: () => void;
+}) {
   const [pressed, setPressed] = useState(false);
   const scene = useMemo(
     () =>
@@ -41,6 +49,14 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
       <SceneCanvas draw={scene} className="bg" />
       <div className="title-veil" />
       <Fullscreen />
+      <button
+        className="btn ghost small lang-btn"
+        onClick={() => {
+          setLang(getLang() === 'tr' ? 'en' : 'tr');
+          onLang();
+        }}>
+        {T('map.lang')}
+      </button>
       <div className="title-body">
         <h1 className="logo">
           Noddles

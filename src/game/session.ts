@@ -142,6 +142,7 @@ export interface UiSnapshot {
   clock: number;
   clockText: string;
   dayEnd: boolean;
+  intro: boolean;
 }
 
 /** An open order waiting to be cooked. */
@@ -200,7 +201,8 @@ type DinerX = Diner & { leaveT: number; cuId?: number; mi?: number; seed: number
 const COOK_RATE = 8.2;
 const FILL_RATE = 0.62;
 const MAX_OPEN = 3;
-const QUEUE_MAX = 3;
+const QUEUE_MAX = 2; // customers wait outside; only one is at the counter at a time
+const INTRO_LEN = 3.6;
 
 export class DaySession {
   engine: Engine;
@@ -270,6 +272,8 @@ export class DaySession {
   private snap: UiSnapshot | null = null;
   private ringT = 0;
   private counterY = 0;
+  private leaveTo: { x: number; y: number } | null = null;
+  intro = INTRO_LEN;
   private pickY = 0;
   private dayOver = false;
   private tapHintShown = false;
@@ -363,6 +367,7 @@ export class DaySession {
       clock: Math.min(1, this.clock / this.dayLen),
       clockText: `${mm}:${String(ss).padStart(2, '0')}`,
       dayEnd: this.phase === 'dayEnd',
+      intro: this.intro > 0,
     };
     return this.snap;
   }
@@ -657,7 +662,7 @@ export class DaySession {
       this.pick = {
         cu,
         mi: s.mi,
-        phase: 'served',
+        phase: this.counter ? 'pickup' : 'served',
         t: 0,
         score: v.score,
         notes: complaint ? v.notes : v.notes.concat(v.praise),
@@ -851,6 +856,7 @@ export class DaySession {
   }
 
   private onDown(x: number, y: number, sx: number, sy: number) {
+    if (this.intro > 0) return;
     const v = this.engine.view;
     const st = Math.floor(x / v.W);
     const lx = x - st * v.W;
@@ -1121,13 +1127,14 @@ export class DaySession {
     if (st === 0 && this.bowl.noodle) {
       const S = this.salL;
       const busy = !!this.pick && this.pick.phase !== 'leave' && this.pick.phase !== 'delivering';
+      void busy;
       if (this.hit(S.deliveryBox, lx, y, 70)) {
         const phoneSlots = this.open.filter((s) => s.cu.phone);
         const s =
           this.target !== null
             ? (phoneSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(phoneSlots))
             : this.pickSlotFromList(phoneSlots);
-        if (s && !busy) {
+        if (s) {
           this.bowlPos = {
             x: S.deliveryBox.x + S.deliveryBox.w / 2,
             y: S.deliveryBox.y + S.deliveryBox.h / 2,
@@ -1142,7 +1149,7 @@ export class DaySession {
           this.target !== null
             ? (walkSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(walkSlots))
             : this.pickSlotFromList(walkSlots);
-        if (s && !busy) {
+        if (s) {
           this.bowlPos = { x: this.pickupX() + S.customer.size * 0.42, y: S.counterTop + 30 };
           this.serve(s, false);
           return;
@@ -1337,7 +1344,19 @@ export class DaySession {
     this.phaseT += dt;
     this.fx.update(dt);
     this.updateCat(dt);
-    if (!this.dayOver) this.clock += dt;
+    if (this.intro > 0) {
+      this.intro -= dt;
+      const v2 = this.engine.view;
+      const k = clamp(1 - this.intro / INTRO_LEN, 0, 1);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      this.engine.camTarget = null;
+      this.engine.camX = lerp(this.engine.maxCam, 0, e);
+      if (this.intro <= 0) {
+        this.engine.camX = 0;
+        this.notify();
+      }
+      void v2;
+    } else if (!this.dayOver) this.clock += dt;
     if (this.toastT > 0) {
       this.toastT -= dt;
       if (this.toastT <= 0) {
@@ -1400,7 +1419,7 @@ export class DaySession {
       }
     }
     // spawning
-    if (!this.dayOver && this.clock < this.dayLen) {
+    if (!this.dayOver && this.intro <= 0 && this.clock < this.dayLen) {
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
         this.spawn();
@@ -1461,6 +1480,7 @@ export class DaySession {
       case 'idle':
         if (
           !this.counter &&
+          (!this.pick || this.pick.phase === 'delivering') &&
           this.queue.length &&
           this.open.length < MAX_OPEN &&
           this.phaseT > 0.8
@@ -1474,8 +1494,8 @@ export class DaySession {
         }
         break;
       case 'enter':
-        this.counterY = Math.min(1, this.counterY + dt * 1.8);
-        if (this.phaseT > 0.6 && this.counter) {
+        this.counterY = Math.min(1, this.counterY + dt * 1.1);
+        if (this.phaseT > 1.0 && this.counter) {
           this.phase = 'greet';
           this.phaseT = 0;
           this.setBubble(this.counter.members[0].name, this.counter.greet, 'counter');
@@ -1505,13 +1525,16 @@ export class DaySession {
           } else {
             this.phase = 'toTable';
             this.phaseT = 0;
+            const seat = this.freeSeat();
+            const sp = seat >= 0 ? this.salL.seats[seat] : null;
+            this.leaveTo = sp ? { x: sp.x, y: sp.y } : { x: -200, y: this.salL.customer.y };
           }
           this.notify();
         }
         break;
       case 'toTable':
-        this.counterY = Math.max(0, this.counterY - dt * 2.2);
-        if (this.phaseT > 0.5 && this.counter) {
+        this.counterY = Math.max(0, this.counterY - dt * 1.4);
+        if (this.phaseT > 0.8 && this.counter) {
           this.seatGroup(this.counter);
           this.counter = null;
           this.phase = 'idle';
@@ -1528,8 +1551,14 @@ export class DaySession {
     pk.t += dt;
     const m = pk.cu.members[pk.mi];
     switch (pk.phase) {
+      case 'pickup':
+        if (!this.counter) {
+          pk.phase = 'served';
+          pk.t = 0;
+        }
+        break;
       case 'served':
-        this.pickY = Math.min(1, this.pickY + dt * 2);
+        this.pickY = Math.min(1, this.pickY + dt * 1.3);
         if (pk.t > 2.4) {
           const sc = pk.score;
           const complaint = pk.score < 70 && pk.notes.length > 0;
@@ -1671,7 +1700,7 @@ export class DaySession {
         bob: d.bob,
       });
     });
-    this.queue.forEach((cu, i) => {
+    this.queue.slice(0, 0).forEach((cu, i) => {
       const sp = qs[Math.min(qs.length - 1, i)];
       cu.members.forEach((m, k) => {
         drawAvatar(
@@ -1698,14 +1727,30 @@ export class DaySession {
         const active = i === this.mi;
         const size = S.customer.size * (m.look.kid ? 0.82 : 1) * (n > 1 ? 0.86 : 1);
         c.save();
-        c.globalAlpha = this.counterY;
+        const k = this.counterY;
+        const ease = 1 - Math.pow(1 - k, 3);
+        let px = this.memberX(base, i, n);
+        let py = S.customer.y + (active ? 0 : 10);
+        let psize = size;
+        if (this.phase === 'enter') {
+          // walks in from the door (left), bobbing
+          px = lerp(-size * 0.7, px, ease);
+          py += Math.abs(Math.sin(k * 14)) * -6;
+        } else if (this.phase === 'toTable' && this.leaveTo) {
+          const g = 1 - k;
+          const ge = g * g;
+          px = lerp(px, this.leaveTo.x, ge);
+          py = lerp(py, this.leaveTo.y + 10, ge);
+          psize = lerp(size, size * 0.55, ge);
+          c.globalAlpha = 1 - Math.max(0, (ge - 0.75) * 4);
+        }
         drawAvatar(
           c,
           m.look,
           active ? 'neutral' : i < this.mi ? 'happy' : 'neutral',
-          this.memberX(base, i, n),
-          S.customer.y + (1 - this.counterY) * 90 + (active ? 0 : 10),
-          size,
+          px,
+          py,
+          psize,
           {
             pose: 'stand',
             talking:

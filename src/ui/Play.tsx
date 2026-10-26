@@ -5,12 +5,13 @@ import { LEVELS } from '../game/data';
 import { DENOMS, fmt, sum } from '../game/money';
 import { COOK_LABEL } from '../game/bowl';
 import { sfx } from '../game/audio';
-import { L, T } from '../game/i18n';
+import { L, T, getLang, setLang } from '../game/i18n';
 
 export default function Play({
   levelId,
   save,
   onToggle,
+  onLang,
   onDone,
   onQuit,
   onRestart,
@@ -18,6 +19,7 @@ export default function Play({
   levelId: number;
   save: Save;
   onToggle: (k: 'sfx' | 'music') => void;
+  onLang: () => void;
   onDone: (r: DayResult, tipCoins: number) => void;
   onQuit: () => void;
   onRestart: () => void;
@@ -70,6 +72,14 @@ export default function Play({
               </button>
               <button className="btn ghost" onClick={() => onToggle('music')}>
                 {save.music ? T('play.musicOn') : T('play.musicOff')}
+              </button>
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setLang(getLang() === 'tr' ? 'en' : 'tr');
+                  onLang();
+                }}>
+                {T('map.lang')}
               </button>
             </div>
             <button className="btn big primary" onClick={() => setPaused(false)}>
@@ -302,6 +312,17 @@ function Overlays({
             {need === 0 ? T('cash.thanks') : T('cash.give')}
           </button>
           {cash.result === 'less' && <div className="cash-msg bad">{T('cash.less')}</div>}
+        </div>
+      )}
+      {ui.intro && (
+        <div className="cine">
+          <div className="cine-bar top" />
+          <div className="cine-bar bottom" />
+          <div className="cine-title">
+            <span className="chip">{T('map.day', { n: s.level.id })}</span>
+            <h1>{L(s.level.title)}</h1>
+            <p>{L(s.level.subtitle)}</p>
+          </div>
         </div>
       )}
       {ui.dayEnd && (

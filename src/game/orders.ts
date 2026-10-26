@@ -547,7 +547,7 @@ export function makeCustomer(levelId: number, i: number): Customer {
   const phoneRatio = lv.phone / lv.customers;
   const phone = i > 0 && Math.random() < phoneRatio;
   const force = (globalThis as { __forceGroup?: boolean }).__forceGroup === true; // test hook
-  const group = !phone && levelId >= 5 && (force || (i > 0 && Math.random() < 0.22));
+  const group = !phone && levelId >= 5 && force; // friends arriving together is off for now (customers come one by one)
   const n = group ? 2 + (Math.random() < 0.5 ? 1 : 0) : 1;
   const members: Member[] = [];
   for (let k = 0; k < n; k++) {

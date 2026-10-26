@@ -125,6 +125,7 @@ export default function App() {
       {screen.s === 'title' && (
         <Title
           hasSave={save.reached > 1 || save.stars[0] > 0}
+          onLang={() => setSave((s) => ({ ...s, lang: s.lang === 'tr' ? 'en' : 'tr' }))}
           onPlay={() => {
             unlockAudio();
             sfx('door');
@@ -177,6 +178,7 @@ export default function App() {
           levelId={screen.level}
           save={save}
           onToggle={toggle}
+          onLang={() => setSave((s) => ({ ...s, lang: s.lang === 'tr' ? 'en' : 'tr' }))}
           onDone={(r, coins) => finishDay(screen.level, r, coins)}
           onQuit={() => setScreen({ s: 'map' })}
           onRestart={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
