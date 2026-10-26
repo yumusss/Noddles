@@ -56,7 +56,7 @@ export const PIECE_SIZE: Record<string, number> = {
 };
 
 /** toppings are drawn larger inside the bowl so they read clearly on phones */
-export const BOWL_PIECE_SCALE = 1.35;
+export const BOWL_PIECE_SCALE = 1.65;
 
 export const PIECE_VARIANTS: Record<string, number> = {
   yesil: 3,
@@ -3163,7 +3163,7 @@ export function drawTub(c: Ctx, id: string, w: number, h: number): void {
       // ~55% of the cavity, scattered densely with the centre on top.
       const ps = PIECE_SIZE[id] ?? 30;
       const minSide = Math.min(iw, ih);
-      const scale = clamp((minSide * 0.6) / ps, 0.5, 1.5);
+      const scale = clamp((minSide * 0.78) / ps, 0.5, 1.9);
       const footprint = ps * scale;
       const n = clamp(Math.round(((iw * ih) / (footprint * footprint)) * 3.2), 7, 26);
       const rand = rng(id.length * 97 + 3);

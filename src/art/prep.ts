@@ -64,9 +64,17 @@ export function prepLayout(W: number, H: number, counts?: SlotCounts): PrepLayou
     trays: Math.min(counts.trays, full.trays.length),
     pots: Math.min(counts.pots, full.pots.length),
   };
+  let tubs = pickRows(full.tubs, n.tubs);
+  // portrait with only the first row in use: the empty second row leaves room for bigger tubs
+  if (H > W && n.tubs <= 6 && tubs.length) {
+    const t0 = tubs[0].w;
+    const big = Math.min(t0 * 1.4, (W - 24 - (n.tubs - 1) * 12) / n.tubs);
+    const span = n.tubs * big + (n.tubs - 1) * 12;
+    tubs = tubs.map((r, i) => ({ x: W / 2 - span / 2 + i * (big + 12), y: r.y, w: big, h: big }));
+  }
   return {
     ...full,
-    tubs: pickRows(full.tubs, n.tubs),
+    tubs,
     trays: pickRows(full.trays, n.trays),
     pots: pickRows(full.pots, n.pots),
   };

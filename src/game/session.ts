@@ -1130,7 +1130,7 @@ export class DaySession {
         const dx = b.x - BOWL_C;
         const dy = b.y - BOWL_C;
         const d = Math.hypot(dx, dy);
-        const maxR = BOWL_R - 22;
+        const maxR = BOWL_R - 30;
         if (d > maxR) {
           b.x = BOWL_C + (dx / d) * maxR;
           b.y = BOWL_C + (dy / d) * maxR;
