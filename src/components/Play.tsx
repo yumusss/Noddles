@@ -15,7 +15,7 @@ import {
   tipCents,
   type DayLedger,
 } from '../money';
-import { BOWL_R, BOWLS, THICK_LABEL, THICK_W, type Thick } from '../food';
+import { BOWLS, THICK_LABEL, THICK_W, isBigTopping, platePiece, type Thick } from '../food';
 import { BowlCanvas, BowlSide, Tray } from './FoodCanvas';
 import {
   COOK_LABEL,
@@ -53,7 +53,6 @@ type Tool = { kind: Kind; id: string } | null;
 type Kind = 'noodle' | 'broth' | 'topping';
 type Stage = 'prep' | 'pot' | 'ready';
 
-const SCATTER = new Set(['yesil', 'susam', 'citir', 'filiz', 'misir', 'aciyag', 'biber']);
 const COOK_SPEED = 100 / 7.5; // progress units per second
 const STATIONS = ['Salon', 'Hazırlık', 'Ocak'];
 type DragSrc = 'prep' | 'ready';
@@ -359,23 +358,10 @@ export default function Play({
 
   const addPiece = (x: number, y: number) => {
     if (!tool || tool.kind !== 'topping') return;
-    const d = Math.hypot(x - 150, y - 150);
-    const max = BOWL_R - 18;
-    if (d > max) {
-      x = 150 + ((x - 150) / d) * max;
-      y = 150 + ((y - 150) / d) * max;
-    }
     const id = tool.id;
     setBowl((b) => {
       if (b.pieces.filter((p) => p.id === id).length >= 200 || b.pieces.length >= 450) return b;
-      const p: Piece = {
-        id,
-        x,
-        y,
-        r: Math.random() * 360,
-        s: SCATTER.has(id) ? 0.7 + Math.random() * 0.15 : 0.82 + Math.random() * 0.12,
-        k: seq.current++,
-      };
+      const p: Piece = platePiece(id, x, y, b.pieces, seq.current++);
       return { ...b, pieces: [...b.pieces, p] };
     });
     lastPiece.current = { x, y };
@@ -404,7 +390,11 @@ export default function Play({
   const onMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!tool || tool.kind !== 'topping' || !lastPiece.current) return;
     const { x, y } = toBowlCoords(e);
-    if (Math.hypot(x - lastPiece.current.x, y - lastPiece.current.y) > 30) addPiece(x, y);
+    if (
+      Math.hypot(x - lastPiece.current.x, y - lastPiece.current.y) >
+      (isBigTopping(tool.id) ? 46 : 26)
+    )
+      addPiece(x, y);
   };
 
   const onUp = () => {

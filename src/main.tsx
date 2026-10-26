@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App.tsx';
+import SpriteSheet from './components/SpriteSheet';
 import Gallery from './components/Gallery.tsx';
 import AvTest from './components/AvTest.tsx';
 
@@ -18,7 +19,9 @@ window.addEventListener('resize', setUi);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {window.location.search.includes('gallery') ? (
+    {window.location.search.includes('sprites') ? (
+      <SpriteSheet />
+    ) : window.location.search.includes('gallery') ? (
       <Gallery />
     ) : window.location.search.includes('avtest') ? (
       <AvTest />

@@ -6172,3 +6172,12 @@ button {
 .stove3.wide .kamado-wrap {
   bottom: calc(60px * var(--ui));
 }
+.bin.bin3 span {
+  white-space: normal;
+  text-overflow: clip;
+  line-height: 1.05;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: 2.1em;
+}
