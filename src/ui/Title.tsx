@@ -5,6 +5,7 @@ import { DEFAULT_DECOR } from '../game/decor';
 import { drawBowlTop } from '../art/food';
 import type { BowlState } from '../game/bowl';
 import Fullscreen from './Fullscreen';
+import { T } from '../game/i18n';
 
 const HERO: BowlState = {
   style: 'kirmizi',
@@ -43,7 +44,7 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
       <div className="title-body">
         <h1 className="logo">
           Noddles
-          <span className="logo-sub">Fener Sokağı’nın son noodle dükkânı</span>
+          <span className="logo-sub">{T('title.sub')}</span>
         </h1>
         <div className="hero-bowl">
           <SceneCanvas
@@ -62,9 +63,9 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
           onPointerDown={() => setPressed(true)}
           onPointerUp={() => setPressed(false)}
           onClick={onPlay}>
-          {hasSave ? 'Devam Et' : 'Dükkânı Aç'}
+          {hasSave ? T('title.continue') : T('title.open')}
         </button>
-        <p className="credits">Karakterler: “Toon Head” — Johan Melin, CC BY 4.0 · DiceBear</p>
+        <p className="credits">{T('title.credits')}</p>
       </div>
     </div>
   );

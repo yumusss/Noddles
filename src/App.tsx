@@ -11,6 +11,7 @@ import Play from './ui/Play';
 import Results from './ui/Results';
 import DecorShop from './ui/DecorShop';
 import Ending from './ui/Ending';
+import { T, setLang, type Lang } from './game/i18n';
 
 export interface Save {
   reached: number; // highest unlocked level (1..11)
@@ -22,6 +23,7 @@ export interface Save {
   tipCoins: number;
   sfx: boolean;
   music: boolean;
+  lang: Lang;
 }
 
 const KEY = 'noddles-save-v2';
@@ -35,6 +37,7 @@ const fresh: Save = {
   tipCoins: 0,
   sfx: true,
   music: true,
+  lang: 'tr',
 };
 
 function load(): Save {
@@ -65,6 +68,7 @@ type Screen =
 export default function App() {
   const [save, setSave] = useState<Save>(load);
   const [screen, setScreen] = useState<Screen>({ s: 'title' });
+  useEffect(() => setLang(save.lang), [save.lang]);
 
   useEffect(() => {
     try {
@@ -133,6 +137,7 @@ export default function App() {
           onBack={() => setScreen({ s: 'title' })}
           onToggle={toggle}
           onReset={reset}
+          onLang={() => setSave((s) => ({ ...s, lang: s.lang === 'tr' ? 'en' : 'tr' }))}
           onEnding={() => setScreen({ s: 'ending' })}
           onDecor={() => setScreen({ s: 'decor' })}
         />
@@ -147,7 +152,7 @@ export default function App() {
       {screen.s === 'intro' && (
         <Story
           key={'i' + screen.level}
-          heading={`${screen.level}. Gün`}
+          heading={T('story.dayHead', { n: screen.level })}
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].intro}
           decor={save.decor}
@@ -185,7 +190,7 @@ export default function App() {
       {screen.s === 'outro' && (
         <Story
           key={'o' + screen.level}
-          heading="Gün sonu"
+          heading={T('story.dayEnd')}
           title={LEVELS[screen.level - 1].title}
           lines={LEVELS[screen.level - 1].outro}
           decor={save.decor}

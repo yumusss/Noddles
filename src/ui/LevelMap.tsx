@@ -5,6 +5,7 @@ import SceneCanvas from './SceneCanvas';
 import { salonScene } from './scenes';
 import { fmt } from '../game/money';
 import { sfx } from '../game/audio';
+import { L, T, getLang, setLang } from '../game/i18n';
 
 const TOD_ICON = { sabah: '🌅', ogle: '☀️', gunbatimi: '🌇', aksam: '🌙' } as const;
 
@@ -16,6 +17,7 @@ export default function LevelMap({
   onReset,
   onEnding,
   onDecor,
+  onLang,
 }: {
   save: Save;
   onPick: (level: number) => void;
@@ -24,6 +26,7 @@ export default function LevelMap({
   onReset: () => void;
   onEnding: () => void;
   onDecor: () => void;
+  onLang: () => void;
 }) {
   const [confirm, setConfirm] = useState(false);
   const scene = useMemo(() => salonScene(save.decor, 'ogle', false), [save.decor]);
@@ -34,7 +37,7 @@ export default function LevelMap({
       <div className="map-veil" />
       <header className="bar">
         <button className="btn ghost small" onClick={onBack}>
-          ‹ Geri
+          {T('map.back')}
         </button>
         <div className="bar-mid">
           <span className="chip gold">★ {total}/30</span>
@@ -46,6 +49,14 @@ export default function LevelMap({
           </button>
           <button className="btn ghost small" onClick={() => onToggle('music')}>
             {save.music ? '🎵' : '🎵̸'}
+          </button>
+          <button
+            className="btn ghost small"
+            onClick={() => {
+              setLang(getLang() === 'tr' ? 'en' : 'tr');
+              onLang();
+            }}>
+            {T('map.lang')}
           </button>
         </div>
       </header>
@@ -65,10 +76,10 @@ export default function LevelMap({
                 }}>
                 <span className="num">{locked ? '🔒' : l.id}</span>
                 <span className="info">
-                  <strong>{l.title}</strong>
+                  <strong>{L(l.title)}</strong>
                   <small>
                     {TOD_ICON[l.time]} {l.rain ? '🌧 ' : ''}
-                    {l.customers} müşteri
+                    {T('map.minutes', { n: l.minutes })}
                   </small>
                   <span className="stars">
                     {[0, 1, 2].map((k) => (
@@ -84,25 +95,25 @@ export default function LevelMap({
         </div>
         <div className="map-actions">
           <button className="btn primary" onClick={onDecor}>
-            🏮 Dükkânı Dekore Et
+            {T('map.decor')}
           </button>
           {save.reached > 10 && (
             <button className="btn" onClick={onEnding}>
-              🎉 Finali İzle
+              {T('map.ending')}
             </button>
           )}
           {!confirm ? (
             <button className="btn ghost small" onClick={() => setConfirm(true)}>
-              İlerlemeyi sıfırla
+              {T('map.reset')}
             </button>
           ) : (
             <span className="confirm">
-              Emin misin?{' '}
+              {T('map.sure')}{' '}
               <button className="btn small danger" onClick={onReset}>
-                Evet, sıfırla
+                {T('map.yesReset')}
               </button>{' '}
               <button className="btn small" onClick={() => setConfirm(false)}>
-                Vazgeç
+                {T('map.cancel')}
               </button>
             </span>
           )}

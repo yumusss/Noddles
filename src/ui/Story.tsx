@@ -6,6 +6,7 @@ import type { DecorState } from '../game/decor';
 import type { Tod } from '../art/common';
 import { sfx } from '../game/audio';
 import Portrait from './Portrait';
+import { L, T } from '../game/i18n';
 
 export default function Story({
   heading,
@@ -27,13 +28,14 @@ export default function Story({
   const [i, setI] = useState(0);
   const [shown, setShown] = useState(0);
   const line = lines[i];
+  const text = L(line.text);
   const scene = useMemo(() => salonScene(decor, tod, rain), [decor, tod, rain]);
 
   useEffect(() => {
     setShown(0);
     const id = setInterval(() => {
       setShown((s) => {
-        if (s >= line.text.length) {
+        if (s >= text.length) {
           clearInterval(id);
           return s;
         }
@@ -42,11 +44,11 @@ export default function Story({
       });
     }, 22);
     return () => clearInterval(id);
-  }, [i, line.text]);
+  }, [i, text]);
 
   const advance = () => {
-    if (shown < line.text.length) {
-      setShown(line.text.length);
+    if (shown < text.length) {
+      setShown(text.length);
       return;
     }
     sfx('tap');
@@ -60,7 +62,7 @@ export default function Story({
       <div className="story-veil" />
       <div className="story-head">
         <span className="chip">{heading}</span>
-        <strong>{title}</strong>
+        <strong>{L(title)}</strong>
       </div>
       <button
         className="btn ghost small skip"
@@ -68,7 +70,7 @@ export default function Story({
           e.stopPropagation();
           onDone();
         }}>
-        Geç ⏭
+        {T('story.skip')}
       </button>
       <div className="dialog">
         <div className="portrait">
@@ -76,11 +78,11 @@ export default function Story({
         </div>
         <div className="dialog-box">
           <span className="name" style={{ background: CHARS[line.who].color }}>
-            {CHARS[line.who].name}
+            {L(CHARS[line.who].name)}
           </span>
           <p>
-            {line.text.slice(0, shown)}
-            {shown < line.text.length && <span className="caret">▍</span>}
+            {text.slice(0, shown)}
+            {shown < text.length && <span className="caret">▍</span>}
           </p>
           <span className="count">
             {i + 1}/{lines.length} ▸

@@ -5,6 +5,7 @@ import { fmt } from '../game/money';
 import SceneCanvas from './SceneCanvas';
 import { salonScene } from './scenes';
 import { sfx } from '../game/audio';
+import { L, T } from '../game/i18n';
 
 export default function DecorShop({
   save,
@@ -24,11 +25,11 @@ export default function DecorShop({
         <SceneCanvas draw={scene} animate={false} />
         <header className="bar overlay">
           <button className="btn ghost small" onClick={onBack}>
-            ‹ Geri
+            {T('map.back')}
           </button>
           <div className="bar-mid">
             <span className="chip">{fmt(save.cash)}</span>
-            <span className="chip gold">Bahşiş +%{tipBonus(save.decor)}</span>
+            <span className="chip gold">{T('decor.tip', { n: tipBonus(save.decor) })}</span>
           </div>
         </header>
       </div>
@@ -39,7 +40,7 @@ export default function DecorShop({
               key={s.id}
               className={`tab ${slot === s.id ? 'on' : ''}`}
               onClick={() => setSlot(s.id)}>
-              {s.name}
+              {L(s.name)}
             </button>
           ))}
         </div>
@@ -65,9 +66,9 @@ export default function DecorShop({
                     ]);
                   } else sfx('fail');
                 }}>
-                <strong>{it.name}</strong>
-                <small>{owned ? (on ? 'Kullanılıyor' : 'Sende var') : fmt(it.price)}</small>
-                {it.tip > 0 && <em>bahşiş +%{it.tip}</em>}
+                <strong>{L(it.name)}</strong>
+                <small>{owned ? (on ? T('decor.using') : T('decor.owned')) : fmt(it.price)}</small>
+                {it.tip > 0 && <em>{T('decor.tipItem', { n: it.tip })}</em>}
               </button>
             );
           })}

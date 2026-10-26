@@ -3,6 +3,7 @@ import type { Level } from '../game/data';
 import type { DayResult } from '../game/session';
 import { fmt, net } from '../game/money';
 import { sfx } from '../game/audio';
+import { L, T } from '../game/i18n';
 
 export default function Results({
   level,
@@ -35,20 +36,20 @@ export default function Results({
     return () => clearInterval(id);
   }, [result.stars]);
   const rows: [string, number, boolean][] = [
-    ['Satışlar', l.sales, true],
-    ['Bahşişler', l.tips, true],
-    ['Malzeme gideri', -l.ingredients, false],
-    ['İsraf', -l.waste, false],
-    ['Fazla verilen para üstü', -l.overChange, false],
-    ['Kira', -l.rent, false],
-    ['Faturalar', -l.utilities, false],
+    [T('res.sales'), l.sales, true],
+    [T('res.tips'), l.tips, true],
+    [T('res.ingredients'), -l.ingredients, false],
+    [T('res.waste'), -l.waste, false],
+    [T('res.overChange'), -l.overChange, false],
+    [T('res.rent'), -l.rent, false],
+    [T('res.utilities'), -l.utilities, false],
   ];
   return (
     <div className="screen results">
       <div className="page ledger">
         <div className="page-head">
-          <span className="chip">{level.id}. Gün · Gün sonu defteri</span>
-          <h2>{level.title}</h2>
+          <span className="chip">{T('res.head', { n: level.id })}</span>
+          <h2>{L(level.title)}</h2>
         </div>
         <div className="stars-big">
           {[0, 1, 2].map((k) => (
@@ -58,9 +59,11 @@ export default function Results({
           ))}
         </div>
         <p className="avg">
-          Ortalama memnuniyet <strong>%{Math.round(result.avg)}</strong> · {l.bowls} kase
-          {result.lost ? ` · ${result.lost} müşteri beklemeden gitti` : ''} ·{' '}
-          {l.changeMistakes ? `${l.changeMistakes} para üstü hatası` : 'para üstleri kusursuz'}
+          {T('res.avg')} <strong>%{Math.round(result.avg)}</strong> ·{' '}
+          {T('res.bowls', { n: l.bowls })}
+          {result.lost ? ` · ${T('res.lost', { n: result.lost })}` : ''}
+          {result.complaints ? ` · ${T('res.complaints', { n: result.complaints })}` : ''} ·{' '}
+          {l.changeMistakes ? T('res.changeErr', { n: l.changeMistakes }) : T('res.changeOk')}
         </p>
         <table>
           <tbody>
@@ -73,11 +76,11 @@ export default function Results({
               </tr>
             ))}
             <tr className={`total ${shown > 7 ? 'in' : ''}`}>
-              <td>Net kâr</td>
+              <td>{T('res.net')}</td>
               <td className={n >= 0 ? 'good' : 'bad'}>{fmt(n)}</td>
             </tr>
             <tr className={`total ${shown > 8 ? 'in' : ''}`}>
-              <td>Kasadaki para</td>
+              <td>{T('res.cash')}</td>
               <td>
                 {fmt(result.cashBefore)} → <strong>{fmt(result.cashAfter)}</strong>
               </td>
@@ -86,26 +89,22 @@ export default function Results({
         </table>
         <div className="modal-row">
           <button className="btn" onClick={onRetry}>
-            Tekrar oyna
+            {T('res.retry')}
           </button>
           {result.stars > 0 ? (
             <button className="btn big primary" onClick={onNext}>
-              Devam ▸
+              {T('res.next')}
             </button>
           ) : (
             <button className="btn big primary" onClick={onRetry}>
-              Bir daha dene
+              {T('res.again')}
             </button>
           )}
           <button className="btn ghost" onClick={onMap}>
-            Harita
+            {T('res.map')}
           </button>
         </div>
-        {result.stars === 0 && (
-          <p className="tip">
-            En az %55 memnuniyet gerekiyor. Siparişi dikkatle oku, göstergeleri izle!
-          </p>
-        )}
+        {result.stars === 0 && <p className="tip">{T('res.tip')}</p>}
       </div>
     </div>
   );

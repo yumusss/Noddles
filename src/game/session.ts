@@ -1,4 +1,5 @@
-// One working day: a real-time clock, customers with patience, the bowl, the three stations, input and rendering.
+// One working day: a real-time clock, a queue of customers, up to three open orders at once,
+// complaints and apologies, the bowl, the three stations, input and rendering.
 import { Engine, type View } from '../core/engine';
 import { PAL, TOD_LIGHT, clamp, lerp, rgba, type Ctx } from '../art/common';
 import {
@@ -27,7 +28,7 @@ import {
   type SalonLayout,
   type Diner,
 } from '../art/salon';
-import { drawAvatar, avatarImage, randomLook, preloadAvatar, type Mood } from '../art/avatar';
+import { drawAvatar, preloadAvatar, randomLook, type Look, type Mood } from '../art/avatar';
 import { drawCat, type CatPose } from '../art/cat';
 import { drawScooter } from '../art/courier';
 import { ParticleSystem } from '../art/fx';
@@ -73,20 +74,10 @@ import {
 } from './money';
 import { tipBonus, type DecorState } from './decor';
 import { sfx, buzz } from './audio';
+import { L, T } from './i18n';
 
-export type Phase =
-  | 'idle' // waiting for the next customer (gap)
-  | 'enter'
-  | 'greet'
-  | 'order'
-  | 'ring'
-  | 'cooking'
-  | 'served'
-  | 'react'
-  | 'pay'
-  | 'delivering'
-  | 'leave'
-  | 'dayEnd';
+export type Phase = 'idle' | 'enter' | 'greet' | 'order' | 'toTable' | 'dayEnd';
+export type PickPhase = 'pickup' | 'served' | 'react' | 'complain' | 'pay' | 'leave' | 'delivering';
 
 export interface Bubble {
   name: string;
@@ -94,6 +85,7 @@ export interface Bubble {
   shown: number;
   phone?: boolean;
   tone?: 'good' | 'bad' | 'neutral';
+  at: 'counter' | 'pickup' | 'phone';
 }
 
 export interface CashUI {
@@ -114,6 +106,7 @@ export interface DayResult {
   cashAfter: number;
   served: number;
   lost: number;
+  complaints: number;
 }
 
 export interface Hint {
@@ -123,15 +116,21 @@ export interface Hint {
   text: string;
 }
 
+export interface TicketInfo {
+  id: number;
+  who: string;
+  lines: string[];
+  patience: number; // 0..1 remaining
+  phone: boolean;
+}
+
 export interface UiSnapshot {
-  phase: Phase;
   served: number;
   bubble: Bubble | null;
-  ticket: string[] | null;
-  ticketPhone: boolean;
-  ticketWho: string | null; // "2/3 · Ayşe" for groups
-  patience: number | null; // 0..1 remaining
+  tickets: TicketInfo[];
+  target: number | null; // slot id chosen for the next serve (null = auto)
   cash: CashUI | null;
+  complaint: { name: string } | null;
   earned: number;
   cook: CookState | null;
   cookWhere: 'prep' | 'stove' | 'hand' | null;
@@ -140,8 +139,25 @@ export interface UiSnapshot {
   hint: Hint | null;
   station: number;
   ringing: boolean;
-  clock: number; // 0..1 of the day
+  clock: number;
   clockText: string;
+  dayEnd: boolean;
+}
+
+/** An open order waiting to be cooked. */
+interface Slot {
+  id: number;
+  cu: Customer;
+  mi: number;
+  waitT: number;
+  lines: string[];
+}
+
+interface GroupState {
+  pay: number;
+  tip: number;
+  served: number; // bowls served so far
+  complained: boolean;
 }
 
 type Drag =
@@ -179,22 +195,47 @@ interface CatState {
   timer: number;
 }
 
-const COOK_RATE = 8.2; // progress units per second on the stove
-const FILL_RATE = 0.62; // fill per second while holding a pot
+type DinerX = Diner & { leaveT: number; cuId?: number; mi?: number; seed: number };
+
+const COOK_RATE = 8.2;
+const FILL_RATE = 0.62;
+const MAX_OPEN = 3;
+const QUEUE_MAX = 3;
 
 export class DaySession {
   engine: Engine;
   level: Level;
-  dayLen: number; // seconds
-  clock = 0; // seconds elapsed
-  customer: Customer | null = null;
-  mi = 0; // active member index
-  nextId = 0;
+  dayLen: number;
+  clock = 0;
+  // counter (ordering)
+  counter: Customer | null = null;
+  mi = 0;
   phase: Phase = 'idle';
   phaseT = 0;
+  // line & open orders
+  queue: Customer[] = [];
+  open: Slot[] = [];
+  ringing: Slot | null = null;
+  private slotId = 1;
+  target: number | null = null;
+  // pickup (receiving / paying)
+  pick: {
+    cu: Customer;
+    mi: number;
+    phase: PickPhase;
+    t: number;
+    score: number;
+    notes: string[];
+    tone: Bubble['tone'];
+    bowl: BowlState | null;
+  } | null = null;
+  groups = new Map<number, GroupState>();
+  nextId = 0;
+  spawnT = 2;
   ledger: DayLedger;
   scores: number[] = [];
   lost = 0;
+  complaints = 0;
   decor: DecorState;
   cashBefore: number;
   bowl: BowlState = newBowl();
@@ -202,43 +243,35 @@ export class DaySession {
   bowlPos = { x: 0, y: 0 };
   bowlLift = 0;
   bubble: Bubble | null = null;
-  ticket: string[] | null = null;
   cash: CashUI | null = null;
   lastScore: number | null = null;
   toast: string | null = null;
   toastT = 0;
   earned = 0;
-  waitT = 0;
   typeT = 0;
   prepL!: PrepLayout;
   kamL!: KamadoLayout;
   salL!: SalonLayout;
-  tops: string[]; // unlocked toppings in tub order
+  tops: string[];
   noods: string[];
   liqs: string[];
   private drag: Drag | null = null;
   private pointer = { x: 0, y: 0, sx: 0, sy: 0, down: false };
   private fx = new ParticleSystem();
   private cat: CatState = { pose: 'sit', spot: 1, x: 0, y: 0, tx: 0, flip: false, timer: 2 };
-  diners: (Diner & { leaveT: number; seed: number })[] = [];
+  diners: DinerX[] = [];
   private seedCounter = 1;
   private scooter: { x: number; t: number } | null = null;
   private tipCoins: number;
   private heat = 0.15;
-  private tutorialDone = new Set<string>();
   private unlocked: Set<string>;
   private lastCook: CookState = 'raw';
   private listeners = new Set<() => void>();
   private snap: UiSnapshot | null = null;
   private ringT = 0;
-  private customerMood: Mood = 'neutral';
-  private customerEating = false;
-  private customerY = 0;
-  private servedBowl: BowlState | null = null;
+  private counterY = 0;
+  private pickY = 0;
   private dayOver = false;
-  private groupPay = 0;
-  private groupTip = 0;
-  private pendingReaction: { text: string; tone: Bubble['tone']; notes: string[] } | null = null;
   private tapHintShown = false;
   onDayEnd: ((r: DayResult) => void) | null = null;
 
@@ -266,14 +299,12 @@ export class DaySession {
     this.engine.camX = 0;
     this.resetBowl();
     for (let i = 0; i < Math.min(2, this.salL.seats.length); i++)
-      this.seatDiner(60 + Math.random() * 60);
+      this.seatExtra(60 + Math.random() * 60);
     this.cat.x = this.salL.catSpots[1].x;
     this.cat.y = this.salL.catSpots[1].y;
     this.cat.tx = this.cat.x;
     this.bindInput(canvas);
     this.engine.start();
-    this.phase = 'idle';
-    this.phaseT = -1.0;
   }
 
   destroy() {
@@ -291,21 +322,23 @@ export class DaySession {
   }
   snapshot(): UiSnapshot {
     if (this.snap) return this.snap;
-    const cu = this.customer;
-    const m = this.member;
     const left = Math.max(0, this.dayLen - this.clock);
     const mm = Math.floor(left / 60);
     const ss = Math.floor(left % 60);
     this.snap = {
-      phase: this.phase,
       served: this.scores.length,
       bubble: this.bubble ? { ...this.bubble } : null,
-      ticket: this.ticket,
-      ticketPhone: !!cu?.phone,
-      ticketWho:
-        cu && m && cu.members.length > 1 ? `${this.mi + 1}/${cu.members.length} · ${m.name}` : null,
-      patience: cu && this.phase === 'cooking' ? Math.max(0, 1 - this.waitT / cu.patience) : null,
+      tickets: this.open.map((s) => ({
+        id: s.id,
+        who: s.cu.members[s.mi].name,
+        lines: s.lines,
+        patience: clamp(1 - s.waitT / s.cu.patience, 0, 1),
+        phone: s.cu.phone,
+      })),
+      target: this.target,
       cash: this.cash ? { ...this.cash, giving: [...this.cash.giving] } : null,
+      complaint:
+        this.pick?.phase === 'complain' ? { name: this.pick.cu.members[this.pick.mi].name } : null,
       earned: this.earned,
       cook: this.bowl.noodle ? cookOf(this.bowl) : null,
       cookWhere:
@@ -316,13 +349,20 @@ export class DaySession {
             : this.bowlAt === 'prep'
               ? 'prep'
               : null,
-      score: this.lastScore,
+      score:
+        this.pick &&
+        (this.pick.phase === 'react' ||
+          this.pick.phase === 'complain' ||
+          this.pick.phase === 'served')
+          ? this.pick.score
+          : null,
       toast: this.toast,
       hint: this.currentHint(),
       station: this.engine.station,
-      ringing: this.phase === 'ring',
+      ringing: !!this.ringing,
       clock: Math.min(1, this.clock / this.dayLen),
       clockText: `${mm}:${String(ss).padStart(2, '0')}`,
+      dayEnd: this.phase === 'dayEnd',
     };
     return this.snap;
   }
@@ -338,8 +378,10 @@ export class DaySession {
     this.notify();
   }
 
-  get member(): Member | undefined {
-    return this.customer?.members[this.mi];
+  setTarget(id: number | null) {
+    this.target = this.target === id ? null : id;
+    sfx('tap');
+    this.notify();
   }
 
   get tipJarCoins() {
@@ -370,58 +412,130 @@ export class DaySession {
     this.lastCook = 'raw';
   }
 
+  /** standing spots for the queue (from the salon layout, with a fallback) */
+  private queueSpots() {
+    const S = this.salL as SalonLayout & { queue?: { x: number; y: number; size: number }[] };
+    if (S.queue?.length) return S.queue;
+    const c = S.customer;
+    return [0, 1, 2].map((i) => ({
+      x: c.x + c.size * (0.95 + i * 0.5),
+      y: c.y - 14 - i * 4,
+      size: c.size * 0.78,
+    }));
+  }
+
+  counterX() {
+    return this.pick && this.counter
+      ? this.salL.customer.x + this.salL.customer.size * 0.45
+      : this.salL.customer.x;
+  }
+  pickupX() {
+    return this.counter
+      ? this.salL.customer.x - this.salL.customer.size * 0.5
+      : this.salL.customer.x;
+  }
+
   // ---------- customers ----------
-  private spawnCustomer() {
+  private spawn() {
     const cu = makeCustomer(this.level.id, this.nextId++);
-    this.customer = cu;
-    this.mi = 0;
-    this.customerMood = 'neutral';
-    this.customerEating = false;
-    this.customerY = 0;
-    this.lastScore = null;
-    this.waitT = 0;
-    this.groupPay = 0;
-    this.groupTip = 0;
     for (const m of cu.members)
       preloadAvatar(m.look, ['neutral', 'happy', 'love', 'angry', 'worried']);
     if (cu.phone) {
-      this.phase = 'ring';
+      if (this.ringing || this.open.length >= MAX_OPEN) return; // try again later
+      const m = cu.members[0];
+      this.ringing = { id: this.slotId++, cu, mi: 0, waitT: 0, lines: orderLines(m.order) };
       this.ringT = 0;
       sfx('phone');
-    } else {
-      this.phase = 'enter';
-      sfx('door');
+      this.notify();
+      return;
     }
-    this.phaseT = 0;
-    this.notify();
-  }
-
-  private gapThenNext(delay: number) {
-    this.phase = 'idle';
-    this.phaseT = -delay;
-    this.bubble = null;
-    this.ticket = null;
-    this.cash = null;
-    this.customer = null;
+    if (this.queue.length >= QUEUE_MAX) return;
+    this.queue.push(cu);
+    sfx('door');
     this.notify();
   }
 
   answerPhone() {
-    if (this.phase !== 'ring' || !this.customer) return;
-    const m = this.member!;
-    this.setBubble(m.name, this.customer.greet + ' ' + m.text, true);
-    this.ticket = orderLines(m.order);
-    this.phase = 'cooking';
-    this.phaseT = 0;
-    this.waitT = 0;
+    if (!this.ringing) return;
+    const s = this.ringing;
+    this.ringing = null;
+    s.waitT = 0;
+    this.open.push(s);
+    const m = s.cu.members[0];
+    this.setBubble(m.name, s.cu.greet + ' ' + m.text, 'phone', 'neutral');
     sfx('tap');
     this.notify();
   }
 
-  private setBubble(name: string, text: string, phone = false, tone: Bubble['tone'] = 'neutral') {
-    this.bubble = { name, text, shown: 0, phone, tone };
+  private setBubble(
+    name: string,
+    text: string,
+    at: Bubble['at'],
+    tone: Bubble['tone'] = 'neutral'
+  ) {
+    this.bubble = { name, text, shown: 0, phone: at === 'phone', tone, at };
     this.typeT = 0;
     this.notify();
+  }
+
+  private startOrder() {
+    const cu = this.counter!;
+    const m = cu.members[this.mi];
+    this.phase = 'order';
+    this.phaseT = 0;
+    const n = cu.members.length;
+    const pre =
+      n > 1 ? (this.mi === 0 ? T('g.first') : this.mi === n - 1 ? T('g.last') : T('g.mine')) : '';
+    this.setBubble(m.name, pre + m.text, 'counter');
+  }
+
+  private placeOrder(cu: Customer, mi: number) {
+    const m = cu.members[mi];
+    this.open.push({ id: this.slotId++, cu, mi, waitT: 0, lines: orderLines(m.order) });
+    if (!this.groups.has(cu.id))
+      this.groups.set(cu.id, { pay: 0, tip: 0, served: 0, complained: false });
+  }
+
+  /** the ordering group walks to a table (or waits standing) */
+  private seatGroup(cu: Customer) {
+    cu.members.forEach((m, i) => {
+      const seat = this.freeSeat();
+      this.diners.push({
+        seat,
+        look: m.look,
+        mood: 'neutral',
+        bob: 0,
+        eating: false,
+        waiting: true,
+        leaveT: 1e9,
+        cuId: cu.id,
+        mi: i,
+        seed: m.look.seed,
+      } as DinerX);
+    });
+  }
+
+  private freeSeat(): number {
+    const used = new Set(this.diners.filter((d) => d.seat >= 0).map((d) => d.seat));
+    const free = this.salL.seats.map((_, i) => i).filter((i) => !used.has(i));
+    if (!free.length) return -1; // standing
+    // prefer seats at the same table as a groupmate
+    return free[Math.floor(Math.random() * free.length)];
+  }
+
+  private seatExtra(stay: number) {
+    const seat = this.freeSeat();
+    if (seat < 0) return;
+    const seed = (this.seedCounter++ * 7919) % 100000;
+    this.diners.push({
+      seat,
+      look: randomLook(seed),
+      mood: 'happy',
+      bob: 0,
+      eating: true,
+      leaveT: stay,
+      seed,
+    } as DinerX);
   }
 
   private endDay() {
@@ -440,82 +554,178 @@ export class DaySession {
       cashAfter: this.cashBefore + net(this.ledger),
       served: this.scores.length,
       lost: this.lost,
+      complaints: this.complaints,
     };
     this.notify();
     setTimeout(() => this.onDayEnd?.(r), 900);
   }
 
-  /** The current member gives up waiting. */
-  private giveUp() {
-    const cu = this.customer!;
-    const m = this.member!;
+  /** an open order's customer gives up */
+  private giveUp(s: Slot) {
+    this.open = this.open.filter((x) => x !== s);
+    if (this.target === s.id) this.target = null;
     this.scores.push(0);
     this.lost++;
-    this.lastScore = 0;
-    this.customerMood = 'angry';
-    this.bubble = null;
-    this.ticket = null;
-    sfx('angry');
+    const m = s.cu.members[s.mi];
     this.setBubble(
       m.name,
-      cu.phone ? 'Çok bekledim, siparişi iptal ediyorum!' : 'Çok bekledim, gidiyorum!',
-      cu.phone,
+      s.cu.phone ? T('g.waitedPhone') : T('g.waited'),
+      s.cu.phone ? 'phone' : 'pickup',
       'bad'
     );
-    this.phase = 'leave';
-    this.phaseT = -1.6;
+    sfx('angry');
+    // the whole group leaves the table
+    this.diners = this.diners.filter((d) => d.cuId !== s.cu.id);
+    this.open = this.open.filter((x) => x.cu !== s.cu);
     this.notify();
   }
 
   // ---------- serving ----------
-  private serve(viaBox: boolean) {
-    const cu = this.customer!;
-    const m = this.member!;
-    const v = judge(m.order, this.bowl, this.waitT / cu.patience);
+  private pickSlotFor(b: BowlState): Slot | null {
+    if (!this.open.length) return null;
+    if (this.target !== null) {
+      const t = this.open.find((s) => s.id === this.target);
+      if (t) return t;
+    }
+    let best: Slot | null = null;
+    let bestScore = -1;
+    for (const s of this.open) {
+      const sc = judge(s.cu.members[s.mi].order, b, 0).score;
+      if (
+        sc > bestScore + 0.01 ||
+        (Math.abs(sc - bestScore) < 0.01 && best && s.waitT > best.waitT)
+      ) {
+        best = s;
+        bestScore = sc;
+      }
+    }
+    return best;
+  }
+
+  private serve(s: Slot, viaBox: boolean) {
+    const cu = s.cu;
+    const m = cu.members[s.mi];
+    const v = judge(m.order, this.bowl, s.waitT / cu.patience);
     const p = price(m.order);
     const pay = paid(v.score, p);
     const tp = tip(v.score, p, tipBonus(this.decor));
+    this.open = this.open.filter((x) => x !== s);
+    if (this.target === s.id) this.target = null;
     this.scores.push(v.score);
     this.lastScore = v.score;
     this.ledger.ingredients += cost(this.bowl);
     this.ledger.bowls++;
-    this.servedBowl = this.bowl;
+    const g = this.groups.get(cu.id) ?? { pay: 0, tip: 0, served: 0, complained: false };
+    g.pay += pay;
+    g.served++;
+    const complaint = v.score < 70 && v.notes.length > 0;
+    if (complaint) {
+      g.complained = true;
+      this.complaints++;
+    } else g.tip += tp;
+    this.groups.set(cu.id, g);
+    const served = this.bowl;
     this.bowl = newBowl(this.bowl.style);
-    this.groupPay += pay;
-    this.groupTip += tp;
     const tone: Bubble['tone'] = v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad';
+    this.bubble = null;
+    if (v.score >= 85) this.fx.emit('sparkle', this.bowlPos.x, this.bowlPos.y - 40, 14, 60);
     if (viaBox) {
       this.bowlAt = 'box';
-      this.phase = 'delivering';
-      this.phaseT = 0;
       this.scooter = { x: this.salL.deliveryBox.x, t: 0 };
       sfx('scooter');
       this.ledger.sales += pay;
-      this.ledger.tips += tp;
-      this.earned += pay + tp;
-      if (tp > 0) this.tipCoins += 1;
-      this.pendingReaction = {
-        text: `Uygulama: "${reactionLine(cu, v.score)}" ★${(v.score / 20).toFixed(1)}`,
-        tone,
+      this.ledger.tips += complaint ? 0 : tp;
+      this.earned += pay + (complaint ? 0 : tp);
+      if (!complaint && tp > 0) this.tipCoins += 1;
+      this.pick = {
+        cu,
+        mi: s.mi,
+        phase: 'delivering',
+        t: 0,
+        score: v.score,
         notes: v.notes,
+        tone,
+        bowl: null,
       };
+      this.groups.delete(cu.id);
     } else {
       this.bowlAt = 'counter';
-      this.phase = 'served';
-      this.phaseT = 0;
-      this.customerMood = 'happy';
-      this.customerEating = true;
-      sfx('place');
-      this.pendingReaction = {
-        text: reactionLine(cu, v.score),
+      // the member comes from the table to the counter
+      this.diners = this.diners.filter((d) => !(d.cuId === cu.id && d.mi === s.mi));
+      this.pick = {
+        cu,
+        mi: s.mi,
+        phase: 'served',
+        t: 0,
+        score: v.score,
+        notes: complaint ? v.notes : v.notes.concat(v.praise),
         tone,
-        notes: v.notes.concat(v.praise),
+        bowl: served,
       };
+      this.pickY = 0;
+      sfx('place');
     }
-    this.bubble = null;
-    this.ticket = null;
-    if (v.score >= 85) this.fx.emit('sparkle', this.bowlPos.x, this.bowlPos.y - 40, 14, 60);
     this.notify();
+  }
+
+  apologize() {
+    if (!this.pick || this.pick.phase !== 'complain') return;
+    const m = this.pick.cu.members[this.pick.mi];
+    this.setBubble(T('g.you'), T('g.sorry'), 'pickup', 'neutral');
+    sfx('tap');
+    this.pick.phase = 'react';
+    this.pick.t = 1.4; // short wait before the reply
+    this.pick.notes = [];
+    this.pick.tone = 'neutral';
+    this.pendingSorryReply = m.name;
+    this.notify();
+  }
+  private pendingSorryReply: string | null = null;
+
+  /** after the reaction: next step for this member/group */
+  private afterReaction() {
+    const pk = this.pick!;
+    const cu = pk.cu;
+    const g = this.groups.get(cu.id)!;
+    if (g.served < cu.members.length) {
+      // this friend goes back to the table and eats; others are still waiting for their bowls
+      this.diners.push({
+        seat: this.freeSeat(),
+        look: cu.members[pk.mi].look,
+        mood: 'happy',
+        bob: 0,
+        eating: true,
+        leaveT: 1e9,
+        cuId: cu.id,
+        mi: pk.mi,
+        seed: cu.members[pk.mi].look.seed,
+      } as DinerX);
+      pk.phase = 'leave';
+      pk.t = 0;
+      this.notify();
+      return;
+    }
+    // everyone served: pay for the whole group
+    pk.phase = 'pay';
+    pk.t = 0;
+    const pay = g.pay;
+    this.ledger.sales += pay;
+    this.earned += pay;
+    const given = cashGiven(pay, this.level.id);
+    const change = sum(given) - pay;
+    this.cash = { due: pay, given, giving: [], tipAmount: g.tip };
+    const who = cu.members.length > 1 ? T('g.billAll') : '';
+    this.setBubble(
+      cu.members[pk.mi].name,
+      T('g.bill', {
+        who,
+        p: pay,
+        g: sum(given),
+        rest: change > 0 ? T('g.changeWillBe', { n: change }) : T('g.exactMoney'),
+      }),
+      'pickup'
+    );
+    sfx('coins');
   }
 
   // ---------- cash ----------
@@ -534,17 +744,18 @@ export class DaySession {
     this.notify();
   }
   confirmChange() {
-    if (!this.cash || this.cash.result === 'ok' || !this.customer) return;
+    if (!this.cash || this.cash.result === 'ok' || !this.pick) return;
     const need = sum(this.cash.given) - this.cash.due;
     const give = sum(this.cash.giving);
-    const name = this.member!.name;
+    const pk = this.pick;
+    const name = pk.cu.members[pk.mi].name;
     if (give === need) {
       this.cash.result = 'ok';
       sfx('coins');
     } else if (give < need) {
       this.cash.result = 'less';
       this.ledger.changeMistakes++;
-      this.setBubble(name, `Hmm, ${need} ₺ olmalıydı, eksik geldi…`, false, 'bad');
+      this.setBubble(name, T('g.lessChange', { n: need }), 'pickup', 'bad');
       sfx('fail');
       this.notify();
       return;
@@ -552,10 +763,11 @@ export class DaySession {
       this.cash.result = 'ok';
       this.ledger.overChange += give - need;
       this.ledger.changeMistakes++;
-      this.setBubble(name, 'Fazla verdin ama… teşekkürler!', false, 'neutral');
+      this.setBubble(name, T('g.moreChange'), 'pickup', 'neutral');
       sfx('coins');
     }
     const tp = this.cash.tipAmount;
+    const g = this.groups.get(pk.cu.id);
     if (tp > 0) {
       this.tipCoins += 1;
       const j = this.salL.tipJar;
@@ -563,19 +775,33 @@ export class DaySession {
       sfx('ding');
       this.setBubble(
         name,
-        tp >= 10
-          ? `Bahşiş kavanozuna ${tp} ₺ bıraktım. Harikaydı!`
-          : `Bahşiş: ${tp} ₺. Teşekkürler şef!`,
-        false,
+        tp >= 10 ? T('g.tipBig', { n: tp }) : T('g.tipSmall', { n: tp }),
+        'pickup',
         'good'
       );
-    }
+    } else if (g?.complained) this.setBubble(name, T('g.noTip'), 'pickup', 'neutral');
     this.ledger.tips += tp;
     this.earned += tp;
-    this.customerMood = tp > 0 ? 'love' : this.customerMood;
     this.cash = null;
-    this.phase = 'leave';
-    this.phaseT = -1.6;
+    this.groups.delete(pk.cu.id);
+    // the group eats at the table now
+    pk.cu.members.forEach((m, i) => {
+      if (!this.diners.some((d) => d.cuId === pk.cu.id && d.mi === i))
+        this.diners.push({
+          seat: this.freeSeat(),
+          look: m.look,
+          mood: tp > 0 ? 'love' : 'happy',
+          bob: 0,
+          eating: true,
+          leaveT: 1e9,
+          cuId: pk.cu.id,
+          mi: i,
+          seed: m.look.seed,
+        } as DinerX);
+    });
+    for (const d of this.diners) if (d.cuId === pk.cu.id) d.leaveT = 50 + Math.random() * 50;
+    pk.phase = 'leave';
+    pk.t = -1.4;
     this.notify();
   }
 
@@ -638,10 +864,10 @@ export class DaySession {
       }
     }
     if (st === 1) {
-      const L = this.prepL;
-      for (let i = 0; i < L.tubs.length; i++) {
+      const Lp = this.prepL;
+      for (let i = 0; i < Lp.tubs.length; i++) {
         const id = this.tops[i];
-        if (!id || !this.hit(L.tubs[i], lx, y, 6)) continue;
+        if (!id || !this.hit(Lp.tubs[i], lx, y, 6)) continue;
         this.drag = {
           kind: 'tub',
           id,
@@ -655,9 +881,9 @@ export class DaySession {
         };
         return;
       }
-      for (let i = 0; i < L.pots.length; i++) {
+      for (let i = 0; i < Lp.pots.length; i++) {
         const id = this.liqs[i];
-        if (!id || !this.hit(L.pots[i], lx, y, 6)) continue;
+        if (!id || !this.hit(Lp.pots[i], lx, y, 6)) continue;
         this.drag = { kind: 'hold', id };
         if (this.bowlAt !== 'prep') return;
         if (this.bowl.broth !== id) {
@@ -667,21 +893,21 @@ export class DaySession {
         }
         return;
       }
-      for (let i = 0; i < L.trays.length; i++) {
-        if (this.noods[i] && this.hit(L.trays[i], lx, y, 6)) {
+      for (let i = 0; i < Lp.trays.length; i++) {
+        if (this.noods[i] && this.hit(Lp.trays[i], lx, y, 6)) {
           this.drag = { kind: 'tap', target: 'tray:' + this.noods[i], sx, sy };
           return;
         }
       }
-      for (let i = 0; i < L.shelf.slots.length; i++) {
-        const s = L.shelf.slots[i];
+      for (let i = 0; i < Lp.shelf.slots.length; i++) {
+        const s = Lp.shelf.slots[i];
         if (BOWLS[i] && Math.hypot(lx - s.x, y - s.y) < 34) {
           this.drag = { kind: 'tap', target: 'shelf:' + BOWLS[i].id, sx, sy };
           return;
         }
       }
-      if (this.hit(L.thickChips, lx, y, 4)) {
-        const k = Math.floor(((lx - L.thickChips.x) / L.thickChips.w) * 3);
+      if (this.hit(Lp.thickChips, lx, y, 4)) {
+        const k = Math.floor(((lx - Lp.thickChips.x) / Lp.thickChips.w) * 3);
         this.drag = {
           kind: 'tap',
           target: 'thick:' + (['ince', 'orta', 'kalin'] as Thick[])[clamp(k, 0, 2)],
@@ -690,7 +916,7 @@ export class DaySession {
         };
         return;
       }
-      if (this.hit(L.trash, lx, y, 6)) {
+      if (this.hit(Lp.trash, lx, y, 6)) {
         this.drag = { kind: 'tap', target: 'trash', sx, sy };
         return;
       }
@@ -778,10 +1004,9 @@ export class DaySession {
     if (d.kind === 'hold') return;
     if (d.kind === 'tub') {
       if (!d.moved) {
-        // a tap on a tub does nothing: the player places every piece by hand
         if (!this.tapHintShown) {
           this.tapHintShown = true;
-          this.showToast('Malzemeyi parmağınla tutup kaseye bırak.');
+          this.showToast(T('g.tapHint'));
         }
         sfx('tap');
         return;
@@ -812,9 +1037,8 @@ export class DaySession {
   }
 
   private place(id: string, at: { x: number; y: number }, v: number, rot: number) {
-    if (this.bowl.pieces.length >= 30) return this.showToast('Kase doldu!');
+    if (this.bowl.pieces.length >= 30) return this.showToast(T('g.bowlFull'));
     this.bowl.pieces.push({ id, x: at.x, y: at.y, rot, v, s: 0.92 + Math.random() * 0.16 });
-    this.tutorialDone.add('topping');
     sfx('place');
     buzz(6);
     this.notify();
@@ -823,12 +1047,10 @@ export class DaySession {
   private tap(target: string) {
     if (target.startsWith('tray:')) {
       const id = target.slice(5);
-      if (this.bowlAt !== 'prep') return this.showToast('Önce kaseyi tezgâha koy.');
-      if (this.bowl.progress > 0)
-        return this.showToast('Pişen erişte değiştirilemez. Kaseyi çöpe at.');
+      if (this.bowlAt !== 'prep') return this.showToast(T('g.bowlFirst'));
+      if (this.bowl.progress > 0) return this.showToast(T('g.noodleLocked'));
       this.bowl.noodle = id;
       this.bowl.progress = 0;
-      this.tutorialDone.add('noodle');
       sfx('place');
       buzz(6);
       this.notify();
@@ -844,8 +1066,8 @@ export class DaySession {
       const id = target.slice(6);
       const b = BOWLS.find((x) => x.id === id)!;
       if (b.unlock > this.level.id)
-        return this.showToast(`${b.name} kase ${b.unlock}. günde raftan iner.`);
-      if (this.bowlAt !== 'prep') return this.showToast('Önce kaseyi tezgâha koy.');
+        return this.showToast(T('g.bowlLocked', { b: L(b.name), n: b.unlock }));
+      if (this.bowlAt !== 'prep') return this.showToast(T('g.bowlFirst'));
       this.bowl.style = id;
       sfx('pop');
       this.notify();
@@ -857,11 +1079,11 @@ export class DaySession {
       this.ledger.waste += cost(this.bowl);
       this.resetBowl();
       sfx('trash');
-      this.showToast('Kase boşaltıldı (israf deftere yazıldı).');
+      this.showToast(T('g.binned'));
       return;
     }
     if (target === 'phone') {
-      if (this.phase === 'ring') this.answerPhone();
+      if (this.ringing) this.answerPhone();
       else sfx('tap');
       return;
     }
@@ -891,52 +1113,56 @@ export class DaySession {
       this.bowlPos = { x: 2 * v.W + this.kamL.bowl.x, y: this.kamL.bowl.y };
       sfx('place');
       if (this.bowl.noodle) sfx('sizzle');
-      this.tutorialDone.add('stove');
       this.notify();
       return;
     }
-    if (st === 0 && this.phase === 'cooking' && this.customer) {
-      const cu = this.customer;
+    if (st === 0 && this.bowl.noodle) {
       const S = this.salL;
-      if (cu.phone) {
-        if (this.hit(S.deliveryBox, lx, y, 70)) {
+      const busy = !!this.pick && this.pick.phase !== 'leave' && this.pick.phase !== 'delivering';
+      if (this.hit(S.deliveryBox, lx, y, 70)) {
+        const phoneSlots = this.open.filter((s) => s.cu.phone);
+        const s =
+          this.target !== null
+            ? (phoneSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(phoneSlots))
+            : this.pickSlotFromList(phoneSlots);
+        if (s && !busy) {
           this.bowlPos = {
             x: S.deliveryBox.x + S.deliveryBox.w / 2,
             y: S.deliveryBox.y + S.deliveryBox.h / 2,
           };
-          this.serve(true);
+          this.serve(s, true);
           return;
         }
-        this.showToast('Paket siparişi kapıdaki kutuya bırak.');
-      } else if (Math.abs(lx - S.customer.x) < v.W * 0.3 && y < S.counterTop + 140) {
-        this.bowlPos = { x: S.customer.x + S.customer.size * 0.42, y: S.counterTop + 30 };
-        this.serve(false);
-        return;
+        this.showToast(s ? T('g.counterBusy') : T('g.noOrder'));
+      } else if (Math.abs(lx - S.customer.x) < v.W * 0.35 && y < S.counterTop + 140) {
+        const walkSlots = this.open.filter((s) => !s.cu.phone);
+        const s =
+          this.target !== null
+            ? (walkSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(walkSlots))
+            : this.pickSlotFromList(walkSlots);
+        if (s && !busy) {
+          this.bowlPos = { x: this.pickupX() + S.customer.size * 0.42, y: S.counterTop + 30 };
+          this.serve(s, false);
+          return;
+        }
+        this.showToast(s ? T('g.counterBusy') : this.ringing ? T('g.ringFirst') : T('g.noOrder'));
       }
-    } else if (st === 0 && this.bowl.noodle)
-      this.showToast(this.phase === 'ring' ? 'Önce telefona bak!' : 'Henüz sipariş yok.');
+    }
     this.bowlAt = 'prep';
     this.bowlPos = { x: v.W + this.prepL.bowl.x, y: this.prepL.bowl.y };
     sfx('place');
     this.notify();
   }
 
-  // ---------- diners & cat ----------
-  private seatDiner(stay: number, seed?: number) {
-    const used = new Set(this.diners.map((d) => d.seat));
-    const free = this.salL.seats.map((_, i) => i).filter((i) => !used.has(i));
-    if (!free.length) return;
-    const seat = free[Math.floor(Math.random() * free.length)];
-    this.diners.push({
-      seat,
-      img: null,
-      bob: 0,
-      eating: true,
-      leaveT: stay,
-      seed: seed ?? (this.seedCounter++ * 7919) % 100000,
-    });
+  private pickSlotFromList(list: Slot[]): Slot | null {
+    const saved = this.open;
+    this.open = list;
+    const s = this.pickSlotFor(this.bowl);
+    this.open = saved;
+    return s;
   }
 
+  // ---------- cat ----------
   private updateCat(dt: number) {
     const c = this.cat;
     c.timer -= dt;
@@ -972,51 +1198,53 @@ export class DaySession {
     }
   }
 
-  // ---------- hints ----------
+  // ---------- hints (days 1–2) ----------
   private currentHint(): Hint | null {
     if (this.level.id > 2) return null;
     const v = this.engine.view;
-    const cu = this.customer;
-    const m = this.member;
-    if (this.phase === 'ring')
+    if (this.ringing)
       return {
         station: 0,
         x: this.salL.phone.x + this.salL.phone.w / 2,
         y: this.salL.phone.y,
-        text: 'Telefon çalıyor! Dokun.',
+        text: T('g.hintRing'),
       };
-    if (this.phase !== 'cooking' || !cu || !m) return null;
-    const o = m.order;
-    const L = this.prepL;
+    const s = this.open[0];
+    if (!s) return null;
+    const o = s.cu.members[s.mi].order;
+    const Lp = this.prepL;
+    const thickName = (tk: Thick) => L(THICK_LABEL[tk]);
     if (this.bowlAt === 'prep') {
       if (!this.bowl.noodle) {
         const i = Math.max(0, this.noods.indexOf(o.noodle ?? 'ramen'));
-        const t = L.trays[i];
+        const t = Lp.trays[i];
         return {
           station: 1,
           x: v.W + t.x + t.w / 2,
           y: t.y + t.h / 2,
-          text: `Erişteyi koy: ${o.thick ? THICK_LABEL[o.thick] + ' ' : ''}${INGREDIENTS[o.noodle ?? 'ramen'].name}`,
+          text: T('g.hintNoodle', {
+            n: `${o.thick ? thickName(o.thick) + ' ' : ''}${L(INGREDIENTS[o.noodle ?? 'ramen'].name)}`,
+          }),
         };
       }
       if (o.thick && this.bowl.thick !== o.thick && this.level.id === 1)
         return {
           station: 1,
-          x: v.W + L.thickChips.x + L.thickChips.w / 2,
-          y: L.thickChips.y + L.thickChips.h / 2,
-          text: `Kalınlık: ${THICK_LABEL[o.thick]}`,
+          x: v.W + Lp.thickChips.x + Lp.thickChips.w / 2,
+          y: Lp.thickChips.y + Lp.thickChips.h / 2,
+          text: T('g.hintThick', { n: thickName(o.thick) }),
         };
       if (!this.bowl.broth || this.bowl.fill < 0.72) {
         const i = Math.max(0, this.liqs.indexOf(o.broth ?? 'shoyu'));
-        const p = L.pots[i];
+        const p = Lp.pots[i];
         return {
           station: 1,
           x: v.W + p.x + p.w / 2,
           y: p.y + p.h / 2,
           text:
             this.bowl.fill > 0
-              ? 'Basılı tut, göstergeyi “tam”a getir'
-              : `Basılı tut ve doldur: ${INGREDIENTS[o.broth ?? 'shoyu'].name}`,
+              ? T('g.hintFillMore')
+              : T('g.hintFill', { n: L(INGREDIENTS[o.broth ?? 'shoyu'].name) }),
         };
       }
       const cnt = new Map<string, number>();
@@ -1025,24 +1253,20 @@ export class DaySession {
         const have = cnt.get(r.id) ?? 0;
         const need = r.mode === 'exact' ? (r.n ?? 1) : r.mode === 'bol' ? 5 : 1;
         if (have < need) {
-          const tb = L.tubs[Math.max(0, this.tops.indexOf(r.id))];
+          const tb = Lp.tubs[Math.max(0, this.tops.indexOf(r.id))];
+          const nm = L(INGREDIENTS[r.id].name);
           return {
             station: 1,
             x: v.W + tb.x + tb.w / 2,
             y: tb.y + tb.h / 2,
             text:
               r.mode === 'exact'
-                ? `${INGREDIENTS[r.id].name}: ${have}/${need} — sürükleyip kaseye bırak`
-                : `${r.mode === 'bol' ? 'Bol ' : ''}${INGREDIENTS[r.id].name} — sürükleyip bırak`,
+                ? T('g.hintTopExact', { n: nm, a: have, b: need })
+                : T('g.hintTop', { n: (r.mode === 'bol' ? T('g.hintLots') : '') + nm }),
           };
         }
       }
-      return {
-        station: 1,
-        x: this.bowlPos.x,
-        y: this.bowlPos.y,
-        text: 'Kaseyi tut, sağa kaydırıp ocağa taşı',
-      };
+      return { station: 1, x: this.bowlPos.x, y: this.bowlPos.y, text: T('g.hintCarry') };
     }
     if (this.bowlAt === 'stove') {
       const cs = cookOf(this.bowl);
@@ -1052,28 +1276,28 @@ export class DaySession {
           station: 2,
           x: this.bowlPos.x,
           y: this.bowlPos.y,
-          text: cs === want ? 'Tam zamanı! Kaseyi al, sola kaydır, müşteriye götür' : 'Hemen al!',
+          text: cs === want ? T('g.hintTake') : T('g.hintTakeNow'),
         };
       return {
         station: 2,
         x: 2 * v.W + this.kamL.timer.x,
         y: this.kamL.timer.y,
-        text: `Bekle… “${COOK_LABEL[want]}” olunca al`,
+        text: T('g.hintWait', { n: L(COOK_LABEL[want]) }),
       };
     }
     if (this.bowlAt === 'hand' && this.bowl.noodle && cookOf(this.bowl) !== 'raw') {
-      return cu.phone
+      return s.cu.phone
         ? {
             station: 0,
             x: this.salL.deliveryBox.x + this.salL.deliveryBox.w / 2,
             y: this.salL.deliveryBox.y,
-            text: 'Paket kutusuna bırak',
+            text: T('g.hintBox'),
           }
         : {
             station: 0,
             x: this.salL.customer.x,
             y: this.salL.counterTop + 30,
-            text: 'Tezgâha, müşterinin önüne bırak',
+            text: T('g.hintServe'),
           };
     }
     return null;
@@ -1120,14 +1344,13 @@ export class DaySession {
       }
     }
     this.bowlLift = lerp(this.bowlLift, this.bowlAt === 'hand' ? 1 : 0, Math.min(1, dt * 12));
-    // edge scroll while carrying
-    if (this.drag && (this.drag.kind === 'bowl' || (this.drag.kind === 'tub' && this.drag.moved))) {
+    if (this.drag && this.drag.kind === 'bowl') {
       const edge = v.cssW * 0.13;
       const sx = this.pointer.sx;
       let dir = 0;
       if (sx < edge) dir = -1 - (edge - sx) / edge;
       else if (sx > v.cssW - edge) dir = 1 + (sx - (v.cssW - edge)) / edge;
-      if (dir && this.drag.kind === 'bowl') {
+      if (dir) {
         const before = this.engine.camX;
         this.engine.camTarget = null;
         this.engine.camX = clamp(this.engine.camX + dir * 520 * dt, 0, this.engine.maxCam);
@@ -1136,7 +1359,6 @@ export class DaySession {
         this.pointer.x += moved;
       }
     }
-    // hold-fill
     if (this.drag && this.drag.kind === 'hold' && this.bowlAt === 'prep') {
       const before = this.bowl.fill;
       this.bowl.fill = Math.min(1.22, this.bowl.fill + FILL_RATE * dt);
@@ -1144,10 +1366,8 @@ export class DaySession {
         sfx('pour');
         this.notify();
       }
-      if (this.bowl.fill >= 1.2 && before < 1.2) this.showToast('Taştı!');
-      this.tutorialDone.add('broth');
+      if (this.bowl.fill >= 1.2 && before < 1.2) this.showToast(T('g.overflow'));
     }
-    // cooking
     if (this.bowlAt === 'stove' && this.bowl.noodle) {
       this.bowl.progress = Math.min(120, this.bowl.progress + COOK_RATE * dt);
       const cs = cookOf(this.bowl);
@@ -1167,12 +1387,6 @@ export class DaySession {
         );
     }
     this.heat = lerp(this.heat, this.bowlAt === 'stove' ? 1 : 0.18, Math.min(1, dt * 2));
-    // patience
-    if (this.phase === 'cooking' && this.customer) {
-      this.waitT += dt;
-      if (Math.floor(this.waitT) !== Math.floor(this.waitT - dt)) this.notify();
-      if (this.waitT >= this.customer.patience) this.giveUp();
-    }
     // typewriter
     if (this.bubble && this.bubble.shown < this.bubble.text.length) {
       this.typeT += dt;
@@ -1183,105 +1397,195 @@ export class DaySession {
         this.notify();
       }
     }
-    const cu = this.customer;
-    const m = this.member;
+    // spawning
+    if (!this.dayOver && this.clock < this.dayLen) {
+      this.spawnT -= dt;
+      if (this.spawnT <= 0) {
+        this.spawn();
+        this.spawnT = this.spawnGap();
+      }
+    }
+    // patience of open orders & the ringing tablet & the queue
+    let tick = false;
+    for (const s of [...this.open]) {
+      s.waitT += dt;
+      if (Math.floor(s.waitT) !== Math.floor(s.waitT - dt)) tick = true;
+      if (s.waitT >= s.cu.patience) this.giveUp(s);
+    }
+    if (this.ringing) {
+      this.ringT += dt;
+      this.ringing.waitT += dt * 0.6;
+      if (this.ringT > 2.4) {
+        this.ringT = 0;
+        sfx('phone');
+      }
+      if (this.ringing.waitT >= this.ringing.cu.patience) {
+        this.lost++;
+        this.scores.push(0);
+        this.ringing = null;
+        this.showToast(T('g.waitedPhone'));
+      }
+    }
+    for (const q of this.queue) q.patience -= dt * 0.35; // waiting in line eats a little patience
+    if (tick) this.notify();
+    // counter flow
+    this.updateCounter(dt);
+    // pickup flow
+    this.updatePickup(dt);
+    // diners
+    for (const d of this.diners) {
+      d.leaveT -= dt;
+      d.bob = Math.sin(t * 2 + d.seed) * 3;
+    }
+    this.diners = this.diners.filter((d) => d.leaveT > 0);
+    if (Math.random() < dt / 60) this.seatExtra(50 + Math.random() * 50);
+    // end of day
+    if (this.clock >= this.dayLen && !this.dayOver) {
+      const nothingLeft = !this.counter && !this.pick && !this.open.length && !this.ringing;
+      if (nothingLeft || this.clock > this.dayLen + 120) {
+        for (const s of this.open) {
+          this.scores.push(0);
+          this.lost++;
+          void s;
+        }
+        this.queue = [];
+        this.endDay();
+      } else if (this.queue.length) this.queue = []; // the line goes home
+    }
+  }
+
+  private updateCounter(dt: number) {
     switch (this.phase) {
       case 'idle':
-        if (this.phaseT >= 0) {
-          if (this.clock >= this.dayLen) this.endDay();
-          else this.spawnCustomer();
-        }
-        break;
-      case 'enter':
-        this.customerY = Math.min(1, this.customerY + dt * 1.6);
-        if (this.phaseT > 0.7 && cu && m) {
-          this.phase = 'greet';
+        if (
+          !this.counter &&
+          this.queue.length &&
+          this.open.length < MAX_OPEN &&
+          this.phaseT > 0.8
+        ) {
+          this.counter = this.queue.shift()!;
+          this.mi = 0;
+          this.counterY = 0;
+          this.phase = 'enter';
           this.phaseT = 0;
-          this.setBubble(m.name, cu.greet);
-        }
-        break;
-      case 'greet':
-        if (this.bubble && this.bubble.shown >= this.bubble.text.length && this.phaseT > 1.4 && m)
-          this.startOrder();
-        break;
-      case 'order':
-        if (this.bubble && this.bubble.shown >= this.bubble.text.length) {
-          this.phase = 'cooking';
-          this.phaseT = 0;
-          this.waitT = 0;
           this.notify();
         }
         break;
-      case 'ring':
-        this.ringT += dt;
-        this.waitT += dt * 0.5;
-        if (this.ringT > 2.4) {
-          this.ringT = 0;
-          sfx('phone');
-        }
-        if (cu && this.waitT >= cu.patience) this.giveUp();
-        break;
-      case 'served':
-        if (this.phaseT > 2.2 && cu && m && this.pendingReaction) {
-          this.phase = 'react';
+      case 'enter':
+        this.counterY = Math.min(1, this.counterY + dt * 1.8);
+        if (this.phaseT > 0.6 && this.counter) {
+          this.phase = 'greet';
           this.phaseT = 0;
-          this.customerEating = false;
-          const sc = this.lastScore ?? 0;
-          this.customerMood =
-            sc >= 85 ? 'love' : sc >= 55 ? 'happy' : sc >= 30 ? 'worried' : 'angry';
-          const notes = this.pendingReaction.notes.slice(0, 2).join(' · ');
-          this.setBubble(
-            m.name,
-            this.pendingReaction.text + (notes ? `  (${notes})` : ''),
-            false,
-            this.pendingReaction.tone
-          );
-          if (sc >= 85) {
-            sfx('perfect');
-            this.fx.emit(
-              'heart',
-              this.memberX(this.mi),
-              this.salL.customer.y - this.salL.customer.size,
-              5,
-              30
-            );
-          } else if (sc < 30) sfx('angry');
-          else sfx('ding');
+          this.setBubble(this.counter.members[0].name, this.counter.greet, 'counter');
         }
         break;
-      case 'react':
+      case 'greet':
         if (
-          this.bubble &&
-          this.bubble.shown >= this.bubble.text.length &&
-          this.phaseT > 2.0 &&
-          cu &&
-          m
+          this.phaseT > 1.6 &&
+          (!this.bubble ||
+            this.bubble.at !== 'counter' ||
+            this.bubble.shown >= this.bubble.text.length)
+        )
+          this.startOrder();
+        break;
+      case 'order':
+        if (
+          this.phaseT > 1.2 &&
+          (!this.bubble ||
+            this.bubble.at !== 'counter' ||
+            this.bubble.shown >= this.bubble.text.length)
         ) {
-          this.servedBowl = null;
-          this.resetBowl();
+          const cu = this.counter!;
+          this.placeOrder(cu, this.mi);
           if (this.mi + 1 < cu.members.length) {
-            // next friend orders
             this.mi++;
-            this.customerMood = 'neutral';
-            this.customerEating = false;
             this.startOrder();
           } else {
-            this.phase = 'pay';
+            this.phase = 'toTable';
             this.phaseT = 0;
-            const pay = this.groupPay;
-            const tp = this.groupTip;
-            this.ledger.sales += pay;
-            this.earned += pay;
-            const given = cashGiven(pay, this.level.id);
-            const change = sum(given) - pay;
-            this.cash = { due: pay, given, giving: [], tipAmount: tp };
-            const who = cu.members.length > 1 ? 'Hepsi benden. ' : '';
+          }
+          this.notify();
+        }
+        break;
+      case 'toTable':
+        this.counterY = Math.max(0, this.counterY - dt * 2.2);
+        if (this.phaseT > 0.5 && this.counter) {
+          this.seatGroup(this.counter);
+          this.counter = null;
+          this.phase = 'idle';
+          this.phaseT = 0;
+          this.notify();
+        }
+        break;
+    }
+  }
+
+  private updatePickup(dt: number) {
+    const pk = this.pick;
+    if (!pk) return;
+    pk.t += dt;
+    const m = pk.cu.members[pk.mi];
+    switch (pk.phase) {
+      case 'served':
+        this.pickY = Math.min(1, this.pickY + dt * 2);
+        if (pk.t > 2.4) {
+          const sc = pk.score;
+          const complaint = pk.score < 70 && pk.notes.length > 0;
+          pk.phase = complaint ? 'complain' : 'react';
+          pk.t = 0;
+          const notes = pk.notes
+            .slice(0, 2)
+            .map((n) => L(n))
+            .join(' · ');
+          if (complaint) {
+            this.setBubble(m.name, T('g.complain', { notes }), 'pickup', 'bad');
+            sfx('angry');
+          } else {
             this.setBubble(
               m.name,
-              `${who}Hesap ${pay} ₺. Buyur ${sum(given)} ₺${change > 0 ? `, para üstü ${change} ₺ olacak` : ', tam para'}.`
+              reactionLine(pk.cu, sc) + (notes ? `  (${notes})` : ''),
+              'pickup',
+              pk.tone
             );
-            sfx('coins');
+            if (sc >= 85) {
+              sfx('perfect');
+              this.fx.emit(
+                'heart',
+                this.pickupX(),
+                this.salL.customer.y - this.salL.customer.size,
+                5,
+                30
+              );
+            } else sfx('ding');
           }
+          this.notify();
+        }
+        break;
+      case 'complain':
+        break; // waits for apologize()
+      case 'react':
+        if (
+          this.pendingSorryReply &&
+          pk.t > 2.0 &&
+          this.bubble &&
+          this.bubble.shown >= this.bubble.text.length
+        ) {
+          this.setBubble(this.pendingSorryReply, T('g.sorryReply'), 'pickup', 'neutral');
+          this.pendingSorryReply = null;
+          pk.t = 0;
+          break;
+        }
+        if (pk.t > 2.0 && this.bubble && this.bubble.shown >= this.bubble.text.length)
+          this.afterReaction();
+        break;
+      case 'pay':
+        break; // cash UI
+      case 'leave':
+        if (pk.t > 0) this.pickY = Math.max(0, this.pickY - dt * 2.5);
+        if (pk.t > 0.6) {
+          this.pick = null;
+          this.bubble = this.bubble?.at === 'pickup' ? null : this.bubble;
+          this.notify();
         }
         break;
       case 'delivering':
@@ -1289,70 +1593,33 @@ export class DaySession {
           this.scooter.t += dt;
           this.scooter.x += dt * 420;
         }
-        if (this.phaseT > 1.4 && this.pendingReaction && this.bubble === null)
+        if (pk.t > 1.4 && pk.t - dt <= 1.4)
           this.setBubble(
-            'Rüzgar',
-            'Paket yolda! ' + this.pendingReaction.text,
-            true,
-            this.pendingReaction.tone
+            L('Rüzgar'),
+            T('g.onTheWay') +
+              `${T('g.app')}: "${reactionLine(pk.cu, pk.score)}" ★${(pk.score / 20).toFixed(1)}`,
+            'phone',
+            pk.tone
           );
-        if (this.phaseT > 4.2) {
+        if (pk.t > 4.2) {
           this.scooter = null;
-          this.servedBowl = null;
+          this.pick = null;
+          this.bowlAt = 'prep';
           this.resetBowl();
-          this.gapThenNext(1.0 + Math.random() * 2);
+          this.notify();
         }
         break;
-      case 'leave':
-        if (this.phaseT > 0 && this.phaseT < dt * 2 && cu) {
-          if (!cu.phone && this.lastScore !== null && this.lastScore >= 55)
-            for (const mem of cu.members)
-              this.seatDiner(40 + Math.random() * 60, mem.look.seed % 100000);
-          this.servedBowl = null;
-          this.resetBowl();
-        }
-        if (this.phaseT > 0) this.customerY = Math.max(0, this.customerY - dt * 2.2);
-        if (this.phaseT > 0.9) this.gapThenNext(this.spawnGap());
-        break;
     }
-    for (const d of this.diners) {
-      d.leaveT -= dt;
-      if (!d.img) d.img = avatarImage(randomLook(d.seed), 'happy', true);
-      d.bob = Math.sin(t * 2 + d.seed) * 3;
-    }
-    this.diners = this.diners.filter((d) => d.leaveT > 0);
-    if (Math.random() < dt / 45) this.seatDiner(50 + Math.random() * 50);
   }
 
-  private startOrder() {
-    const cu = this.customer!;
-    const m = this.member!;
-    this.phase = 'order';
-    this.phaseT = 0;
-    const pre =
-      cu.members.length > 1
-        ? this.mi === 0
-          ? 'Önce ben: '
-          : this.mi === cu.members.length - 1
-            ? 'Son olarak ben: '
-            : 'Sıra bende: '
-        : '';
-    this.setBubble(m.name, pre + m.text);
-    this.ticket = orderLines(m.order);
-  }
-
-  /** seconds between customers; shorter on busier days */
   private spawnGap() {
-    const busy = this.level.customers / this.level.minutes; // customers per minute at target pace
-    return clamp(14 / busy, 2, 9) * (0.6 + Math.random() * 0.8);
+    const busy = this.level.customers / this.level.minutes;
+    return clamp(16 / busy, 3, 12) * (0.6 + Math.random() * 0.8);
   }
 
-  private memberX(i: number) {
-    const cu = this.customer!;
-    const n = cu.members.length;
-    const S = this.salL;
-    const spread = S.customer.size * 0.78;
-    return S.customer.x + (i - (n - 1) / 2) * spread;
+  private memberX(base: number, i: number, n: number) {
+    const spread = this.salL.customer.size * 0.7;
+    return base + (i - (n - 1) / 2) * spread;
   }
 
   // ---------- drawing ----------
@@ -1375,78 +1642,108 @@ export class DaySession {
     c.restore();
   }
 
-  private drawPatience(c: Ctx, x: number, y: number) {
-    const cu = this.customer;
-    if (!cu || this.phase !== 'cooking') return;
-    const f = clamp(1 - this.waitT / cu.patience, 0, 1);
-    const w = 110;
-    const h = 14;
-    c.save();
-    c.translate(x - w / 2, y);
-    c.fillStyle = rgba('#ffffff', 0.85);
-    c.beginPath();
-    c.roundRect(-4, -4, w + 8, h + 8, 11);
-    c.fill();
-    c.fillStyle = rgba(PAL.ink, 0.12);
-    c.beginPath();
-    c.roundRect(0, 0, w, h, 7);
-    c.fill();
-    c.fillStyle = f > 0.5 ? PAL.matcha : f > 0.25 ? PAL.honey : PAL.tomato;
-    c.beginPath();
-    c.roundRect(0, 0, Math.max(6, w * f), h, 7);
-    c.fill();
-    c.font = `800 11px "Baloo 2", system-ui`;
-    c.fillStyle = PAL.ink;
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText(f > 0.5 ? '🙂 sabır' : f > 0.25 ? '😐 acele!' : '😠 gidiyor!', w / 2, h / 2 + 1);
-    c.restore();
-  }
-
   private drawSalon(c: Ctx, v: View, t: number) {
     const S = this.salL;
     const tod = this.level.time;
-    const cu = this.customer;
     const opts = {
       rain: !!this.level.rain,
-      diners: this.diners,
-      phoneRinging: this.phase === 'ring',
-      boxOpen: !!cu?.phone && this.phase === 'cooking',
+      diners: this.diners.filter((d) => d.seat >= 0),
+      phoneRinging: !!this.ringing,
+      boxOpen: this.open.some((s) => s.cu.phone),
       tipCoins: this.tipCoins,
-      cashOnCounter: this.phase === 'pay',
+      cashOnCounter: this.pick?.phase === 'pay',
       lampsOn: TOD_LIGHT[tod].lamp > 0,
     };
     drawSalonBack(c, v.W, v.H, this.decor, tod, t, opts);
-    if (cu && !cu.phone && this.phase !== 'dayEnd' && this.customerY > 0) {
+    // standing-and-waiting diners (no free seat) + the queue, behind the counter people
+    const qs = this.queueSpots();
+    const standing = this.diners.filter((d) => d.seat < 0);
+    standing.slice(0, 3).forEach((d, i) => {
+      const sp = qs[Math.min(2, i)];
+      drawAvatar(c, d.look, 'neutral', sp.x + 40 * i, sp.y - 60, sp.size * 0.9, {
+        pose: 'queue',
+        bob: d.bob,
+      });
+    });
+    this.queue.forEach((cu, i) => {
+      const sp = qs[Math.min(qs.length - 1, i)];
+      cu.members.forEach((m, k) => {
+        drawAvatar(
+          c,
+          m.look,
+          'neutral',
+          sp.x + k * sp.size * 0.45,
+          sp.y + k * 4,
+          sp.size * (m.look.kid ? 0.82 : 1),
+          { pose: 'queue', bob: Math.sin(t * 1.5 + i + k) * 2 }
+        );
+      });
+    });
+    // ordering customer(s)
+    if (this.counter && this.counterY > 0) {
+      const cu = this.counter;
       const n = cu.members.length;
+      const base = this.counterX();
       const order = cu.members
         .map((_, i) => i)
         .sort((a, b) => (a === this.mi ? 1 : b === this.mi ? -1 : 0));
       for (const i of order) {
-        const mem = cu.members[i];
+        const m = cu.members[i];
         const active = i === this.mi;
-        const size = S.customer.size * (mem.look.kid ? 0.82 : 1) * (n > 1 ? 0.86 : 1);
-        const slideIn = (1 - this.customerY) * (this.phase === 'leave' ? 0 : 90);
-        const slideOut = this.phase === 'leave' ? (1 - this.customerY) * 120 : 0;
-        const mood: Mood = active ? this.customerMood : i < this.mi ? 'happy' : 'neutral';
+        const size = S.customer.size * (m.look.kid ? 0.82 : 1) * (n > 1 ? 0.86 : 1);
         c.save();
-        c.globalAlpha = this.customerY;
+        c.globalAlpha = this.counterY;
         drawAvatar(
           c,
-          mem.look,
-          mood,
-          this.memberX(i) + slideOut,
-          S.customer.y + slideIn + (active ? 0 : 10),
+          m.look,
+          active ? 'neutral' : i < this.mi ? 'happy' : 'neutral',
+          this.memberX(base, i, n),
+          S.customer.y + (1 - this.counterY) * 90 + (active ? 0 : 10),
           size,
-          { eating: active && this.customerEating, bob: Math.sin(t * 2 + i) * 2 }
+          {
+            pose: 'stand',
+            talking:
+              active &&
+              this.phase === 'order' &&
+              !!this.bubble &&
+              this.bubble.shown < this.bubble.text.length,
+            bob: Math.sin(t * 2 + i) * 2,
+          }
         );
         c.restore();
       }
-      this.drawPatience(
+    }
+    // pickup customer
+    const pk = this.pick;
+    if (pk && pk.phase !== 'delivering' && this.pickY > 0) {
+      const m = pk.cu.members[pk.mi];
+      const mood: Mood =
+        pk.phase === 'served'
+          ? 'happy'
+          : pk.score >= 85
+            ? 'love'
+            : pk.score >= 70
+              ? 'happy'
+              : pk.score >= 45
+                ? 'worried'
+                : 'angry';
+      const size = S.customer.size * (m.look.kid ? 0.82 : 1);
+      c.save();
+      c.globalAlpha = this.pickY;
+      drawAvatar(
         c,
-        this.memberX(this.mi),
-        S.customer.y - S.customer.size * (n > 1 ? 0.86 : 1) - 36
+        m.look,
+        pk.phase === 'pay' || pk.phase === 'leave'
+          ? this.groups.get(pk.cu.id)?.complained
+            ? 'neutral'
+            : 'happy'
+          : mood,
+        this.pickupX(),
+        S.customer.y + (1 - this.pickY) * 60,
+        size,
+        { pose: 'stand', eating: pk.phase === 'served', bob: Math.sin(t * 2) * 2 }
       );
+      c.restore();
     }
     if (this.cat.spot !== 0)
       drawCat(c, this.cat.x, this.cat.y, 64, this.cat.pose, t, this.cat.flip);
@@ -1454,19 +1751,16 @@ export class DaySession {
     if (this.cat.spot === 0)
       drawCat(c, this.cat.x, this.cat.y, 56, this.cat.pose, t, this.cat.flip);
     if (
-      this.servedBowl &&
-      (this.bowlAt === 'counter' || this.bowlAt === 'box') &&
-      this.phase !== 'delivering'
+      pk &&
+      pk.bowl &&
+      (pk.phase === 'served' || pk.phase === 'react' || pk.phase === 'complain')
     ) {
       c.save();
       c.translate(this.bowlPos.x, this.bowlPos.y);
-      const eaten =
-        this.phase === 'react' ? 1 : this.phase === 'served' ? Math.min(1, this.phaseT / 2.2) : 0;
+      const eaten = pk.phase !== 'served' ? 1 : Math.min(1, pk.t / 2.4);
       drawBowlTop(
         c,
-        eaten > 0.6
-          ? { ...this.servedBowl, pieces: [], fill: this.servedBowl.fill * 0.2 }
-          : this.servedBowl,
+        eaten > 0.6 ? { ...pk.bowl, pieces: [], fill: pk.bowl.fill * 0.2 } : pk.bowl,
         S.customer.size * 0.4,
         t,
         { steam: 0.6 }
@@ -1481,11 +1775,11 @@ export class DaySession {
   }
 
   private drawPrep(c: Ctx, v: View, t: number) {
-    const L = this.prepL;
+    const Lp = this.prepL;
     c.save();
     c.translate(v.W, 0);
-    drawPrepBack(c, v.W, v.H, this.level.time, t, L);
-    L.shelf.slots.forEach((s, i) => {
+    drawPrepBack(c, v.W, v.H, this.level.time, t, Lp);
+    Lp.shelf.slots.forEach((s, i) => {
       const b = BOWLS[i];
       if (!b || b.unlock > this.level.id) return;
       c.save();
@@ -1500,7 +1794,7 @@ export class DaySession {
       }
       c.restore();
     });
-    L.trays.forEach((r, i) => {
+    Lp.trays.forEach((r, i) => {
       const id = this.noods[i];
       if (!id) return;
       c.save();
@@ -1508,10 +1802,10 @@ export class DaySession {
       drawNoodleTray(c, id, this.bowl.thick, r.w, r.h);
       c.restore();
       if (this.bowl.noodle === id) this.ringSlot(c, r);
-      this.slotLabel(c, INGREDIENTS[id].name, r);
+      this.slotLabel(c, L(INGREDIENTS[id].name), r);
     });
     {
-      const r = L.thickChips;
+      const r = Lp.thickChips;
       const cw = r.w / 3;
       (['ince', 'orta', 'kalin'] as Thick[]).forEach((tk, i) => {
         const x = r.x + i * cw;
@@ -1527,10 +1821,10 @@ export class DaySession {
         c.textAlign = 'center';
         c.textBaseline = 'middle';
         c.fillStyle = on ? '#fff' : PAL.ink;
-        c.fillText(THICK_LABEL[tk], x + cw / 2, r.y + r.h / 2 + 1);
+        c.fillText(L(THICK_LABEL[tk]), x + cw / 2, r.y + r.h / 2 + 1);
       });
     }
-    L.pots.forEach((r, i) => {
+    Lp.pots.forEach((r, i) => {
       const id = this.liqs[i];
       if (!id) return;
       c.save();
@@ -1538,9 +1832,9 @@ export class DaySession {
       drawPot(c, id, r.w, r.h, t);
       c.restore();
       if (this.bowl.broth === id) this.ringSlot(c, r);
-      this.slotLabel(c, INGREDIENTS[id].name, r);
+      this.slotLabel(c, L(INGREDIENTS[id].name), r);
     });
-    L.tubs.forEach((r, i) => {
+    Lp.tubs.forEach((r, i) => {
       const id = this.tops[i];
       if (!id) return;
       c.save();
@@ -1551,7 +1845,7 @@ export class DaySession {
       if (n) this.countBadge(c, r, n);
     });
     if (this.bowl.broth || this.bowl.fill > 0) {
-      const g = L.gauge;
+      const g = Lp.gauge;
       drawGauge(
         c,
         g.x,
@@ -1564,7 +1858,7 @@ export class DaySession {
       );
     }
     c.restore();
-    if (this.bowlAt === 'prep') this.drawTheBowl(c, t, L.bowl.size);
+    if (this.bowlAt === 'prep') this.drawTheBowl(c, t, Lp.bowl.size);
     const h = this.currentHint();
     if (h && h.station === 1) drawPointerHint(c, h.x, h.y, t);
   }
@@ -1632,7 +1926,8 @@ export class DaySession {
   }
 }
 
-// slot orders (ingredient ids); only unlocked ones get a slot, in this order
+export type { Look, Member };
+
 export const NOODLES = ['ramen', 'udon', 'soba', 'pirinc'];
 export const LIQUIDS = [
   'shoyu',

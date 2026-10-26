@@ -846,12 +846,23 @@ body {
   background: var(--ink);
   color: #fff;
 }
-.ticket {
+.tickets {
   position: absolute;
   left: calc(var(--sal) + 10px);
   top: calc(var(--sat) + 50px);
   z-index: 3;
   width: min(60vw, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.tickets > * {
+  pointer-events: auto;
+}
+.ticket {
+  position: relative;
+  width: 100%;
   background: #fffdf5;
   border-radius: 14px;
   border: 2px solid var(--ink);
@@ -881,6 +892,27 @@ body {
 }
 .ticket.open .ticket-title {
   flex: 1;
+}
+.ticket.target {
+  border-color: var(--tomato);
+  box-shadow:
+    0 4px 0 var(--walnut),
+    0 0 0 3px rgba(239, 138, 118, 0.35);
+}
+.ticket-pin {
+  border: none;
+  background: transparent;
+  font-size: 15px;
+  padding: 0 2px;
+  line-height: 1;
+}
+.apologize {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--sab) + 70px);
+  transform: translateX(-50%);
+  z-index: 6;
+  animation: rise 0.3s;
 }
 .ticket ul {
   margin: 0;
@@ -1077,7 +1109,7 @@ i.note {
   font-size: 19px;
 }
 @media (orientation: portrait) {
-  .ticket {
+  .tickets {
     top: calc(var(--sat) + 92px);
     width: min(92vw, 440px);
   }
@@ -1086,10 +1118,11 @@ i.note {
   }
 }
 @media (orientation: landscape) {
-  .ticket {
+  .tickets {
     top: auto;
     bottom: calc(var(--sab) + 12px);
     width: min(28vw, 260px);
+    flex-direction: column-reverse;
   }
   .ticket ul {
     max-height: 40vh;

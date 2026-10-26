@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { T } from '../game/i18n';
 
 export default function Fullscreen() {
   const [on, setOn] = useState(false);
@@ -21,8 +22,8 @@ export default function Fullscreen() {
     else el.webkitRequestFullscreen?.();
   };
   return (
-    <button className="btn ghost small fs-btn" onClick={toggle} aria-label="Tam ekran">
-      {on ? '⤢ Küçült' : '⤢ Tam ekran'}
+    <button className="btn ghost small fs-btn" onClick={toggle} aria-label={T('title.fullscreen')}>
+      {on ? T('title.exitFullscreen') : T('title.fullscreen')}
     </button>
   );
 }

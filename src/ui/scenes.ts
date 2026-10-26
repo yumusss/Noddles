@@ -6,25 +6,22 @@ import {
   salonLayout,
   type Diner,
 } from '../art/salon';
-import { avatarImage, randomLook } from '../art/avatar';
+import { randomLook } from '../art/avatar';
 import { drawCat } from '../art/cat';
 import type { Tod } from '../art/common';
 import type { DecorState } from '../game/decor';
 import type { SceneDraw } from './SceneCanvas';
 
 const diners: (Diner & { seed: number })[] = [
-  { seat: 0, img: null, bob: 0, eating: true, seed: 101 },
-  { seat: 1, img: null, bob: 1, eating: false, seed: 202 },
-  { seat: 3, img: null, bob: 2, eating: true, seed: 303 },
+  { seat: 0, look: randomLook(101), mood: 'happy', bob: 0, eating: true, seed: 101 },
+  { seat: 1, look: randomLook(202), mood: 'happy', bob: 1, eating: false, seed: 202 },
+  { seat: 3, look: randomLook(303), mood: 'love', bob: 2, eating: true, seed: 303 },
 ];
 
 export function salonScene(decor: DecorState, tod: Tod, rain = false, withCat = true): SceneDraw {
   return (c, W, H, t) => {
     const L = salonLayout(W, H, decor);
-    for (const d of diners) {
-      if (!d.img) d.img = avatarImage(randomLook(d.seed), 'happy', d.eating);
-      d.bob = Math.sin(t * 2 + d.seed) * 3;
-    }
+    for (const d of diners) d.bob = Math.sin(t * 2 + d.seed) * 3;
     const ds = diners.filter((d) => d.seat < L.seats.length);
     const o = { rain, diners: ds, tipCoins: 6, lampsOn: tod === 'aksam' || tod === 'gunbatimi' };
     drawSalonBack(c, W, H, decor, tod, t, o);

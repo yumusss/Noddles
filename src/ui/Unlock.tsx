@@ -2,13 +2,14 @@ import { INGREDIENTS, BOWLS, type Level } from '../game/data';
 import { drawIngredientIcon, drawBowlIcon } from '../art/food';
 import SceneCanvas from './SceneCanvas';
 import { sfx } from '../game/audio';
+import { L, T } from '../game/i18n';
 
-const CAT_NAME: Record<string, string> = {
-  noodle: 'Erişte',
-  broth: 'Çorba',
-  sauce: 'Sos',
-  topping: 'Malzeme',
-};
+const CAT_NAME = {
+  noodle: 'unlock.noodle',
+  broth: 'unlock.broth',
+  sauce: 'unlock.sauce',
+  topping: 'unlock.topping',
+} as const;
 
 /** "Recipe book page": what opens this day, the star targets and a tip. */
 export default function Unlock({ level, onDone }: { level: Level; onDone: () => void }) {
@@ -17,8 +18,8 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
     <div className="screen unlock">
       <div className="page">
         <div className="page-head">
-          <span className="chip">Tarif defteri · Sayfa {level.id}</span>
-          <h2>{level.subtitle}</h2>
+          <span className="chip">{T('unlock.page', { n: level.id })}</span>
+          <h2>{L(level.subtitle)}</h2>
         </div>
         <div className="unlock-row">
           {level.unlock.map((id) => (
@@ -35,8 +36,8 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
                   }}
                 />
               </div>
-              <strong>{INGREDIENTS[id].name}</strong>
-              <small>{CAT_NAME[INGREDIENTS[id].cat]}</small>
+              <strong>{L(INGREDIENTS[id].name)}</strong>
+              <small>{T(CAT_NAME[INGREDIENTS[id].cat as keyof typeof CAT_NAME])}</small>
             </div>
           ))}
           {bowls.map((b) => (
@@ -53,8 +54,8 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
                   }}
                 />
               </div>
-              <strong>{b.name}</strong>
-              <small>Yeni kase</small>
+              <strong>{L(b.name)}</strong>
+              <small>{T('unlock.newBowl')}</small>
             </div>
           ))}
         </div>
@@ -62,30 +63,31 @@ export default function Unlock({ level, onDone }: { level: Level; onDone: () => 
           <span>
             <i>★</i>
             <i className="off">★</i>
-            <i className="off">★</i> %55
+            <i className="off">★</i> 55%
           </span>
           <span>
             <i>★</i>
             <i>★</i>
-            <i className="off">★</i> %75
+            <i className="off">★</i> 75%
           </span>
           <span>
             <i>★</i>
             <i>★</i>
-            <i>★</i> %90
+            <i>★</i> 90%
           </span>
           <em>
-            {level.customers} müşteri{level.phone ? ` · ${level.phone} paket` : ''}
+            {T('unlock.minutes', { n: level.minutes })}
+            {level.phone ? ` · ${T('unlock.phone')}` : ''}
           </em>
         </div>
-        {level.tip && <p className="tip">💡 {level.tip}</p>}
+        {level.tip && <p className="tip">💡 {L(level.tip)}</p>}
         <button
           className="btn big primary"
           onClick={() => {
             sfx('door');
             onDone();
           }}>
-          Kepengi Aç!
+          {T('unlock.open')}
         </button>
       </div>
     </div>
