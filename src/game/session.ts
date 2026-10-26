@@ -9,6 +9,7 @@ import {
   drawPot,
   drawBowlIcon,
   PIECE_VARIANTS,
+  BOWL_PIECE_SCALE,
   drawPiece,
 } from '../art/food';
 import {
@@ -44,6 +45,7 @@ import {
 import {
   BOWL_C,
   BOWL_SPACE,
+  BOWL_R,
   cookOf,
   inBowl,
   newBowl,
@@ -1123,6 +1125,17 @@ export class DaySession {
       if (!this.held || this.bowlAt !== 'prep') return;
       const [px, py] = target.slice(8).split(',').map(Number);
       const b = this.bowlSpace(px, py);
+      if (b && inBowl(b.x, b.y, 6)) {
+        // big pieces near the rim are nudged inward so they sit inside the bowl
+        const dx = b.x - BOWL_C;
+        const dy = b.y - BOWL_C;
+        const d = Math.hypot(dx, dy);
+        const maxR = BOWL_R - 22;
+        if (d > maxR) {
+          b.x = BOWL_C + (dx / d) * maxR;
+          b.y = BOWL_C + (dy / d) * maxR;
+        }
+      }
       if (b && inBowl(b.x, b.y, 6))
         this.place(
           this.held,
@@ -1413,7 +1426,7 @@ export class DaySession {
       const k = this.prepL.bowl.size / BOWL_SPACE;
       c.save();
       c.translate(d.x, d.y - 16);
-      c.scale(k * 1.12, k * 1.12);
+      c.scale(k * 1.12 * BOWL_PIECE_SCALE, k * 1.12 * BOWL_PIECE_SCALE);
       drawPiece(c, d.id, d.v, 1, d.rot);
       c.restore();
     }
@@ -2041,7 +2054,7 @@ export class DaySession {
         this.bowlPos.x + Lp.bowl.size * 0.36,
         this.bowlPos.y - Lp.bowl.size * 0.46 + Math.sin(t * 3) * 4
       );
-      c.scale(k * 1.1, k * 1.1);
+      c.scale(k * 1.1 * BOWL_PIECE_SCALE, k * 1.1 * BOWL_PIECE_SCALE);
       drawPiece(c, this.held, 0, 1, 0);
       c.restore();
     }

@@ -55,6 +55,9 @@ export const PIECE_SIZE: Record<string, number> = {
   susam: 36,
 };
 
+/** toppings are drawn larger inside the bowl so they read clearly on phones */
+export const BOWL_PIECE_SCALE = 1.35;
+
 export const PIECE_VARIANTS: Record<string, number> = {
   yesil: 3,
   yumurta: 3,
@@ -3051,7 +3054,7 @@ export function drawBowlTop(
   for (const p of b.pieces) {
     c.save();
     c.translate((p.x - 150) * k, (p.y - 150) * k);
-    drawPiece(c, p.id, p.v, p.s * k, p.rot);
+    drawPiece(c, p.id, p.v, p.s * k * BOWL_PIECE_SCALE, p.rot);
     c.restore();
   }
 

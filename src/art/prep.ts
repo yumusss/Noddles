@@ -119,7 +119,7 @@ function landscape(W: number, H: number): PrepLayout {
   const gap = 10;
   // vertical budget: top row + side column (3 tubs) + bottom row must fit between the wall and the bottom edge
   const vertMax = (H - 14 - (wallH + 16) - 4 * gap) / 5;
-  const tub = Math.round(
+  const tub1 = Math.round(
     Math.max(
       80,
       Math.min(
@@ -130,7 +130,23 @@ function landscape(W: number, H: number): PrepLayout {
       )
     )
   );
-  const mcx = (mx0 + mx1) / 2;
+  // wide phones: two tub columns on each side of the bowl → only 4 tubs tall, so every tub can be bigger
+  const tub2 = Math.floor(
+    Math.min(
+      124,
+      (H - 14 - (wallH + 16) - 3 * gap) / 4,
+      (M - 5 * gap) / 6,
+      (M - bowlSize - 44 - 2 * gap) / 4 // gauge + trash move to the left column in this mode
+    )
+  );
+  const twoCol = !narrow && tub2 > tub1 + 8;
+  const tub = twoCol ? tub2 : tub1;
+  // centre the bowl so the gauge (left) and trash (right) both fit beside the tub columns
+  const extraL = twoCol ? 0 : gaugeW + 20;
+  const extraR = twoCol || narrow ? 0 : trashW + 26;
+  const sideBlock = (twoCol ? 2 * tub + gap : tub) + 22 + bowlSize / 2;
+  const slack = Math.max(0, M - 2 * sideBlock - extraL - extraR);
+  const mcx = mx0 + extraL + sideBlock + slack / 2;
   // shelf with 6 bowl slots — on the left half of the wall (the ticket rail hangs on the right)
   const slotSp = Math.min(100, (W * 0.5 - 2 * m) / 6);
   const shelfW = 6 * slotSp + 20;
@@ -143,19 +159,28 @@ function landscape(W: number, H: number): PrepLayout {
   };
   // top & bottom tub rows (6 each), centred on the middle region
   const rowW = 6 * tub + 5 * gap;
-  const rowX = mcx - rowW / 2;
+  const rowX = Math.max(mx0, Math.min(mx1 - rowW, mcx - rowW / 2));
   const topY = wallH + 16;
   const botY = H - 14 - tub;
   const tubs: Rect[] = [];
   for (let i = 0; i < 6; i++) tubs.push({ x: rowX + i * (tub + gap), y: topY, w: tub, h: tub });
   const bowlY = (topY + tub + botY) / 2;
   const bowl = { x: mcx, y: bowlY, size: bowlSize };
-  const colH = 3 * tub + 2 * gap;
+  const cols = twoCol ? 2 : 1;
+  const sideRows = twoCol ? 2 : 3;
+  const colH = sideRows * tub + (sideRows - 1) * gap;
   const colY = bowlY - colH / 2;
-  const lx = mcx - bowlSize / 2 - 22 - tub;
+  const sideW = cols * tub + (cols - 1) * gap;
+  const lx = mcx - bowlSize / 2 - 22 - sideW;
   const rx = mcx + bowlSize / 2 + 22;
-  for (let i = 0; i < 3; i++) tubs.push({ x: lx, y: colY + i * (tub + gap), w: tub, h: tub });
-  for (let i = 0; i < 3; i++) tubs.push({ x: rx, y: colY + i * (tub + gap), w: tub, h: tub });
+  // (the right block sits 0.01 lower so each side forms its own row for re-centring)
+  for (const [x0, dy] of [
+    [lx, 0],
+    [rx, 0.01],
+  ])
+    for (let r = 0; r < sideRows; r++)
+      for (let k = 0; k < cols; k++)
+        tubs.push({ x: x0 + k * (tub + gap), y: colY + r * (tub + gap) + dy, w: tub, h: tub });
   for (let i = 0; i < 6; i++) tubs.push({ x: rowX + i * (tub + gap), y: botY, w: tub, h: tub });
   // trays at the left
   const trays: Rect[] = [];
@@ -183,13 +208,20 @@ function landscape(W: number, H: number): PrepLayout {
       w: pot,
       h: pot,
     });
+  const propsY = thickChips.y + thickChips.h + 18;
+  if (twoCol) {
+    // gauge and trash share the left column under the noodle trays
+    const gh = Math.min(270, H - 16 - propsY);
+    const gauge = { x: m + 8, y: propsY, w: gaugeW, h: gh };
+    const trash = { x: m + 8 + gaugeW + 36, y: propsY + gh - 90, w: trashW, h: 84 };
+    return { bowl, shelf, trays, thickChips, pots, tubs, gauge, trash, wallH, props: [] };
+  }
   // gauge between the trays and the left tub column
   const gauge = { x: lx - 20 - gaugeW, y: bowlY - 135, w: gaugeW, h: 270 };
   // trash between the right tub column and the pots
   const trash = narrow
     ? { x: trX + (traysW - trashW) / 2, y: thickChips.y + thickChips.h + 16, w: trashW, h: 84 }
-    : { x: rx + tub + 26, y: bowlY + 40, w: trashW, h: 84 };
-  const propsY = thickChips.y + thickChips.h + 18;
+    : { x: rx + sideW + 26, y: bowlY + 40, w: trashW, h: 84 };
   const props: Rect[] = narrow
     ? []
     : [{ x: m, y: propsY, w: Math.max(0, gauge.x - 16 - m), h: H - propsY - 16 }];
@@ -199,8 +231,8 @@ function landscape(W: number, H: number): PrepLayout {
 function portrait(W: number, H: number): PrepLayout {
   const cx = W / 2;
   // tall phones: a taller wall leaves room for the order ticket on the rail
-  const wallH = Math.max(170, Math.min(340, H - 1060));
-  const tub = 88;
+  const wallH = Math.max(170, Math.min(340, H - 1120));
+  const tub = H > 1300 ? 108 : 88;
   const gap = 8;
   const slotSp = Math.min(104, (W - 80) / 6);
   const shelfW = 6 * slotSp + 16;
