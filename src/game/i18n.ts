@@ -222,8 +222,12 @@ export const UI = {
     'Hold to pour until the gauge says “full”',
   ],
   'g.hintFill': ['Basılı tut ve doldur: {n}', 'Hold to pour: {n}'],
-  'g.hintTopExact': ['{n}: {a}/{b} — sürükleyip kaseye bırak', '{n}: {a}/{b} — drag into the bowl'],
-  'g.hintTop': ['{n} — sürükleyip bırak', '{n} — drag and drop'],
+  'g.hintTopExact': [
+    '{n}: {a}/{b} — kaba dokun, sonra kaseye dokun',
+    '{n}: {a}/{b} — tap the tub, then tap the bowl',
+  ],
+  'g.hintTop': ['{n} — kaba dokun, sonra kaseye dokun', '{n} — tap the tub, then tap the bowl'],
+  'g.hintPlace': ['Şimdi kasede istediğin yere dokun', 'Now tap where you want it in the bowl'],
   'g.hintLots': ['Bol ', 'Lots of '],
   'g.hintCarry': [
     'Kaseyi tut, sağa kaydırıp ocağa taşı',

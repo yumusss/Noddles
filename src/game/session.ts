@@ -251,6 +251,7 @@ export class DaySession {
   bowlAt: 'prep' | 'stove' | 'hand' | 'counter' | 'box' = 'prep';
   bowlPos = { x: 0, y: 0 };
   bowlLift = 0;
+  servedPos = { x: 0, y: 0 };
   bubble: Bubble | null = null;
   cash: CashUI | null = null;
   lastScore: number | null = null;
@@ -664,7 +665,8 @@ export class DaySession {
       this.groups.delete(cu.id);
       this.resetBowl();
     } else {
-      this.bowlAt = 'counter';
+      this.servedPos = { ...this.bowlPos };
+      this.resetBowl(); // a fresh bowl is ready on the counter immediately
       this.diners = this.diners.filter((d) => !(d.cuId === cu.id && d.mi === s.mi));
       const atCounter = this.counter === cu;
       if (atCounter) {
@@ -1309,6 +1311,8 @@ export class DaySession {
         const have = cnt.get(r.id) ?? 0;
         const need = r.mode === 'exact' ? (r.n ?? 1) : r.mode === 'bol' ? 5 : 1;
         if (have < need) {
+          if (this.held === r.id)
+            return { station: 1, x: this.bowlPos.x, y: this.bowlPos.y, text: T('g.hintPlace') };
           const tb = Lp.tubs[Math.max(0, this.tops.indexOf(r.id))];
           const nm = L(INGREDIENTS[r.id].name);
           return {
@@ -1869,7 +1873,7 @@ export class DaySession {
       (pk.phase === 'served' || pk.phase === 'react' || pk.phase === 'complain')
     ) {
       c.save();
-      c.translate(this.bowlPos.x, this.bowlPos.y);
+      c.translate(this.servedPos.x, this.servedPos.y);
       const eaten = pk.phase !== 'served' ? 1 : Math.min(1, pk.t / 2.4);
       drawBowlTop(
         c,
@@ -1992,6 +1996,19 @@ export class DaySession {
     }
     c.restore();
     if (this.bowlAt === 'prep') this.drawTheBowl(c, t, Lp.bowl.size);
+    if (this.held && this.bowlAt === 'prep') {
+      // the picked topping hovers above the bowl so the player knows what the next tap places
+      const k = Lp.bowl.size / BOWL_SPACE;
+      c.save();
+      c.globalAlpha = 0.9;
+      c.translate(
+        this.bowlPos.x + Lp.bowl.size * 0.36,
+        this.bowlPos.y - Lp.bowl.size * 0.46 + Math.sin(t * 3) * 4
+      );
+      c.scale(k * 1.1, k * 1.1);
+      drawPiece(c, this.held, 0, 1, 0);
+      c.restore();
+    }
     const h = this.currentHint();
     if (h && h.station === 1) drawPointerHint(c, h.x, h.y, t);
   }
