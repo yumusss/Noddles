@@ -32,3 +32,5 @@ jobs:
         with:
           branch: gh-pages
           folder: dist
+          # keep the sushi game (deployed from the sushi branch) when the noodle game redeploys
+          clean-exclude: sushi
