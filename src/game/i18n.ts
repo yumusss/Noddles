@@ -91,6 +91,7 @@ export const UI = {
   'play.delivery': ['📱 Paket', '📱 Delivery'],
   'play.goTo': ['{s} bölümüne geç', 'Go to {s}'],
   'play.closing': ['Kepenk kapanıyor…', 'Closing up…'],
+  'play.pct': ['%{n}', '{n}%'],
   'play.apologize': ['🙏 Özür dile', '🙏 Apologize'],
   'play.serveTo': ['Kime: {n}', 'For: {n}'],
   // cash

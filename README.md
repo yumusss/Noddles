@@ -20,11 +20,14 @@ Tek bir dünya: **Salon · Tezgâh · Ocak** yan yana durur, parmakla sağa-sola
 
 - 10 günlük hikâye; her gün giriş/kapanış diyalogu ve tarif defterinden yeni bir sayfa
 - 4 erişte (3 kalınlık), 6 çorba, 4 sos, 18 malzeme, 6 Japon kasesi
-- Telefon/paket siparişleri ve kurye Rüzgar; özel misafirler (eleştirmen, Baron, Hana Nine)
+- Tabletten gelen paket siparişleri ve kurye Rüzgar; özel misafirler (eleştirmen, Baron, Hana Nine)
+- Kuyruk: müşteriler sırada bekler, aynı anda 3 açık sipariş alınabilir; sipariş verenler masada bekler, kaseleri gelince yemeye devam eder
+- Yanlış/eksik/fazla pişmiş kase → müşteri şikâyet eder, özür dilersin, bahşiş bırakmaz
+- Türkçe / İngilizce dil seçeneği (haritadaki 🌐 düğmesi)
 - Dükkânın kedisi Mochi (kahverengi-beyaz tekir) salonda dolaşır
 - Günler sabah / öğle / gün batımı / akşam ışığında geçer; bir gün yağmurlu
 - Arkada gerçek bir restoran: masalar, oturan müşteriler, pencere; 10 dekor yuvası
-- Tamamı Canvas ile çizilmiş yemekler, karakter başları DiceBear “Toon Head” (Johan Melin, CC BY 4.0)
+- Yemekler, karakterler ve sakuralı Japon kafe sahnesi tamamen el çizimi Canvas (dış kütüphane yok)
 - Ses efektleri, hafif titreşim, ilk iki günde ipuçlu öğretici
 - PWA: ana ekrana eklenip çevrimdışı oynanabilir; ilerleme cihazda saklanır
 

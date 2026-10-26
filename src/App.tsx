@@ -66,7 +66,11 @@ type Screen =
   | { s: 'decor' };
 
 export default function App() {
-  const [save, setSave] = useState<Save>(load);
+  const [save, setSave] = useState<Save>(() => {
+    const s = load();
+    setLang(s.lang);
+    return s;
+  });
   const [screen, setScreen] = useState<Screen>({ s: 'title' });
   useEffect(() => setLang(save.lang), [save.lang]);
 

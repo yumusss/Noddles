@@ -846,6 +846,14 @@ body {
   background: var(--ink);
   color: #fff;
 }
+.dot .icon {
+  display: none;
+}
+@media (orientation: portrait) {
+  .dot .icon {
+    display: inline;
+  }
+}
 .tickets {
   position: absolute;
   left: calc(var(--sal) + 10px);
@@ -1110,11 +1118,41 @@ i.note {
 }
 @media (orientation: portrait) {
   .tickets {
-    top: calc(var(--sat) + 92px);
-    width: min(92vw, 440px);
+    top: auto;
+    bottom: calc(var(--sab) + 10px);
+    left: calc(var(--sal) + 8px);
+    right: calc(var(--sar) + 8px);
+    width: auto;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+  }
+  .tickets .ticket {
+    flex: 0 0 auto;
+    width: 220px;
+  }
+  .tickets .ticket.open {
+    width: 260px;
+  }
+  .hint-text {
+    bottom: calc(var(--sab) + 62px);
   }
   .hud {
-    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .hud .chip {
+    padding: 5px 9px;
+    font-size: 13px;
+  }
+  .hud .chip.served {
+    display: none;
+  }
+  .stations .dot .label {
+    display: none;
+  }
+  .stations .dot {
+    padding: 5px 7px;
+    font-size: 15px;
   }
 }
 @media (orientation: landscape) {

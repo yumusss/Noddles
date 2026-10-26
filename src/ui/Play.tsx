@@ -108,6 +108,7 @@ function Overlays({
   const sc = v.scale;
   const S = s.salL;
   const stations = [T('play.salon'), T('play.prep'), T('play.stove')];
+  const stationIcons = ['🍽️', '🥣', '🔥'];
   const b = ui.bubble;
   const anchorXw =
     b?.at === 'phone' ? S.phone.x + S.phone.w / 2 : b?.at === 'pickup' ? s.pickupX() : s.counterX();
@@ -160,7 +161,7 @@ function Overlays({
             <i className="clock-ring" />
             {ui.clockText}
           </span>
-          <span className="chip">{ui.served} 🍜</span>
+          <span className="chip served">{ui.served} 🍜</span>
           <span className="chip gold">{fmt(ui.earned)}</span>
           {cookPill}
           {ui.ringing && (
@@ -175,7 +176,8 @@ function Overlays({
               key={n}
               className={`dot ${ui.station === i ? 'on' : ''}`}
               onClick={() => s.jumpTo(i)}>
-              {n}
+              <span className="icon">{stationIcons[i]}</span>
+              <span className="label">{n}</span>
             </button>
           ))}
         </nav>
@@ -235,7 +237,7 @@ function Overlays({
       {ui.toast && <div className="toast">{ui.toast}</div>}
       {ui.score !== null && (
         <div className={`score-pop ${ui.score >= 85 ? 'great' : ui.score >= 55 ? 'ok' : 'bad'}`}>
-          %{ui.score}
+          {T('play.pct', { n: ui.score })}
         </div>
       )}
       {ui.complaint && (

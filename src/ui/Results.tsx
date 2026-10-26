@@ -59,7 +59,7 @@ export default function Results({
           ))}
         </div>
         <p className="avg">
-          {T('res.avg')} <strong>%{Math.round(result.avg)}</strong> ·{' '}
+          {T('res.avg')} <strong>{T('play.pct', { n: Math.round(result.avg) })}</strong> ·{' '}
           {T('res.bowls', { n: l.bowls })}
           {result.lost ? ` · ${T('res.lost', { n: result.lost })}` : ''}
           {result.complaints ? ` · ${T('res.complaints', { n: result.complaints })}` : ''} ·{' '}

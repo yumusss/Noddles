@@ -180,10 +180,10 @@ function portrait(W: number, H: number): PrepLayout {
   const shelfW = 6 * slotSp + 16;
   const shelf = {
     x: cx - shelfW / 2,
-    y: 126,
+    y: 152,
     w: shelfW,
-    h: 16,
-    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 92 })),
+    h: 14,
+    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 118 })),
   };
   // trays: 4 in a row
   const trW = 110;

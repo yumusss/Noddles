@@ -425,9 +425,11 @@ export class DaySession {
   }
 
   counterX() {
-    return this.pick && this.counter
-      ? this.salL.customer.x + this.salL.customer.size * 0.45
-      : this.salL.customer.x;
+    const S = this.salL;
+    const n = this.counter?.members.length ?? 1;
+    let x = S.customer.x - (n - 1) * S.customer.size * 0.22;
+    if (this.pick && this.counter) x += S.customer.size * 0.45;
+    return x;
   }
   pickupX() {
     return this.counter
@@ -1656,7 +1658,11 @@ export class DaySession {
     };
     drawSalonBack(c, v.W, v.H, this.decor, tod, t, opts);
     // standing-and-waiting diners (no free seat) + the queue, behind the counter people
-    const qs = this.queueSpots();
+    const nAtCounter = this.counter ? this.counter.members.length : 1;
+    const qshift =
+      (nAtCounter - 1) * S.customer.size * 0.32 +
+      (this.pick && this.counter ? S.customer.size * 0.4 : 0);
+    const qs = this.queueSpots().map((q) => ({ ...q, x: q.x + qshift }));
     const standing = this.diners.filter((d) => d.seat < 0);
     standing.slice(0, 3).forEach((d, i) => {
       const sp = qs[Math.min(2, i)];
