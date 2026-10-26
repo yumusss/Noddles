@@ -45,7 +45,9 @@ export default function LevelMap({
           {T('map.back')}
         </button>
         <div className="bar-mid">
-          <span className="chip gold">★ {total}/{LEVELS.length * 3}</span>
+          <span className="chip gold">
+            ★ {total}/{LEVELS.length * 3}
+          </span>
           <span className="chip">{fmt(save.cash)}</span>
         </div>
         <div className="bar-right">
