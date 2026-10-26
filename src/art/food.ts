@@ -3,6 +3,7 @@
 // Pure Canvas 2D. Everything static is pre-rendered into sprites.
 import {
   PAL,
+  hexToRgb,
   shade,
   rgba,
   mix,
@@ -385,99 +386,128 @@ const PIECES: Record<string, PieceDrawer> = {
     const ry = 30 + v * 1.2;
     const seed = 500 + v * 13;
     const path = () => blobPath(c, 0, 0, rx, ry, rng(seed), 0.07, 12);
+    const sx = rx / Math.min(rx, ry);
+    const sy = ry / Math.min(rx, ry);
+    const rmin = Math.min(rx, ry);
     // meat base
     path();
     c.fillStyle = radial(c, -6, -8, 3, rx * 1.35, [
-      [0, '#cf957a'],
-      [0.5, '#b5705a'],
-      [0.85, '#94553f'],
-      [1, '#73402e'],
+      [0, '#c98b70'],
+      [0.5, '#ad6a52'],
+      [0.85, '#8d523c'],
+      [1, '#6e3e2b'],
     ]);
     c.fill();
     c.save();
     path();
     c.clip();
-    // muscle fibres: short strokes following one direction
+    // spiral helper: rolled belly = concentric-ish bands of meat and fat
+    const spiralPts = (turns: number, r0: number, r1: number, ph: number, wobA: number) => {
+      const pts: [number, number][] = [];
+      const N = 110;
+      for (let i = 0; i <= N; i++) {
+        const t = i / N;
+        const a = ph + t * TAU * turns;
+        const wob = Math.sin(t * 23 + v * 2) * wobA + Math.sin(t * 7 + 1) * wobA * 0.6;
+        const rr = lerp(r0, r1, t) * rmin + wob;
+        pts.push([Math.cos(a) * rr * sx, Math.sin(a) * rr * sy]);
+      }
+      return pts;
+    };
+    const strokePts = (pts: [number, number][], w: number, col: string) => {
+      c.lineWidth = w;
+      c.strokeStyle = col;
+      c.beginPath();
+      c.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const m = mid(pts[i], pts[i + 1]);
+        c.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]);
+      }
+      c.stroke();
+    };
+    const ph = -0.6 + v * 0.9;
+    const fat = spiralPts(2.1, 0.88, 0.1, ph, 1.2);
+    const meatLine = spiralPts(2.1, 0.74, 0.0, ph + 0.2, 1.0);
+    // darker meat seam between layers (the roll's layers)
+    strokePts(meatLine, 3.2, 'rgba(95,40,25,0.28)');
+    // muscle fibres: short strokes roughly following the spiral tangent
     c.lineCap = 'round';
-    for (let i = 0; i < 70; i++) {
+    for (let i = 0; i < 90; i++) {
       const x = (rand() - 0.5) * rx * 2;
       const y = (rand() - 0.5) * ry * 2;
-      const L = 3 + rand() * 7;
-      const a = 0.55 + (rand() - 0.5) * 0.5;
-      c.lineWidth = 0.8 + rand() * 0.8;
-      c.strokeStyle = rand() < 0.55 ? 'rgba(90,40,25,0.22)' : 'rgba(240,195,170,0.22)';
+      const L = 2.5 + rand() * 6;
+      const a = Math.atan2(y, x) + Math.PI / 2 + (rand() - 0.5) * 0.6;
+      c.lineWidth = 0.7 + rand() * 0.9;
+      c.strokeStyle = rand() < 0.55 ? 'rgba(80,32,20,0.25)' : 'rgba(235,185,160,0.2)';
       c.beginPath();
       c.moveTo(x, y);
       c.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
       c.stroke();
     }
-    // fat swirl: a spiral band of cream-pink fat (rolled belly)
-    const spiral = (w: number, col: string, off: number) => {
-      c.lineWidth = w;
-      c.strokeStyle = col;
-      c.beginPath();
-      const turns = 1.45;
-      const N = 80;
-      for (let i = 0; i <= N; i++) {
-        const t = i / N;
-        const a = -0.6 + v * 0.9 + t * TAU * turns;
-        const rr = (0.92 - t * 0.78) * Math.min(rx, ry) + off;
-        const wob = Math.sin(t * 19 + v) * 1.1;
-        const x = Math.cos(a) * (rr + wob) * (rx / Math.min(rx, ry));
-        const y = Math.sin(a) * (rr + wob) * (ry / Math.min(rx, ry));
-        if (i === 0) c.moveTo(x, y);
-        else c.lineTo(x, y);
-      }
-      c.stroke();
-    };
-    spiral(8.5, 'rgba(120,60,40,0.22)', 0.8); // shadowed edge under the fat layer
-    spiral(6.5, '#f1dccb', 0);
-    spiral(3.4, '#faebdf', -0.4);
-    spiral(1.2, 'rgba(255,245,236,0.8)', -1);
-    // pink tint where fat meets meat
-    spiral(9.5, 'rgba(230,150,130,0.12)', 0);
-    // fat cap along one side of the rim
-    c.fillStyle = 'rgba(244,226,210,0.9)';
+    // fat band: soft shadow under, cream body, pinkish translucent edge, bright core
+    strokePts(fat, 6.5, 'rgba(110,55,35,0.22)');
+    strokePts(fat, 5, 'rgba(236,205,185,0.95)');
+    strokePts(fat, 3.6, '#f5e4d6');
+    strokePts(fat, 1.4, 'rgba(255,248,240,0.75)');
+    // the band's width varies: nibble it with meat-coloured dabs
+    for (let i = 0; i < 14; i++) {
+      const p = fat[Math.floor(rand() * fat.length)];
+      c.fillStyle = 'rgba(165,100,78,0.55)';
+      ellipse(c, p[0] + (rand() - 0.5) * 2, p[1] + (rand() - 0.5) * 2, 1.5 + rand() * 2, 1 + rand());
+      c.fill();
+    }
+    // fat cap: thick creamy layer along one part of the rim
+    const capA = ph + 0.3;
+    c.save();
+    c.rotate(capA);
+    c.fillStyle = 'rgba(240,220,202,0.92)';
     c.beginPath();
-    c.ellipse(rx * 0.42, -ry * 0.5, rx * 0.62, ry * 0.2, -0.75, 0, TAU);
+    c.ellipse(rmin * 0.72, 0, rmin * 0.26, rmin * 0.5, 0, 0, TAU);
     c.fill();
-    c.fillStyle = 'rgba(255,245,235,0.6)';
+    c.fillStyle = 'rgba(255,246,236,0.5)';
     c.beginPath();
-    c.ellipse(rx * 0.45, -ry * 0.53, rx * 0.4, ry * 0.1, -0.75, 0, TAU);
+    c.ellipse(rmin * 0.76, -rmin * 0.08, rmin * 0.12, rmin * 0.3, 0, 0, TAU);
     c.fill();
-    // seared caramel rim with char flecks
-    c.lineWidth = 9;
-    c.strokeStyle = 'rgba(110,50,20,0.55)';
+    c.strokeStyle = 'rgba(190,140,120,0.35)';
+    c.lineWidth = 0.8;
+    c.beginPath();
+    c.ellipse(rmin * 0.72, 0, rmin * 0.26, rmin * 0.5, 0, 0, TAU);
+    c.stroke();
+    c.restore();
+    // seared caramel rim with char flecks (thin, mottled)
+    c.lineWidth = 5.5;
+    c.strokeStyle = 'rgba(105,45,18,0.5)';
     c.shadowColor = 'rgba(90,40,15,0.6)';
-    c.shadowBlur = 5;
+    c.shadowBlur = 4;
     blobPath(c, 0, 0, rx + 1.5, ry + 1.5, rng(seed), 0.07, 12);
     c.stroke();
     c.shadowBlur = 0;
-    c.lineWidth = 2.6;
-    c.strokeStyle = 'rgba(55,22,8,0.6)';
-    blobPath(c, 0, 0, rx + 0.6, ry + 0.6, rng(seed), 0.07, 12);
+    c.lineWidth = 1.8;
+    c.strokeStyle = 'rgba(50,20,8,0.55)';
+    blobPath(c, 0, 0, rx + 0.4, ry + 0.4, rng(seed), 0.07, 12);
     c.stroke();
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 22; i++) {
       const a = rand() * TAU;
-      const d = 0.86 + rand() * 0.12;
+      const d = 0.84 + rand() * 0.14;
       const x = Math.cos(a) * rx * d;
       const y = Math.sin(a) * ry * d;
-      dot(c, x, y, 0.8 + rand() * 1.6, `rgba(35,12,4,${0.35 + rand() * 0.4})`);
+      dot(c, x, y, 0.7 + rand() * 1.5, `rgba(35,12,4,${0.3 + rand() * 0.4})`);
+      if (rand() < 0.4) dot(c, x + 1, y + 1, 0.6 + rand(), 'rgba(200,120,60,0.4)');
     }
     // soy glaze: broad glossy sheen + sharp streaks
     c.fillStyle = radial(c, -rx * 0.35, -ry * 0.4, 0, rx * 0.9, [
-      [0, 'rgba(255,230,210,0.35)'],
-      [0.5, 'rgba(255,230,210,0.12)'],
+      [0, 'rgba(255,230,210,0.3)'],
+      [0.5, 'rgba(255,230,210,0.1)'],
       [1, 'rgba(255,230,210,0)'],
     ]);
     c.fillRect(-rx, -ry, rx * 2, ry * 2);
     c.lineCap = 'round';
-    c.strokeStyle = 'rgba(255,245,235,0.55)';
-    for (let i = 0; i < 5; i++) {
+    c.strokeStyle = 'rgba(255,245,235,0.5)';
+    for (let i = 0; i < 6; i++) {
       const x = (rand() - 0.5) * rx * 1.2;
       const y = (rand() - 0.5) * ry * 1.2;
-      const L = 4 + rand() * 9;
-      c.lineWidth = 1 + rand();
+      const L = 3 + rand() * 8;
+      c.lineWidth = 0.8 + rand();
       c.beginPath();
       c.moveTo(x, y);
       c.lineTo(x + L * 0.8, y - L * 0.45);
@@ -494,66 +524,79 @@ const PIECES: Record<string, PieceDrawer> = {
     const x = -w / 2;
     const y = -h / 2;
     const fold = 10 + v * 2;
+    // slightly irregular edges (hand-cut sheet)
+    const e = (k: number) => (rng(900 + v * 7 + k)() - 0.5) * 1.6;
     const sheet = () => {
       c.beginPath();
       c.moveTo(x + 0.8, y + 0.4);
+      c.lineTo(x + w * 0.5, y + e(1));
       c.lineTo(x + w - fold, y);
       c.lineTo(x + w, y + fold);
+      c.lineTo(x + w + e(2), y + h * 0.55);
       c.lineTo(x + w - 0.5, y + h - 0.8);
+      c.lineTo(x + w * 0.45, y + h + e(3));
       c.lineTo(x + 0.3, y + h);
+      c.lineTo(x + e(4), y + h * 0.5);
       c.closePath();
     };
     sheet();
     c.fillStyle = linear(c, x, y, x + w, y + h, [
-      [0, '#28493a'],
-      [0.4, '#182f22'],
-      [0.75, '#1d3a2a'],
-      [1, '#2a4c36'],
+      [0, '#223527'],
+      [0.4, '#141f17'],
+      [0.75, '#182a1c'],
+      [1, '#233a28'],
     ]);
     c.fill();
     c.save();
     sheet();
     c.clip();
-    // fibres: directional fine strokes plus a few cross fibres
-    for (let i = 0; i < 90; i++) {
-      const sx = x + rand() * w;
-      const sy = y + rand() * h;
-      const L = 4 + rand() * 14;
-      const a = -0.35 + (rand() - 0.5) * 0.3 + (rand() < 0.2 ? 1.4 : 0);
-      c.lineWidth = 0.5 + rand() * 0.7;
-      c.strokeStyle = `rgba(140,190,130,${0.05 + rand() * 0.11})`;
-      c.beginPath();
-      c.moveTo(sx, sy);
-      c.lineTo(sx + Math.cos(a) * L, sy + Math.sin(a) * L);
-      c.stroke();
-    }
-    // mottled density (darker and lighter patches)
-    for (let i = 0; i < 10; i++) {
+    // mottled density first (dark and lighter patches, soft)
+    for (let i = 0; i < 16; i++) {
       const px = x + rand() * w;
       const py = y + rand() * h;
-      const rr = 5 + rand() * 10;
+      const rr = 4 + rand() * 9;
       c.fillStyle = radial(c, px, py, 0, rr, [
-        [0, rand() < 0.5 ? 'rgba(10,25,15,0.3)' : 'rgba(110,160,100,0.14)'],
+        [0, rand() < 0.45 ? 'rgba(5,12,8,0.35)' : 'rgba(95,140,80,0.16)'],
         [1, 'rgba(0,0,0,0)'],
       ]);
       circle(c, px, py, rr);
       c.fill();
     }
-    // tiny holes (thin spots)
-    for (let i = 0; i < 9; i++) {
-      dot(c, x + rand() * w, y + rand() * h, 0.5 + rand() * 0.9, 'rgba(190,210,170,0.35)');
+    // pressed seaweed fibres: tiny, soft, mostly one direction
+    c.lineCap = 'round';
+    for (let i = 0; i < 220; i++) {
+      const sx = x + rand() * w;
+      const sy = y + rand() * h;
+      const L = 1 + rand() * 2.5;
+      const a = -0.3 + (rand() - 0.5) * 1.2 + (rand() < 0.3 ? 1.5 : 0);
+      c.lineWidth = 0.35 + rand() * 0.4;
+      c.strokeStyle = `rgba(110,160,100,${0.04 + rand() * 0.09})`;
+      c.beginPath();
+      c.moveTo(sx, sy);
+      c.lineTo(sx + Math.cos(a) * L, sy + Math.sin(a) * L);
+      c.stroke();
     }
-    // translucent thin edge
-    c.lineWidth = 3;
-    c.strokeStyle = 'rgba(120,170,110,0.22)';
+    // purple-ish iridescence (real nori has a faint purple cast)
+    c.fillStyle = radial(c, x + w * 0.3, y + h * 0.7, 0, w * 0.5, [
+      [0, 'rgba(90,60,90,0.14)'],
+      [1, 'rgba(90,60,90,0)'],
+    ]);
+    c.fillRect(x, y, w, h);
+    // tiny holes (thin spots)
+    for (let i = 0; i < 7; i++) {
+      dot(c, x + rand() * w, y + rand() * h, 0.4 + rand() * 0.7, 'rgba(190,210,170,0.3)');
+    }
+    // translucent thin edge: lighter rim
+    c.lineWidth = 2.4;
+    c.strokeStyle = 'rgba(110,160,100,0.2)';
     sheet();
     c.stroke();
     // sheen band
     c.fillStyle = linear(c, x, y + h, x + w * 0.7, y, [
       [0, 'rgba(255,255,255,0)'],
-      [0.42, 'rgba(255,255,255,0.05)'],
-      [0.5, 'rgba(255,255,255,0.16)'],
-      [0.56, 'rgba(255,255,255,0.05)'],
+      [0.4, 'rgba(255,255,255,0.04)'],
+      [0.5, 'rgba(255,255,255,0.14)'],
+      [0.58, 'rgba(255,255,255,0.04)'],
       [1, 'rgba(255,255,255,0)'],
     ]);
     c.fillRect(x, y, w, h);
@@ -567,12 +610,12 @@ const PIECES: Record<string, PieceDrawer> = {
     c.beginPath();
     c.moveTo(x + w - fold, y);
     c.lineTo(x + w - fold * 0.1, y + fold * 0.9);
-    c.lineTo(x + w - fold * 1.05, y + fold * 0.95);
+    c.quadraticCurveTo(x + w - fold * 0.6, y + fold * 0.35, x + w - fold * 1.05, y + fold * 0.95);
     c.closePath();
     c.fillStyle = linear(c, x + w - fold, y, x + w, y + fold, [
-      [0, '#4b7a56'],
-      [0.6, '#365f42'],
-      [1, '#2b4d36'],
+      [0, '#3f6a4a'],
+      [0.6, '#2f5439'],
+      [1, '#24422c'],
     ]);
     c.fill();
     c.restore();
@@ -588,56 +631,88 @@ const PIECES: Record<string, PieceDrawer> = {
   pakchoi(c, v, rand) {
     c.rotate(v === 1 ? 0.55 : -0.25);
     const leaves = [
-      { x: -12, y: -11, rx: 14, ry: 19, a: -0.55 },
-      { x: 12, y: -12, rx: 14, ry: 19, a: 0.55 },
-      { x: 0, y: -16, rx: 13, ry: 18, a: 0.02 },
+      { x: -12, y: -11, rx: 14, ry: 19, a: -0.55, seed: 11 },
+      { x: 12, y: -12, rx: 14, ry: 19, a: 0.55, seed: 23 },
+      { x: 0, y: -16, rx: 13, ry: 18, a: 0.02, seed: 37 },
     ];
+    // ruffled, slightly irregular leaf outline
     const leafPath = (l: (typeof leaves)[0]) => {
-      c.beginPath();
-      c.ellipse(l.x, l.y, l.rx, l.ry, l.a, 0, TAU);
+      const r = rng(l.seed + v * 5);
+      const pts: [number, number][] = [];
+      const n = 16;
+      for (let i = 0; i < n; i++) {
+        const t = (i / n) * TAU;
+        const ruff = 1 + (r() - 0.5) * 0.16 + Math.sin(t * 5) * 0.05;
+        // narrow toward the stem end (+y in leaf space)
+        const taper = 1 - 0.25 * Math.max(0, Math.sin(t));
+        const px = Math.cos(t) * l.rx * ruff * taper;
+        const py = Math.sin(t) * l.ry * ruff;
+        const ca = Math.cos(l.a);
+        const sa = Math.sin(l.a);
+        pts.push([l.x + px * ca - py * sa, l.y + px * sa + py * ca]);
+      }
+      smoothClosed(c, pts);
     };
     for (const l of leaves) {
       miniShadow(c, l.x + 1, l.y + 2, l.rx, l.ry * 0.8, 0.2);
       leafPath(l);
       c.fillStyle = radial(c, l.x - 4, l.y - 6, 1, l.ry * 1.35, [
-        [0, '#9ad683'],
-        [0.5, '#5fab57'],
-        [0.85, '#3b8542'],
-        [1, '#2a6633'],
+        [0, '#8fcf78'],
+        [0.5, '#5aa652'],
+        [0.85, '#39803f'],
+        [1, '#27602f'],
       ]);
       c.fill();
       c.save();
       leafPath(l);
       c.clip();
-      // crinkle shading
-      for (let i = 0; i < 8; i++) {
-        const px = l.x + (rand() - 0.5) * l.rx * 1.6;
-        const py = l.y + (rand() - 0.5) * l.ry * 1.6;
-        const rr = 3 + rand() * 6;
+      // crinkle shading: pockets of dark and light
+      for (let i = 0; i < 14; i++) {
+        const px = l.x + (rand() - 0.5) * l.rx * 1.7;
+        const py = l.y + (rand() - 0.5) * l.ry * 1.7;
+        const rr = 2.5 + rand() * 6;
         c.fillStyle = radial(c, px, py, 0, rr, [
-          [0, rand() < 0.5 ? 'rgba(20,70,30,0.22)' : 'rgba(200,240,170,0.2)'],
+          [0, rand() < 0.5 ? 'rgba(15,60,25,0.26)' : 'rgba(205,240,170,0.22)'],
           [1, 'rgba(0,0,0,0)'],
         ]);
         circle(c, px, py, rr);
         c.fill();
       }
-      // midrib + veins
+      // midrib + veins (pale, slightly raised)
       const dx = Math.sin(l.a);
       const dy = Math.cos(l.a);
       c.lineCap = 'round';
-      c.strokeStyle = 'rgba(232,245,212,0.9)';
+      c.strokeStyle = 'rgba(25,80,35,0.35)';
+      c.lineWidth = 3.2;
+      c.beginPath();
+      c.moveTo(l.x + dx * l.ry * 0.95 + 0.6, l.y + dy * l.ry * 0.95 + 0.6);
+      c.lineTo(l.x - dx * l.ry * 0.7 + 0.6, l.y - dy * l.ry * 0.7 + 0.6);
+      c.stroke();
+      c.strokeStyle = 'rgba(228,244,205,0.95)';
       c.lineWidth = 2.2;
       c.beginPath();
       c.moveTo(l.x + dx * l.ry * 0.95, l.y + dy * l.ry * 0.95);
-      c.lineTo(l.x - dx * l.ry * 0.75, l.y - dy * l.ry * 0.75);
+      c.lineTo(l.x - dx * l.ry * 0.72, l.y - dy * l.ry * 0.72);
       c.stroke();
       c.lineWidth = 0.9;
-      c.strokeStyle = 'rgba(232,245,212,0.5)';
       for (let i = 0; i < 5; i++) {
-        const t = -0.55 + i * 0.3;
+        const t = -0.5 + i * 0.3;
         const px = l.x - dx * l.ry * t;
         const py = l.y - dy * l.ry * t;
         for (const s of [-1, 1]) {
+          c.strokeStyle = 'rgba(20,70,30,0.22)';
+          c.lineWidth = 1.6;
+          c.beginPath();
+          c.moveTo(px + 0.5, py + 0.5);
+          c.quadraticCurveTo(
+            px + s * dy * l.rx * 0.45 - dx * 3 + 0.5,
+            py - s * dx * l.rx * 0.45 - dy * 3 + 0.5,
+            px + s * dy * l.rx * 0.85 - dx * 7 + 0.5,
+            py - s * dx * l.rx * 0.85 - dy * 7 + 0.5
+          );
+          c.stroke();
+          c.strokeStyle = 'rgba(228,244,205,0.6)';
+          c.lineWidth = 0.9;
           c.beginPath();
           c.moveTo(px, py);
           c.quadraticCurveTo(
@@ -650,7 +725,7 @@ const PIECES: Record<string, PieceDrawer> = {
         }
       }
       // glossy wet highlight
-      spec(c, l.x - 4, l.y - 7, l.rx * 0.5, l.ry * 0.3, 0.5, l.a - 0.3);
+      spec(c, l.x - 4, l.y - 7, l.rx * 0.45, l.ry * 0.25, 0.45, l.a - 0.3);
       c.restore();
       edgeAO(c, () => leafPath(l), 1.6, 'rgba(20,60,25,0.35)', 2);
     }
@@ -675,23 +750,28 @@ const PIECES: Record<string, PieceDrawer> = {
     c.save();
     stem();
     c.clip();
-    c.strokeStyle = 'rgba(150,185,130,0.45)';
-    c.lineWidth = 1.2;
+    // overlapping stalks: each stalk a pale ridge with a shadow groove
     for (let i = -2; i <= 2; i++) {
+      c.strokeStyle = 'rgba(140,175,120,0.5)';
+      c.lineWidth = 1.6;
       c.beginPath();
-      c.moveTo(i * 5, 4);
-      c.quadraticCurveTo(i * 4.5, 14, i * 2, 25);
+      c.moveTo(i * 5.2, 3);
+      c.quadraticCurveTo(i * 4.6, 14, i * 2.2, 25);
+      c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,0.75)';
+      c.lineWidth = 1.4;
+      c.beginPath();
+      c.moveTo(i * 5.2 + 1.6, 4);
+      c.quadraticCurveTo(i * 4.6 + 1.4, 14, i * 2.2 + 1, 24);
       c.stroke();
     }
-    c.strokeStyle = 'rgba(255,255,255,0.7)';
-    c.lineWidth = 0.9;
-    for (let i = -2; i <= 2; i++) {
-      c.beginPath();
-      c.moveTo(i * 5 + 1.2, 5);
-      c.quadraticCurveTo(i * 4.5 + 1, 14, i * 2 + 0.8, 24);
-      c.stroke();
-    }
-    spec(c, -4, 12, 7, 4, 0.55, 0.9);
+    // slight green tint where the stems turn into leaves
+    c.fillStyle = linear(c, 0, 0, 0, 10, [
+      [0, 'rgba(150,200,120,0.5)'],
+      [1, 'rgba(150,200,120,0)'],
+    ]);
+    c.fillRect(-15, 0, 30, 10);
+    spec(c, -4, 12, 7, 4, 0.5, 0.9);
     c.restore();
     edgeAO(c, stem, 1.5, 'rgba(90,120,70,0.3)', 2);
   },
@@ -1210,38 +1290,51 @@ const PIECES: Record<string, PieceDrawer> = {
     c.moveTo(-12, 8);
     c.quadraticCurveTo(-8, 0, -3, -4);
     c.stroke();
-    // lacy, crunchy batter: clustered blobs along the body with shadowed undersides
-    const cols = ['#f5d58c', '#e3b25a', '#c88d3a', '#fbe8b8', '#d7a04a'];
-    for (let i = 0; i < 70; i++) {
+    // crunchy batter: irregular lacy clumps (tenkasu) along the body
+    const cols = ['#f1cf84', '#e2ae55', '#c98a38', '#f8e3ae', '#d49a45'];
+    const clump = (x: number, y: number, r: number) => {
+      const seedR = rand;
+      const path = () => blobPath(c, x, y, r, r * (0.7 + seedR() * 0.5), seedR, 0.35, 7);
+      c.save();
+      c.shadowColor = 'rgba(110,60,15,0.45)';
+      c.shadowBlur = 2;
+      c.shadowOffsetY = 1.2;
+      path();
+      c.fillStyle = cols[Math.floor(rand() * cols.length)];
+      c.fill();
+      c.restore();
+      c.save();
+      path();
+      c.clip();
+      c.fillStyle = radial(c, x - r * 0.3, y - r * 0.4, 0, r * 1.3, [
+        [0, 'rgba(255,245,215,0.75)'],
+        [0.5, 'rgba(255,235,190,0.15)'],
+        [1, 'rgba(150,90,30,0.45)'],
+      ]);
+      c.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
+      // pores
+      for (let k = 0; k < 4; k++) {
+        dot(c, x + (rand() - 0.5) * r * 1.4, y + (rand() - 0.5) * r * 1.4, 0.4 + rand() * 0.6, 'rgba(120,70,20,0.5)');
+      }
+      c.restore();
+    };
+    for (let i = 0; i < 46; i++) {
       const t = 0.14 + rand() * 0.86;
       const p = bez(t, P0, P1, P2, P3);
-      const off = (rand() - 0.5) * 18;
-      const r = 1.5 + rand() * 2.8;
-      const x = p[0] + off * 0.45 + (rand() - 0.5) * 2;
-      const y = p[1] + off * 0.7;
-      dot(c, x + 0.5, y + 1.2, r, 'rgba(120,70,20,0.35)');
-      circle(c, x, y, r);
-      c.fillStyle = radial(c, x - r * 0.35, y - r * 0.4, 0, r * 1.2, [
-        [0, '#fff0c8'],
-        [0.5, cols[Math.floor(rand() * cols.length)]],
-        [1, '#b57a2a'],
-      ]);
-      c.fill();
+      const off = (rand() - 0.5) * 20;
+      const r = 2 + rand() * 3.4;
+      clump(p[0] + off * 0.45 + (rand() - 0.5) * 2, p[1] + off * 0.7, r);
     }
     // head end clump
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 10; i++) {
       const a = rand() * TAU;
-      const x = 30 + Math.cos(a) * 5;
-      const y = 3 + Math.sin(a) * 7;
-      const r = 1.5 + rand() * 2.2;
-      dot(c, x + 0.5, y + 1.2, r, 'rgba(120,70,20,0.35)');
-      circle(c, x, y, r);
-      c.fillStyle = radial(c, x - r * 0.35, y - r * 0.4, 0, r * 1.2, [
-        [0, '#fff0c8'],
-        [0.5, cols[Math.floor(rand() * cols.length)]],
-        [1, '#b57a2a'],
-      ]);
-      c.fill();
+      clump(30 + Math.cos(a) * 5, 3 + Math.sin(a) * 7, 2 + rand() * 3);
+    }
+    // loose crumbs around
+    for (let i = 0; i < 14; i++) {
+      const t = rand();
+      const p = bez(t, P0, P1, P2, P3);
+      dot(c, p[0] + (rand() - 0.5) * 30, p[1] + (rand() - 0.5) * 26, 0.6 + rand(), 'rgba(200,140,60,0.75)');
     }
     // overall light
     spec(c, 8, -14, 14, 6, 0.3, -0.2);
@@ -1671,67 +1764,73 @@ interface NoodleCfg {
   rhoMax: number;
   len: [number, number]; // strand length range (fraction of r)
   col: Record<CookState, string>;
-  outline: string;
+  dark: string; // shade colour for the strand's shadow side / back strands
+  hi: number; // highlight strength multiplier
   alpha: number; // body alpha (pirinc translucent)
+  flecks?: boolean; // soba: buckwheat flecks
 }
 
 const NOODLES: Record<string, NoodleCfg> = {
   ramen: {
-    density: 95,
-    width: 3.4,
-    wave: 0.85,
-    wavelen: 5.2,
+    density: 110,
+    width: 3.3,
+    wave: 0.9,
+    wavelen: 5.0,
     rhoMin: 0.3,
     rhoMax: 0.8,
-    len: [1.2, 2.4],
+    len: [1.3, 2.6],
     col: {
-      raw: '#f3ecd3',
-      dente: '#f5d98a',
-      perfect: '#f3cb62',
-      soft: '#f1d894',
-      burnt: '#d9d0ad',
+      raw: '#efe6cc',
+      dente: '#f6dd90',
+      perfect: '#f5d46c',
+      soft: '#f2dc9c',
+      burnt: '#d8d1b2',
     },
-    outline: 'rgba(160,110,40,0.5)',
+    dark: '#a8742c',
+    hi: 1,
     alpha: 1,
   },
   udon: {
-    density: 34,
-    width: 8.0,
+    density: 36,
+    width: 8.2,
     wave: 0.22,
     wavelen: 6,
     rhoMin: 0.3,
     rhoMax: 0.8,
     len: [1.4, 2.6],
     col: {
-      raw: '#ece5d8',
-      dente: '#f8f3e8',
-      perfect: '#fbf6ec',
-      soft: '#f6f1e6',
-      burnt: '#e3dcce',
+      raw: '#e9e2d5',
+      dente: '#f8f4ec',
+      perfect: '#fbf8f1',
+      soft: '#f5f1e8',
+      burnt: '#e1dbce',
     },
-    outline: 'rgba(150,120,80,0.55)',
+    dark: '#8f7a5e',
+    hi: 1.1,
     alpha: 1,
   },
   soba: {
-    density: 130,
-    width: 2.9,
+    density: 140,
+    width: 2.8,
     wave: 0.15,
     wavelen: 8,
     rhoMin: 0.6,
     rhoMax: 1.0,
     len: [1.0, 1.9],
     col: {
-      raw: '#c7b49f',
-      dente: '#ad8c6e',
-      perfect: '#a88466',
-      soft: '#b29176',
-      burnt: '#a59a8d',
+      raw: '#c4b29d',
+      dente: '#a98a6c',
+      perfect: '#a28064',
+      soft: '#af8f74',
+      burnt: '#a4998c',
     },
-    outline: 'rgba(80,50,30,0.5)',
+    dark: '#4a2e1c',
+    hi: 0.7,
     alpha: 1,
+    flecks: true,
   },
   pirinc: {
-    density: 150,
+    density: 160,
     width: 2.0,
     wave: 0.5,
     wavelen: 6,
@@ -1739,14 +1838,15 @@ const NOODLES: Record<string, NoodleCfg> = {
     rhoMax: 0.85,
     len: [1.2, 2.4],
     col: {
-      raw: '#f4efe4',
-      dente: '#faf6ee',
-      perfect: '#fbf8f2',
-      soft: '#f6f2ea',
-      burnt: '#e6e1d8',
+      raw: '#f2ede2',
+      dente: '#faf7f0',
+      perfect: '#fcfaf5',
+      soft: '#f6f3ec',
+      burnt: '#e5e0d7',
     },
-    outline: 'rgba(160,140,105,0.6)',
-    alpha: 0.88,
+    dark: '#a6957a',
+    hi: 0.9,
+    alpha: 0.82,
   },
 };
 
@@ -1760,9 +1860,9 @@ const COOK_W: Record<CookState, number> = {
 };
 const COOK_GLOSS: Record<CookState, number> = {
   raw: 0.0,
-  dente: 0.45,
-  perfect: 0.7,
-  soft: 0.35,
+  dente: 0.5,
+  perfect: 0.8,
+  soft: 0.4,
   burnt: 0.12,
 };
 
@@ -1813,21 +1913,26 @@ function renderNoodles(
       (thick === 'kalin' ? 0.72 : thick === 'ince' ? 1.3 : 1)
   );
   const body = cfg.col[cook];
-  const glossA = COOK_GLOSS[cook];
+  const glossA = COOK_GLOSS[cook] * cfg.hi;
   const sharp = cook === 'raw';
   const limp = cook === 'soft' || cook === 'burnt';
   c.lineCap = 'round';
   c.lineJoin = 'round';
 
-  // faint nest shadow on the bowl floor
-  c.fillStyle = radial(c, 0, 2, r * 0.3, r * 0.98, [
-    [0, 'rgba(60,35,20,0.16)'],
+  // nest shadow on the bowl floor
+  c.fillStyle = radial(c, 0, 3, r * 0.25, r * 1.0, [
+    [0, 'rgba(60,35,20,0.2)'],
+    [0.7, 'rgba(60,35,20,0.1)'],
     [1, 'rgba(60,35,20,0)'],
   ]);
-  circle(c, 0, 2, r);
+  circle(c, 0, 3, r);
   c.fill();
 
-  const strands: [number, number][][] = [];
+  interface Strand {
+    pts: [number, number][];
+    depth: number; // 0 back .. 1 front
+  }
+  const strands: Strand[] = [];
   const amp = cfg.wave * w * (sharp ? 1.1 : limp ? 0.6 : 1);
   const wl = cfg.wavelen * w * (sharp ? 1.1 : 1);
   const spin = rand() < 0.5 ? 1 : -1;
@@ -1859,7 +1964,29 @@ function renderNoodles(
       const rr = rho + amp * wob + (rand() - 0.5) * w * 0.3;
       pts.push([cx + Math.cos(th) * rr, cy + Math.sin(th) * rr]);
     }
-    strands.push(pts);
+    strands.push({ pts, depth: i / n });
+  }
+  // a few strands lift out of the nest: short, bright, drawn last
+  const risers: Strand[] = [];
+  if (!limp) {
+    const nr = Math.round(3 + r / 40);
+    for (let i = 0; i < nr; i++) {
+      const a = rand() * TAU;
+      const d = rand() * r * 0.55;
+      const x0 = Math.cos(a) * d;
+      const y0 = Math.sin(a) * d;
+      const b = rand() * TAU;
+      const L = r * (0.35 + rand() * 0.4);
+      const bend = (rand() - 0.5) * L * 0.8;
+      const pts: [number, number][] = [];
+      for (let s = 0; s <= 10; s++) {
+        const t = s / 10;
+        const x = x0 + Math.cos(b) * L * t - Math.sin(b) * bend * Math.sin(t * Math.PI);
+        const y = y0 + Math.sin(b) * L * t + Math.cos(b) * bend * Math.sin(t * Math.PI);
+        pts.push([x, y]);
+      }
+      risers.push({ pts, depth: 1 });
+    }
   }
 
   const path = (pts: [number, number][], smooth: boolean) => {
@@ -1877,43 +2004,83 @@ function renderNoodles(
     c.lineTo(l[0], l[1]);
   };
 
-  const hiCol = `rgba(255,255,255,${glossA})`;
-  const shadeCol = cook === 'burnt' ? 'rgba(90,80,60,0.35)' : cfg.outline;
+  const [br, bg, bb] = hexToRgb(body);
+  const [dr, dg, db] = hexToRgb(cfg.dark);
+  const tone = (depth: number, alpha = 1) => {
+    // back strands: darker and desaturated; front: bright
+    const k = 0.3 * (1 - depth);
+    const m = (b: number, d: number) => Math.round(b + (d - b) * k);
+    return `rgba(${m(br, dr)},${m(bg, dg)},${m(bb, db)},${alpha})`;
+  };
+  const shadeCol = cook === 'burnt' ? 'rgba(90,80,60,0.4)' : rgba(cfg.dark, 0.38);
+
   c.globalAlpha = cfg.alpha;
-  for (const pts of strands) {
+  const all = strands.concat(risers);
+  for (const st of all) {
+    const pts = st.pts;
+    const isRiser = st.depth >= 1 && risers.includes(st);
     path(pts, !sharp);
-    c.lineWidth = w + 1.6;
+    // contact shadow under the strand (offset down-right), stronger for front strands
+    c.save();
+    c.translate(w * 0.12, w * 0.3);
+    c.lineWidth = w + 1.2;
     c.strokeStyle = shadeCol;
     c.stroke();
+    c.restore();
+    // body
+    path(pts, !sharp);
     c.lineWidth = w;
-    c.strokeStyle = body;
+    c.strokeStyle = isRiser ? tone(1) : tone(st.depth);
     c.stroke();
+    // shadow side: thin dark line along the lower-right edge
+    c.save();
+    c.translate(w * 0.18, w * 0.2);
+    path(pts, !sharp);
+    c.lineWidth = Math.max(0.6, w * 0.22);
+    c.strokeStyle = rgba(cfg.dark, 0.18 + 0.1 * (1 - st.depth));
+    c.stroke();
+    c.restore();
     if (glossA > 0) {
-      // highlight line, offset up-left
+      // gloss: a soft wide highlight then a thin bright core, offset up-left
+      const g = glossA * (0.45 + 0.55 * st.depth);
       c.save();
-      c.translate(-w * 0.16, -w * 0.22);
+      c.translate(-w * 0.16, -w * 0.24);
       path(pts, !sharp);
-      c.lineWidth = Math.max(0.8, w * 0.3);
-      c.strokeStyle = hiCol;
+      c.lineWidth = Math.max(0.8, w * 0.34);
+      c.strokeStyle = `rgba(255,255,255,${g * 0.5})`;
       c.stroke();
-      if (cook === 'perfect') {
-        c.lineWidth = Math.max(0.5, w * 0.12);
-        c.strokeStyle = 'rgba(255,255,255,0.55)';
-        c.stroke();
-      }
+      c.lineWidth = Math.max(0.45, w * 0.13);
+      c.strokeStyle = `rgba(255,255,255,${g * 0.9})`;
+      c.stroke();
+      c.restore();
+    } else {
+      // raw: matte, a paler centre line only
+      c.save();
+      c.translate(-w * 0.1, -w * 0.15);
+      path(pts, !sharp);
+      c.lineWidth = Math.max(0.6, w * 0.3);
+      c.strokeStyle = 'rgba(255,255,255,0.22)';
+      c.stroke();
       c.restore();
     }
   }
   c.globalAlpha = 1;
 
+  if (cfg.flecks) {
+    // buckwheat flecks on the strands
+    c.save();
+    c.globalCompositeOperation = 'source-atop';
+    speckle(c, -r, -r, r * 2, r * 2, seed + 9, Math.round(r * 2.5), 'rgba(50,30,15,0.45)');
+    speckle(c, -r, -r, r * 2, r * 2, seed + 10, Math.round(r * 1.2), 'rgba(230,215,190,0.35)');
+    c.restore();
+  }
   if (cook === 'raw') {
-    // flour dusting
+    // matte wash + flour dusting
     c.save();
     circle(c, 0, 0, r);
     c.clip();
-    // matte wash + flour dusting
     c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = 'rgba(245,240,228,0.28)';
+    c.fillStyle = 'rgba(245,240,228,0.3)';
     c.fillRect(-r, -r, r * 2, r * 2);
     c.globalCompositeOperation = 'source-over';
     speckle(c, -r, -r, r * 2, r * 2, seed + 3, Math.round(r * 3), 'rgba(255,255,255,0.7)');
@@ -2009,18 +2176,29 @@ interface BrothCfg {
   col: string;
   alpha: number;
   creamy: number; // 0 clear .. 1 opaque creamy
-  oil?: string;
-  chilli?: boolean;
+  oil?: string; // fat droplets / rings colour
+  oilN?: number;
+  chilli?: boolean; // chilli-oil marbling
   sesame?: boolean;
+  particles?: string; // fine suspended particles (miso)
+  thick?: boolean; // curry: thick, slow surface
 }
 
 const BROTHS: Record<string, BrothCfg> = {
-  shoyu: { col: '#8a461a', alpha: 0.68, creamy: 0, oil: '#f5bd55' },
-  miso: { col: '#d19546', alpha: 0.92, creamy: 0.65 },
-  tavuk: { col: '#e2ae57', alpha: 0.66, creamy: 0.05, oil: '#fbe08a' },
-  acili: { col: '#c9412a', alpha: 0.88, creamy: 0.2, oil: '#f0712f', chilli: true, sesame: true },
-  kori: { col: '#d49a2a', alpha: 0.92, creamy: 0.45 },
-  tonkotsu: { col: '#efe1c8', alpha: 0.97, creamy: 1 },
+  shoyu: { col: '#7a3d14', alpha: 0.72, creamy: 0, oil: '#f3b84a', oilN: 16 },
+  miso: { col: '#c98d44', alpha: 0.94, creamy: 0.7, particles: '#8a5a24', oil: '#f0c66a', oilN: 5 },
+  tavuk: { col: '#dcac52', alpha: 0.66, creamy: 0.08, oil: '#fbe08a', oilN: 14 },
+  acili: {
+    col: '#c43f24',
+    alpha: 0.9,
+    creamy: 0.25,
+    oil: '#ff7a2a',
+    oilN: 6,
+    chilli: true,
+    sesame: true,
+  },
+  kori: { col: '#d19a2c', alpha: 0.95, creamy: 0.5, thick: true, oil: '#f4c75a', oilN: 4 },
+  tonkotsu: { col: '#efe3cc', alpha: 0.98, creamy: 1, oil: '#fff3d6', oilN: 8 },
 };
 
 const SAUCES: Record<string, string> = {
@@ -2054,69 +2232,124 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
   const base = cfg.col;
   const a = cfg.alpha * alphaMul;
   circle(c, 0, 0, R);
-  // deeper (darker) in the middle, thinner at the wall
+  // clear broths: deeper (darker) in the middle, thinner at the wall.
+  // creamy broths: nearly flat, slightly brighter in the middle.
+  const deep = 0.2 * (1 - cfg.creamy);
   c.fillStyle = radial(c, 0, 0, R * 0.1, R, [
-    [0, shade(base, -0.18 * (1 - cfg.creamy * 0.6), a)],
+    [0, shade(base, -deep + cfg.creamy * 0.05, a)],
     [0.6, shade(base, -0.02, a)],
-    [0.93, shade(base, 0.12, a)],
-    [1, shade(base, 0.2, a * 0.9)],
+    [0.9, shade(base, 0.06 * (1 - cfg.creamy), a)],
+    [1, shade(base, -0.12, a)],
   ]);
   c.fill();
   c.save();
   circle(c, 0, 0, R);
   c.clip();
   if (cfg.creamy > 0) {
-    // cloudy swirls
-    for (let i = 0; i < 6; i++) {
-      const x = (rand() - 0.5) * R * 1.2;
-      const y = (rand() - 0.5) * R * 1.2;
-      const rr = R * (0.25 + rand() * 0.35);
+    // cloudy swirls: emulsion patches, lighter and darker
+    for (let i = 0; i < 9; i++) {
+      const x = (rand() - 0.5) * R * 1.4;
+      const y = (rand() - 0.5) * R * 1.4;
+      const rr = R * (0.2 + rand() * 0.35);
+      const light = rand() < 0.6;
       c.fillStyle = radial(c, x, y, 0, rr, [
-        [0, shade(base, 0.18, 0.35 * cfg.creamy)],
+        [0, shade(base, light ? 0.22 : -0.1, (light ? 0.35 : 0.2) * cfg.creamy)],
         [1, shade(base, 0.18, 0)],
       ]);
       circle(c, x, y, rr);
       c.fill();
     }
   }
-  if (cfg.chilli) {
+  if (cfg.particles) {
+    // miso: fine suspended particles
+    speckle(c, -R, -R, R * 2, R * 2, R + 1, Math.round(R * 9), rgba(cfg.particles, 0.22));
+    speckle(c, -R, -R, R * 2, R * 2, R + 2, Math.round(R * 4), 'rgba(255,240,210,0.18)');
+  }
+  if (cfg.thick) {
+    // curry: slow thick surface, soft ridges
     c.lineCap = 'round';
-    c.lineWidth = R * 0.07;
-    c.strokeStyle = 'rgba(230,70,25,0.6)';
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const a0 = rand() * TAU;
-      const rr = R * (0.3 + rand() * 0.55);
+      const rr = R * (0.25 + rand() * 0.6);
+      c.lineWidth = R * (0.03 + rand() * 0.03);
+      c.strokeStyle = shade(base, 0.2, 0.3);
       c.beginPath();
-      c.arc(0, 0, rr, a0, a0 + 0.8 + rand() * 1.4);
+      c.arc(0, 0, rr, a0, a0 + 0.5 + rand() * 1.0);
       c.stroke();
-    }
-    c.lineWidth = R * 0.03;
-    c.strokeStyle = 'rgba(255,150,70,0.45)';
-    for (let i = 0; i < 4; i++) {
-      const a0 = rand() * TAU;
-      const rr = R * (0.3 + rand() * 0.55);
+      c.lineWidth = R * 0.015;
+      c.strokeStyle = shade(base, -0.25, 0.25);
       c.beginPath();
-      c.arc(0, 0, rr, a0, a0 + 0.6 + rand() * 1.2);
+      c.arc(0, 0, rr + c.lineWidth * 2, a0 + 0.1, a0 + 0.4 + rand() * 0.8);
       c.stroke();
     }
   }
+  if (cfg.chilli) {
+    // chilli oil marbling: translucent orange-red streaks with a bright edge
+    c.lineCap = 'round';
+    for (let i = 0; i < 7; i++) {
+      const a0 = rand() * TAU;
+      const rr = R * (0.25 + rand() * 0.62);
+      const span = 0.6 + rand() * 1.6;
+      c.lineWidth = R * (0.05 + rand() * 0.05);
+      c.strokeStyle = 'rgba(240,80,25,0.55)';
+      c.beginPath();
+      c.arc(0, 0, rr, a0, a0 + span);
+      c.stroke();
+      c.lineWidth = R * 0.018;
+      c.strokeStyle = 'rgba(255,170,80,0.5)';
+      c.beginPath();
+      c.arc(0, 0, rr - R * 0.02, a0 + 0.1, a0 + span * 0.8);
+      c.stroke();
+    }
+    // darker red pools
+    for (let i = 0; i < 4; i++) {
+      const x = (rand() - 0.5) * R * 1.3;
+      const y = (rand() - 0.5) * R * 1.3;
+      const rr = R * (0.12 + rand() * 0.2);
+      c.fillStyle = radial(c, x, y, 0, rr, [
+        [0, 'rgba(150,25,10,0.35)'],
+        [1, 'rgba(150,25,10,0)'],
+      ]);
+      circle(c, x, y, rr);
+      c.fill();
+    }
+  }
   if (cfg.oil) {
-    for (let i = 0; i < 10; i++) {
+    // fat: rings (clear broths) and small blobs; a thin sheen for creamy
+    const nOil = cfg.oilN ?? 10;
+    for (let i = 0; i < nOil; i++) {
       const ang = rand() * TAU;
       const d = Math.sqrt(rand()) * R * 0.92;
-      const rr = R * (0.012 + rand() * 0.022);
+      const rr = R * (0.012 + rand() * 0.03);
       const x = Math.cos(ang) * d;
       const y = Math.sin(ang) * d;
       circle(c, x, y, rr);
       c.fillStyle = radial(c, x - rr * 0.3, y - rr * 0.3, 0, rr, [
-        [0, rgba(cfg.oil, 0.85)],
-        [0.7, rgba(cfg.oil, 0.6)],
-        [1, rgba(cfg.oil, 0.2)],
+        [0, rgba(cfg.oil, 0.9)],
+        [0.6, rgba(cfg.oil, 0.55)],
+        [0.9, rgba(cfg.oil, 0.25)],
+        [1, rgba(cfg.oil, 0.05)],
       ]);
       c.fill();
-      c.strokeStyle = 'rgba(255,255,255,0.35)';
-      c.lineWidth = 0.6;
+      // bright meniscus ring
+      c.strokeStyle = 'rgba(255,255,255,0.45)';
+      c.lineWidth = Math.max(0.5, rr * 0.18);
+      circle(c, x, y, rr * 0.92);
       c.stroke();
+      // tiny specular
+      c.fillStyle = 'rgba(255,255,255,0.7)';
+      circle(c, x - rr * 0.35, y - rr * 0.35, rr * 0.2);
+      c.fill();
+    }
+    if (cfg.creamy > 0.8) {
+      // thin fat sheen on the creamy surface
+      c.fillStyle = radial(c, -R * 0.1, -R * 0.2, 0, R * 0.9, [
+        [0, 'rgba(255,245,215,0.3)'],
+        [0.6, 'rgba(255,245,215,0.1)'],
+        [1, 'rgba(255,245,215,0)'],
+      ]);
+      circle(c, 0, 0, R);
+      c.fill();
     }
   }
   if (cfg.sesame) {
@@ -2141,13 +2374,13 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
   c.fillStyle = radial(c, R * 0.1, R * 0.12, R * 0.6, R * 1.02, [
     [0, 'rgba(40,20,10,0)'],
     [0.75, 'rgba(40,20,10,0.1)'],
-    [1, 'rgba(40,20,10,0.4)'],
+    [1, 'rgba(40,20,10,0.42)'],
   ]);
   circle(c, 0, 0, R);
   c.fill();
   // ambient sheen (static); the moving one is drawn per frame
   c.fillStyle = radial(c, -R * 0.35, -R * 0.4, 0, R * 0.8, [
-    [0, 'rgba(255,255,255,0.22)'],
+    [0, `rgba(255,255,255,${0.14 + cfg.creamy * 0.1})`],
     [1, 'rgba(255,255,255,0)'],
   ]);
   circle(c, 0, 0, R);
