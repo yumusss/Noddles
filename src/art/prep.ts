@@ -68,7 +68,7 @@ export function prepLayout(W: number, H: number, counts?: SlotCounts): PrepLayou
   // portrait with only the first row in use: the empty second row leaves room for bigger tubs
   if (H > W && n.tubs <= 6 && tubs.length) {
     const t0 = tubs[0].w;
-    const big = Math.min(t0 * 1.4, (W - 24 - (n.tubs - 1) * 12) / n.tubs);
+    const big = Math.min(t0 * 1.2, (W - 24 - (n.tubs - 1) * 12) / n.tubs);
     const span = n.tubs * big + (n.tubs - 1) * 12;
     tubs = tubs.map((r, i) => ({ x: W / 2 - span / 2 + i * (big + 12), y: r.y, w: big, h: big }));
   }
