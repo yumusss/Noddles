@@ -124,6 +124,11 @@ function Overlays({
   const bubbleY = (ui.bubble?.phone ? S.phone.y - 10 : S.customer.y - S.customer.size - 8) * sc;
   const bw = Math.min(v.cssW * 0.78, 460);
   const bubbleX = Math.max(bw / 2 + 8, Math.min(v.cssW - bw / 2 - 8, anchorX));
+  // keep the bubble under the HUD: estimate its height from the text length
+  const textLen = ui.bubble?.text.length ?? 0;
+  const lines = Math.max(1, Math.ceil((textLen * 9.5) / (bw - 32)));
+  const estH = 46 + lines * 24;
+  const bubbleYc = Math.max(bubbleY, 54 + estH);
   const tail = Math.max(24, Math.min(bw - 24, anchorX - (bubbleX - bw / 2)));
   const cash = ui.cash;
   const need = cash ? sum(cash.given) - cash.due : 0;
@@ -142,7 +147,7 @@ function Overlays({
         {ui.bubble && (
           <div
             className={`bubble ${ui.bubble.phone ? 'phone' : ''} tone-${ui.bubble.tone ?? 'neutral'}`}
-            style={{ left: bubbleX, top: bubbleY, width: bw, ['--tail' as string]: `${tail}px` }}>
+            style={{ left: bubbleX, top: bubbleYc, width: bw, ['--tail' as string]: `${tail}px` }}>
             <span className="bubble-name">
               {ui.bubble.phone ? '📞 ' : ''}
               {ui.bubble.name}
@@ -159,10 +164,13 @@ function Overlays({
           ❚❚
         </button>
         <div className="hud-mid">
-          <span className="chip">
-            {ui.customerIdx < 0 ? 0 : Math.min(ui.customerCount, ui.customerIdx + 1)}/
-            {ui.customerCount} 👤
+          <span
+            className={`chip clock ${ui.clock > 0.85 ? 'late' : ''}`}
+            style={{ ['--p' as string]: `${Math.round(ui.clock * 100)}%` }}>
+            <i className="clock-ring" />
+            {ui.clockText}
           </span>
+          <span className="chip">{ui.served} 🍜</span>
           <span className="chip gold">{fmt(ui.earned)}</span>
           {cookPill}
           {ui.ringing && (
@@ -186,8 +194,17 @@ function Overlays({
         <div
           className={`ticket ${ticketOpen ? 'open' : ''}`}
           onClick={() => setTicketOpen(!ticketOpen)}>
+          {ui.patience !== null && (
+            <div
+              className="patience"
+              style={{ ['--p' as string]: `${Math.round(ui.patience * 100)}%` }}>
+              <i className={ui.patience > 0.5 ? 'ok' : ui.patience > 0.25 ? 'warn' : 'bad'} />
+            </div>
+          )}
           <div className="ticket-head">
-            <span className="ticket-title">{ui.ticketPhone ? '📞 Paket' : '📝 Sipariş'}</span>
+            <span className="ticket-title">
+              {ui.ticketPhone ? '📞 Paket' : ui.ticketWho ? `👥 ${ui.ticketWho}` : '📝 Sipariş'}
+            </span>
             {!ticketOpen && <span className="ticket-sum">{ui.ticket.slice(0, 4).join(' · ')}</span>}
             <span className="ticket-arrow">{ticketOpen ? '▴' : '▾'}</span>
           </div>

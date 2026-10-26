@@ -58,7 +58,8 @@ export default function Results({
           ))}
         </div>
         <p className="avg">
-          Ortalama memnuniyet <strong>%{Math.round(result.avg)}</strong> · {l.bowls} kase ·{' '}
+          Ortalama memnuniyet <strong>%{Math.round(result.avg)}</strong> · {l.bowls} kase
+          {result.lost ? ` · ${result.lost} müşteri beklemeden gitti` : ''} ·{' '}
           {l.changeMistakes ? `${l.changeMistakes} para üstü hatası` : 'para üstleri kusursuz'}
         </p>
         <table>

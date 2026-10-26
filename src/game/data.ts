@@ -224,8 +224,9 @@ export interface Level {
   id: number;
   title: string;
   subtitle: string;
-  customers: number;
-  phone: number; // how many of them order by phone
+  customers: number; // roughly how many fit in the day (display only)
+  minutes: number; // real-time length of the day
+  phone: number; // how many of them order by phone (sets the phone ratio)
   complexity: number; // 1..4
   unlock: string[];
   intro: Line[];
@@ -240,6 +241,7 @@ export const LEVELS: Level[] = [
     id: 1,
     time: 'sabah',
     customers: 5,
+    minutes: 5,
     phone: 0,
     complexity: 1,
     title: 'Açılış Günü',
@@ -274,6 +276,7 @@ export const LEVELS: Level[] = [
     id: 2,
     time: 'ogle',
     customers: 6,
+    minutes: 6,
     phone: 0,
     complexity: 1,
     title: 'Mahallenin Tadı',
@@ -298,6 +301,7 @@ export const LEVELS: Level[] = [
     id: 3,
     time: 'ogle',
     customers: 7,
+    minutes: 6,
     phone: 2,
     complexity: 2,
     title: 'Rüzgar Geliyor',
@@ -333,6 +337,7 @@ export const LEVELS: Level[] = [
     id: 4,
     time: 'gunbatimi',
     customers: 7,
+    minutes: 7,
     phone: 2,
     complexity: 2,
     title: 'Kalın ve Yumuşak',
@@ -358,6 +363,7 @@ export const LEVELS: Level[] = [
     time: 'ogle',
     rain: true,
     customers: 8,
+    minutes: 7,
     phone: 2,
     complexity: 3,
     title: 'Yağmurlu Öğle',
@@ -380,6 +386,7 @@ export const LEVELS: Level[] = [
     id: 6,
     time: 'aksam',
     customers: 8,
+    minutes: 8,
     phone: 2,
     complexity: 3,
     title: 'Ateşli Gece',
@@ -409,6 +416,7 @@ export const LEVELS: Level[] = [
     id: 7,
     time: 'ogle',
     customers: 8,
+    minutes: 8,
     phone: 2,
     complexity: 3,
     title: 'Eleştirmen',
@@ -435,6 +443,7 @@ export const LEVELS: Level[] = [
     id: 8,
     time: 'sabah',
     customers: 9,
+    minutes: 9,
     phone: 3,
     complexity: 4,
     title: 'Deniz Kenarı',
@@ -460,6 +469,7 @@ export const LEVELS: Level[] = [
     id: 9,
     time: 'gunbatimi',
     customers: 9,
+    minutes: 9,
     phone: 3,
     complexity: 4,
     title: 'Kemik Suyu Sırrı',
@@ -487,6 +497,7 @@ export const LEVELS: Level[] = [
     id: 10,
     time: 'aksam',
     customers: 10,
+    minutes: 10,
     phone: 3,
     complexity: 4,
     title: 'Büyük Festival',

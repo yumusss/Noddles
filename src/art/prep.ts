@@ -49,8 +49,50 @@ const TAU = Math.PI * 2;
 
 // ---------------------------------------------------------------- layout
 
-export function prepLayout(W: number, H: number): PrepLayout {
-  return W >= H ? landscape(W, H) : portrait(W, H);
+export interface SlotCounts {
+  tubs: number;
+  trays: number;
+  pots: number;
+}
+
+/** Lay out only the unlocked slots (no empty coasters). Rows re-centre when partially filled. */
+export function prepLayout(W: number, H: number, counts?: SlotCounts): PrepLayout {
+  const full = H > W ? portrait(W, H) : landscape(W, H);
+  if (!counts) return full;
+  const n = {
+    tubs: Math.min(counts.tubs, full.tubs.length),
+    trays: Math.min(counts.trays, full.trays.length),
+    pots: Math.min(counts.pots, full.pots.length),
+  };
+  return {
+    ...full,
+    tubs: pickRows(full.tubs, n.tubs),
+    trays: pickRows(full.trays, n.trays),
+    pots: pickRows(full.pots, n.pots),
+  };
+}
+
+/** Keep the first n rects, then re-centre each horizontal row of the kept rects around the row's original centre. */
+function pickRows(all: Rect[], n: number): Rect[] {
+  const kept = all.slice(0, n);
+  const rows = new Map<number, Rect[]>();
+  for (const r of all) (rows.get(r.y) ?? rows.set(r.y, []).get(r.y)!).push(r);
+  const out: Rect[] = [];
+  for (const r of kept) {
+    const row = rows.get(r.y)!;
+    if (row.length <= 2 || row.every((q) => q.x === row[0].x)) {
+      out.push(r);
+      continue;
+    }
+    const keptRow = row.filter((q) => kept.includes(q));
+    const minX = Math.min(...row.map((q) => q.x));
+    const maxX = Math.max(...row.map((q) => q.x + q.w));
+    const centre = (minX + maxX) / 2;
+    const span = keptRow.length * r.w + (keptRow.length - 1) * (row[1].x - row[0].x - row[0].w);
+    const idx = keptRow.indexOf(r);
+    out.push({ ...r, x: centre - span / 2 + idx * (row[1].x - row[0].x) });
+  }
+  return out;
 }
 
 function landscape(W: number, H: number): PrepLayout {
@@ -197,7 +239,13 @@ export function drawPrepBack(
   L: PrepLayout
 ): void {
   void t;
-  const s = sprite(`prep:back:${W}x${H}:${tod}`, W, H, (g) => paintBack(g, W, H, tod, L), 2);
+  const s = sprite(
+    `prep:back:${W}x${H}:${tod}:${L.tubs.length}-${L.trays.length}-${L.pots.length}`,
+    W,
+    H,
+    (g) => paintBack(g, W, H, tod, L),
+    2
+  );
   c.save();
   blit(c, s, 0, 0, W, H);
   c.restore();

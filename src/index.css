@@ -57,6 +57,18 @@ canvas {
 .app {
   position: fixed;
   inset: 0;
+  margin: auto;
+  max-width: calc(100vh * 1.9);
+  max-height: calc(100vw * 2.3);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(60, 35, 20, 0.15);
+}
+html,
+body {
+  background: radial-gradient(circle at 50% 40%, #7a5538, #3a2a22 75%) fixed;
+}
+#root {
+  background: transparent;
 }
 .screen {
   position: absolute;
@@ -759,6 +771,44 @@ canvas {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+.chip.clock {
+  position: relative;
+  padding-left: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.chip.clock.late {
+  background: #ffd9d2;
+  color: var(--tomato);
+}
+.clock-ring {
+  position: absolute;
+  left: 7px;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: conic-gradient(var(--honey) var(--p), rgba(0, 0, 0, 0.12) 0);
+  mask: radial-gradient(circle, transparent 42%, #000 46%);
+  -webkit-mask: radial-gradient(circle, transparent 42%, #000 46%);
+}
+.patience {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.12);
+}
+.patience i {
+  display: block;
+  height: 100%;
+  width: var(--p);
+  background: var(--matcha);
+  transition: width 0.4s linear;
+}
+.patience i.warn {
+  background: var(--honey);
+}
+.patience i.bad {
+  background: var(--tomato);
 }
 .chip.cook {
   background: #fff3dd;

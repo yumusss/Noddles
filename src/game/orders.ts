@@ -39,15 +39,20 @@ export interface Order {
   cook: CookPref;
 }
 
-export interface Customer {
-  id: number;
+export interface Member {
   name: string;
   look: Look;
+  order: Order;
+  text: string; // the spoken order
+}
+
+export interface Customer {
+  id: number;
   phone: boolean;
   special?: 'hana' | 'baron' | 'lezzetova';
+  members: Member[]; // 1 = single customer, 2–3 = a group of friends ordering together
   greet: string;
-  text: string;
-  order: Order;
+  patience: number; // seconds before they give up
   bonus: number; // ₺ bonus for a great bowl (specials)
   reactions?: { great: string; ok: string; bad: string };
 }
@@ -429,51 +434,62 @@ const SPECIALS: Record<number, SpecialDef[]> = {
   ],
 };
 
-export function dayCustomers(levelId: number): Customer[] {
+const GROUP_GREETS = [
+  'Selam şef! Arkadaşlarımla geldik, hepimiz açız.',
+  'Üç kişiyiz, masa var mı? Siparişleri sırayla verelim.',
+  'Ekip olarak geldik! Herkes kendi kasesini söylesin.',
+];
+
+/** Builds the i-th customer of a day on demand (the day is time-based, so there is no fixed list). */
+export function makeCustomer(levelId: number, i: number): Customer {
   const L = LEVELS[levelId - 1];
-  const out: Customer[] = [];
   const specials = SPECIALS[levelId] ?? [];
-  const phoneSlots = new Set<number>();
-  while (phoneSlots.size < L.phone) {
-    const i = 1 + Math.floor(Math.random() * (L.customers - 1));
-    if (!specials.some((s) => s.at === i)) phoneSlots.add(i);
-  }
-  for (let i = 0; i < L.customers; i++) {
-    const sp = specials.find((s) => s.at === i);
-    if (sp) {
-      out.push({
-        id: i,
-        name: sp.name,
-        look: { seed: 7, special: sp.look },
-        phone: false,
-        special: sp.look,
-        greet: sp.greet,
-        text: sp.text,
-        order: sp.order,
-        bonus: sp.bonus,
-        reactions: sp.reactions,
-      });
-      continue;
-    }
-    const order = randomOrder(levelId);
-    const phone = phoneSlots.has(i);
-    const look = randomLook(Math.floor(Math.random() * 1e9));
-    out.push({
+  const sp = specials.find((s) => s.at === i);
+  const basePatience = Math.max(70, 150 - levelId * 6);
+  if (sp) {
+    return {
       id: i,
+      phone: false,
+      special: sp.look,
+      members: [
+        { name: sp.name, look: { seed: 7, special: sp.look }, order: sp.order, text: sp.text },
+      ],
+      greet: sp.greet,
+      patience: basePatience + 40,
+      bonus: sp.bonus,
+      reactions: sp.reactions,
+    };
+  }
+  const phoneRatio = L.phone / L.customers;
+  const phone = i > 0 && Math.random() < phoneRatio;
+  const force = (globalThis as { __forceGroup?: boolean }).__forceGroup === true; // test hook
+  const group = !phone && levelId >= 5 && (force || (i > 0 && Math.random() < 0.22));
+  const n = group ? 2 + (Math.random() < 0.5 ? 1 : 0) : 1;
+  const members: Member[] = [];
+  for (let k = 0; k < n; k++) {
+    const order = randomOrder(levelId);
+    const look = randomLook(Math.floor(Math.random() * 1e9));
+    members.push({
       name: phone ? pick(ONLINE_NAMES) : pick(isFeminine(look) ? FEMALE : MALE),
       look,
-      phone,
-      greet: phone
-        ? pick(PHONE_GREETS)
+      order,
+      text: orderText(order),
+    });
+  }
+  return {
+    id: i,
+    phone,
+    members,
+    greet: phone
+      ? pick(PHONE_GREETS)
+      : group
+        ? pick(GROUP_GREETS)
         : L.rain && Math.random() < 0.5
           ? pick(RAIN_GREETS)
           : pick(GREETS),
-      text: orderText(order),
-      order,
-      bonus: 0,
-    });
-  }
-  return out;
+    patience: phone ? basePatience + 60 : basePatience * (group ? 1.6 : 1),
+    bonus: 0,
+  };
 }
 
 // ---------- judging ----------
@@ -490,7 +506,7 @@ function countOf(b: BowlState) {
   return m;
 }
 
-export function judge(o: Order, b: BowlState, waitSec: number): Verdict {
+export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   const notes: string[] = [];
   const praise: string[] = [];
   let score = 0;
@@ -621,10 +637,10 @@ export function judge(o: Order, b: BowlState, waitSec: number): Verdict {
       notes.push('Malzemeler bir kenara yığılmış');
     } else if (off < 25) praise.push('Malzemeler çok güzel dağılmış');
   }
-  if (waitSec > 90) {
-    score -= Math.min(10, (waitSec - 90) / 6);
-    notes.push('Biraz uzun sürdü');
-  }
+  if (waitFrac > 0.55) {
+    score -= Math.min(18, Math.round((waitFrac - 0.55) * 40));
+    notes.push(waitFrac > 0.85 ? 'Çok bekledim!' : 'Biraz uzun sürdü');
+  } else if (waitFrac < 0.3) praise.push('Çok hızlıydı!');
   score = Math.round(Math.max(0, Math.min(100, score)));
   if (score >= 95 && !praise.length) praise.push('Kusursuz!');
   return { score, notes, praise };
