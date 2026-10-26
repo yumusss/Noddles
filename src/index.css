@@ -1036,6 +1036,19 @@ i.note {
   }
 }
 @media (orientation: landscape) {
+  .ticket {
+    top: auto;
+    bottom: calc(var(--sab) + 12px);
+    width: min(28vw, 260px);
+  }
+  .ticket ul {
+    max-height: 40vh;
+    overflow: auto;
+  }
+  .hint-text {
+    left: 58%;
+    max-width: 46vw;
+  }
   .cash-panel {
     left: auto;
     right: calc(var(--sar) + 10px);

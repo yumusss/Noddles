@@ -63,10 +63,10 @@ function landscape(W: number, H: number): PrepLayout {
   const shelfW = 6 * slotSp + 20;
   const shelf = {
     x: cx - shelfW / 2,
-    y: 108,
+    y: 146,
     w: shelfW,
-    h: 16,
-    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 74 })),
+    h: 14,
+    slots: Array.from({ length: 6 }, (_, i) => ({ x: cx - (2.5 - i) * slotSp, y: 114 })),
   };
   // top & bottom tub rows (6 each)
   const rowW = 6 * tub + 5 * gap;
