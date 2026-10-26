@@ -948,7 +948,10 @@ const COOK_ZONES: { to: number; name: string; col: string }[] = [
 ];
 
 /** Optional translated labels the game can set: cook zones (5) and gauge (az/tam/taşma). */
-export const PREP_LABELS = { zones: null as string[] | null, gauge: null as [string, string, string] | null };
+export const PREP_LABELS = {
+  zones: null as string[] | null,
+  gauge: null as [string, string, string] | null,
+};
 
 export function cookLabel(progress: number): string {
   for (let i = 0; i < COOK_ZONES.length; i++)

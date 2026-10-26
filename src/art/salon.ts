@@ -14,6 +14,7 @@ import {
   clearSprites,
   ellipse,
   gloss,
+  hGrad,
   mix,
   rgba,
   rng,
@@ -27,6 +28,9 @@ import {
 import { drawAvatar, type Look, type Mood } from './avatar';
 import type { DecorState } from '../game/decor';
 import { tableCount } from '../game/decor';
+
+/** Translatable labels painted into the scene; the game sets them from its language. */
+export const SALON_LABELS = { open: 'AÇIK', tips: 'bahşiş', newOrder: 'Yeni sipariş!' };
 
 export interface SalonLayout {
   counterTop: number;
@@ -231,6 +235,54 @@ function stroke(c: Ctx, col = OUT, w = 1.2) {
   c.stroke();
 }
 
+const AO = (a: number) => `rgba(45,28,18,${a})`;
+const AO0 = 'rgba(45,28,18,0)';
+
+/** Soft contact shadow fading downward from a horizontal edge (under shelves, lips, sills). */
+function dropAO(c: Ctx, x: number, y: number, w: number, size: number, alpha: number) {
+  c.fillStyle = vGrad(c, y, y + size, AO(alpha), AO0);
+  c.fillRect(x, y, w, size);
+}
+
+/** Ambient occlusion creeping in from the four inside edges of a rect (window reveals, frames). */
+function innerAO(c: Ctx, x: number, y: number, w: number, h: number, size: number, alpha: number) {
+  c.fillStyle = vGrad(c, y, y + size, AO(alpha), AO0);
+  c.fillRect(x, y, w, size);
+  c.fillStyle = vGrad(c, y + h - size, y + h, AO0, AO(alpha * 0.7));
+  c.fillRect(x, y + h - size, w, size);
+  c.fillStyle = hGrad(c, x, x + size, AO(alpha * 0.8), AO0);
+  c.fillRect(x, y, size, h);
+  c.fillStyle = hGrad(c, x + w - size, x + w, AO0, AO(alpha * 0.8));
+  c.fillRect(x + w - size, y, size, h);
+}
+
+/** Soft radial glow (lamp light on a wall, sun haze). */
+function glow(c: Ctx, x: number, y: number, r: number, rgb: string, alpha: number) {
+  const g = c.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${rgb},${alpha})`);
+  g.addColorStop(0.45, `rgba(${rgb},${alpha * 0.4})`);
+  g.addColorStop(1, `rgba(${rgb},0)`);
+  c.fillStyle = g;
+  c.fillRect(x - r, y - r, r * 2, r * 2);
+}
+
+/** Thin highlight line along a lit edge. */
+function hiLine(c: Ctx, x: number, y: number, w: number, alpha = 0.3, h = 1.5) {
+  c.fillStyle = `rgba(255,250,240,${alpha})`;
+  c.fillRect(x, y, w, h);
+}
+
+/** Satin sheen: a soft horizontal light band across a surface (lacquer, glass, wood). */
+function sheen(c: Ctx, x: number, y: number, w: number, h: number, alpha: number) {
+  const g = c.createLinearGradient(x, 0, x + w, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.35, `rgba(255,255,255,${alpha})`);
+  g.addColorStop(0.55, `rgba(255,255,255,${alpha * 0.6})`);
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g;
+  c.fillRect(x, y, w, h);
+}
+
 function grainLines(
   c: Ctx,
   x: number,
@@ -284,47 +336,123 @@ function petal(c: Ctx, x: number, y: number, r: number, rot: number, col: string
   c.restore();
 }
 
-/** Five-petal blossom with a honey centre. */
-function blossom(c: Ctx, x: number, y: number, r: number, col: string, centre = true) {
+/** Five-petal blossom: shaded petals (darker base, lighter tip), white heart, tiny stamens. */
+function blossom(c: Ctx, x: number, y: number, r: number, col: string, centre = true, rot = 0) {
+  const dark = mix(col.startsWith('#') ? col : '#f4b9c9', '#c97d9a', 0.35);
   for (let k = 0; k < 5; k++) {
-    const a = (k / 5) * Math.PI * 2 - Math.PI / 2;
-    petal(c, x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55, r * 0.6, a + Math.PI / 2, col);
+    const a = (k / 5) * Math.PI * 2 - Math.PI / 2 + rot;
+    const px = x + Math.cos(a) * r * 0.55;
+    const py = y + Math.sin(a) * r * 0.55;
+    petal(c, px, py, r * 0.62, a + Math.PI / 2, dark);
+    petal(
+      c,
+      px + Math.cos(a) * r * 0.06,
+      py + Math.sin(a) * r * 0.06,
+      r * 0.52,
+      a + Math.PI / 2,
+      col
+    );
   }
   if (centre) {
-    c.fillStyle = 'rgba(232,179,90,0.9)';
-    circle(c, x, y, r * 0.22);
+    const g = c.createRadialGradient(x, y, 0, x, y, r * 0.42);
+    g.addColorStop(0, 'rgba(255,255,255,0.95)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = g;
+    circle(c, x, y, r * 0.42);
+    c.fill();
+    c.fillStyle = 'rgba(214,120,90,0.75)';
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2 + 0.3 + rot;
+      circle(c, x + Math.cos(a) * r * 0.2, y + Math.sin(a) * r * 0.2, r * 0.06);
+      c.fill();
+    }
+  }
+}
+
+/** Soft blossom cluster (distance look): shaded puffs in three pinks, lit from top-left. */
+function blossomPuff(c: Ctx, x: number, y: number, r: number, seed: number) {
+  const rr = rng(seed);
+  // a loose cloud of small shaded florets (each a radial gradient lit from top-left)
+  const n = 16 + Math.floor(rr() * 8);
+  const pts: [number, number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const a = rr() * Math.PI * 2;
+    const d = Math.sqrt(rr()) * r;
+    pts.push([x + Math.cos(a) * d * 1.3, y + Math.sin(a) * d * 0.85, r * (0.15 + rr() * 0.17)]);
+  }
+  // soft shadow mass under the cloud
+  c.fillStyle = 'rgba(200,120,150,0.3)';
+  for (const [px, py, pr] of pts) {
+    circle(c, px + pr * 0.3, py + pr * 0.5, pr * 1.15);
+    c.fill();
+  }
+  // florets: subtle top-left light, deeper rose underneath
+  for (const [px, py, pr] of pts) {
+    const gr = c.createRadialGradient(px - pr * 0.3, py - pr * 0.35, pr * 0.1, px, py, pr * 1.1);
+    gr.addColorStop(0, '#fde4ec');
+    gr.addColorStop(0.55, PINK);
+    gr.addColorStop(1, '#e6a0b8');
+    c.fillStyle = gr;
+    circle(c, px, py, pr);
+    c.fill();
+  }
+  // crisp five-petal flowers scattered over the lit side, a few white hearts
+  for (let i = 0; i < 6; i++) {
+    const [px, py, pr] = pts[Math.floor(rr() * pts.length)];
+    blossom(
+      c,
+      px - pr * 0.1,
+      py - pr * 0.2,
+      pr * 1.15,
+      i % 3 === 0 ? PINK_X : i % 3 === 1 ? PINK_L : PINK,
+      true,
+      rr() * 1.2
+    );
+  }
+  c.fillStyle = 'rgba(255,255,255,0.8)';
+  for (let i = 0; i < 5; i++) {
+    const [px, py, pr] = pts[Math.floor(rr() * pts.length)];
+    circle(c, px - pr * 0.2, py - pr * 0.25, pr * 0.18);
     c.fill();
   }
 }
 
-/** Soft blossom cluster (distance look): overlapping puffs in three pinks. */
-function blossomPuff(c: Ctx, x: number, y: number, r: number, seed: number) {
-  const rr = rng(seed);
-  c.fillStyle = '#eaa4b9';
-  for (let i = 0; i < 5; i++) {
-    circle(c, x + (rr() - 0.5) * r * 1.5, y + r * 0.25 + (rr() - 0.5) * r, r * (0.4 + rr() * 0.35));
-    c.fill();
+/** Tapered branch with bark shading: dark core, lit top edge. */
+function branch(
+  c: Ctx,
+  x0: number,
+  y0: number,
+  cx: number,
+  cy: number,
+  x1: number,
+  y1: number,
+  w: number,
+  bark: string,
+  lit: string
+) {
+  c.lineCap = 'round';
+  c.strokeStyle = bark;
+  // tapered: the curve is walked as a polyline with the width shrinking toward the tip
+  const N = 10;
+  const q = (t: number): [number, number] => [
+    (1 - t) * (1 - t) * x0 + 2 * (1 - t) * t * cx + t * t * x1,
+    (1 - t) * (1 - t) * y0 + 2 * (1 - t) * t * cy + t * t * y1,
+  ];
+  for (let i = 0; i < N; i++) {
+    const [ax, ay] = q(i / N);
+    const [bx, by] = q((i + 1) / N);
+    c.lineWidth = w * (0.85 - (i / N) * 0.5);
+    c.beginPath();
+    c.moveTo(ax, ay);
+    c.lineTo(bx, by);
+    c.stroke();
   }
-  c.fillStyle = PINK;
-  for (let i = 0; i < 7; i++) {
-    circle(c, x + (rr() - 0.5) * r * 1.6, y + (rr() - 0.5) * r * 1.2, r * (0.45 + rr() * 0.35));
-    c.fill();
-  }
-  c.fillStyle = PINK_L;
-  for (let i = 0; i < 5; i++) {
-    circle(
-      c,
-      x + (rr() - 0.5) * r * 1.3,
-      y - r * 0.15 + (rr() - 0.5) * r * 0.9,
-      r * (0.3 + rr() * 0.3)
-    );
-    c.fill();
-  }
-  c.fillStyle = PINK_X;
-  for (let i = 0; i < 3; i++) {
-    circle(c, x + (rr() - 0.5) * r, y - r * 0.3 + (rr() - 0.5) * r * 0.6, r * (0.15 + rr() * 0.2));
-    c.fill();
-  }
+  c.strokeStyle = lit;
+  c.lineWidth = Math.max(0.8, w * 0.22);
+  c.beginPath();
+  c.moveTo(x0, y0 - w * 0.3);
+  c.quadraticCurveTo(cx, cy - w * 0.3, x1, y1 - w * 0.2);
+  c.stroke();
 }
 
 /** Invented brush-calligraphy "character" in a square cell of size s. */
@@ -454,7 +582,7 @@ function seigaiha(c: Ctx, x: number, y: number, w: number, h: number, r: number,
 }
 
 // ---------- wall ----------
-function drawWall(c: Ctx, W: number, g: Geo, id: string) {
+function drawWall(c: Ctx, W: number, g: Geo, id: string, tod: Tod, lampsOn: boolean) {
   const f = g.floorY;
   switch (id) {
     case 'duvar-sage': {
@@ -475,21 +603,22 @@ function drawWall(c: Ctx, W: number, g: Geo, id: string) {
       c.fillStyle = vGrad(c, 0, f, '#fdf6ea', '#f4e9d6');
       c.fillRect(0, 0, W, f);
       speckle(c, 0, 0, W, f, 31, 900, 'rgba(200,170,130,0.08)');
-      // delicate kumiko lattice: tall cells with a thin inner sub-grid
+      // delicate kumiko lattice: tall cells with a thin inner sub-grid, each bar casting
+      // a faint soft shadow onto the paper
       const cell = Math.max(64, W / 14);
-      c.strokeStyle = 'rgba(150,105,65,0.75)';
-      c.lineWidth = 3;
-      for (let x = (W / 2) % cell; x <= W + 1; x += cell) {
-        c.beginPath();
-        c.moveTo(x, 0);
-        c.lineTo(x, f);
-        c.stroke();
+      const bars: [number, number, number, number][] = [];
+      for (let x = (W / 2) % cell; x <= W + 1; x += cell) bars.push([x - 1.5, 0, 3, f]);
+      for (let y = f * 0.1; y < f; y += cell * 1.3) bars.push([0, y - 1.5, W, 3]);
+      for (const [bx, by, bw, bh] of bars) {
+        c.fillStyle = 'rgba(90,60,35,0.12)';
+        c.fillRect(bx + 2, by + 3, bw, bh);
+        c.fillStyle = 'rgba(90,60,35,0.06)';
+        c.fillRect(bx + 4, by + 6, bw, bh);
       }
-      for (let y = f * 0.1; y < f; y += cell * 1.3) {
-        c.beginPath();
-        c.moveTo(0, y);
-        c.lineTo(W, y);
-        c.stroke();
+      for (const [bx, by, bw, bh] of bars) {
+        c.fillStyle = bh > bw ? hGrad(c, bx, bx + bw, '#b08556', '#8a6340') : '#a07a4e';
+        c.fillRect(bx, by, bw, bh);
+        hiLine(c, bx, by, bh > bw ? 1 : bw, 0.25, bh > bw ? bh : 1);
       }
       c.strokeStyle = 'rgba(150,105,65,0.28)';
       c.lineWidth = 1;
@@ -534,48 +663,91 @@ function drawWall(c: Ctx, W: number, g: Geo, id: string) {
       }
     }
   }
-  // ambient darkening toward the floor + light from above
-  c.fillStyle = vGrad(c, f * 0.55, f, 'rgba(60,35,20,0)', 'rgba(60,35,20,0.13)');
-  c.fillRect(0, f * 0.55, W, f * 0.45);
-  c.fillStyle = vGrad(c, 0, f * 0.35, 'rgba(255,245,225,0.22)', 'rgba(255,245,225,0)');
-  c.fillRect(0, 0, W, f * 0.35);
+  // plaster feel: faint large-scale mottling + fine tooth
+  const mr = rng(301);
+  for (let i = 0; i < 14; i++) {
+    const mx = mr() * W;
+    const my = mr() * f;
+    const rr = f * (0.18 + mr() * 0.3);
+    const gr = c.createRadialGradient(mx, my, 0, mx, my, rr);
+    const light = mr() < 0.5;
+    gr.addColorStop(0, light ? 'rgba(255,250,240,0.07)' : 'rgba(120,80,50,0.045)');
+    gr.addColorStop(1, light ? 'rgba(255,250,240,0)' : 'rgba(120,80,50,0)');
+    c.fillStyle = gr;
+    c.fillRect(mx - rr, my - rr, rr * 2, rr * 2);
+  }
+  speckle(c, 0, 0, W, f, 302, Math.round(W * 1.2), 'rgba(90,60,35,0.035)');
+  // ambient darkening toward the floor + light from above + side vignette
+  c.fillStyle = vGrad(c, f * 0.5, f, 'rgba(45,28,18,0)', 'rgba(45,28,18,0.16)');
+  c.fillRect(0, f * 0.5, W, f * 0.5);
+  c.fillStyle = vGrad(c, 0, f * 0.4, 'rgba(255,245,225,0.2)', 'rgba(255,245,225,0)');
+  c.fillRect(0, 0, W, f * 0.4);
+  c.fillStyle = hGrad(c, 0, W * 0.18, 'rgba(45,28,18,0.14)', 'rgba(45,28,18,0)');
+  c.fillRect(0, 0, W * 0.18, f);
+  c.fillStyle = hGrad(c, W * 0.82, W, 'rgba(45,28,18,0)', 'rgba(45,28,18,0.14)');
+  c.fillRect(W * 0.82, 0, W * 0.18, f);
+  // atmospheric perspective: the back wall sits a little lighter / less saturated
+  c.fillStyle = vGrad(c, 0, f, 'rgba(245,238,228,0.16)', 'rgba(245,238,228,0.06)');
+  c.fillRect(0, 0, W, f);
+  // warm halos around the lamps when lit, a soft cool-white bloom when not
+  for (const l of g.lamps) {
+    if (lampsOn) {
+      glow(c, l.x, l.y + 36, Math.min(W, f) * 0.34, '255,214,150', 0.34);
+    } else if (tod === 'sabah' || tod === 'ogle') {
+      glow(c, l.x, l.y + 30, f * 0.16, '255,255,250', 0.12);
+    }
+  }
 
   // lower wainscot: vertical hinoki slats (koshi-ita) below the window sill
   const wy = f * 0.79;
-  c.fillStyle = vGrad(c, wy, f, '#d9ad7c', '#c3925f');
+  c.fillStyle = vGrad(c, wy, f, '#dcb283', '#bf8d5a');
   c.fillRect(0, wy, W, f - wy);
   const sw = Math.max(10, W / 90);
+  const wr = rng(303);
   for (let x = 0; x < W; x += sw) {
-    c.fillStyle = 'rgba(60,35,20,0.14)';
+    c.fillStyle = `rgba(120,75,35,${0.02 + wr() * 0.07})`;
+    c.fillRect(x, wy, sw, f - wy);
+    c.fillStyle = 'rgba(45,28,18,0.2)';
     c.fillRect(x, wy, 1.4, f - wy);
-    c.fillStyle = 'rgba(255,255,255,0.1)';
+    c.fillStyle = 'rgba(255,245,230,0.16)';
     c.fillRect(x + 1.4, wy, 1.2, f - wy);
   }
+  sheen(c, 0, wy, W, f - wy, 0.07);
   // rail on top of the wainscot
-  c.fillStyle = vGrad(c, wy - 6, wy + 2, WALNUT_L, WALNUT);
-  c.fillRect(0, wy - 6, W, 8);
-  c.fillStyle = 'rgba(255,255,255,0.18)';
-  c.fillRect(0, wy - 6, W, 1.5);
-  c.fillStyle = vGrad(c, wy + 2, wy + 10, 'rgba(60,35,20,0.22)', 'rgba(60,35,20,0)');
-  c.fillRect(0, wy + 2, W, 8);
-  // baseboard
-  c.fillStyle = WALNUT;
-  c.fillRect(0, f - 5, W, 5);
+  c.fillStyle = vGrad(c, wy - 7, wy + 2, '#8a6446', WALNUT);
+  c.fillRect(0, wy - 7, W, 9);
+  hiLine(c, 0, wy - 7, W, 0.28);
+  dropAO(c, 0, wy + 2, W, 12, 0.26);
+  // baseboard with its contact shadow onto the wainscot
+  dropAO(c, 0, f - 14, W, 9, 0.12);
+  c.fillStyle = vGrad(c, f - 6, f, WALNUT_L, '#4a3222');
+  c.fillRect(0, f - 6, W, 6);
 
   // ceiling beam (hari) with a soft shadow below it
   const b = g.beam;
-  c.fillStyle = vGrad(c, 0, b, WALNUT_L, WALNUT);
+  c.fillStyle = vGrad(c, 0, b, '#5a3f2d', '#6e4f38');
   c.fillRect(0, 0, W, b);
   grainLines(c, 0, 2, W, b - 4, 77, 30, 'rgba(255,230,200,0.12)');
-  c.fillStyle = vGrad(c, b, b + 16, 'rgba(60,35,20,0.28)', 'rgba(60,35,20,0)');
-  c.fillRect(0, b, W, 16);
+  c.fillStyle = vGrad(c, b - 4, b, 'rgba(255,230,200,0)', 'rgba(255,230,200,0.14)');
+  c.fillRect(0, b - 4, W, 4);
+  dropAO(c, 0, b, W, 22, 0.32);
   // corner posts (hashira)
   const pw2 = Math.max(10, W * 0.012);
   for (const px of [0, W - pw2]) {
-    c.fillStyle = vGrad(c, 0, f, WALNUT_L, WALNUT);
+    c.fillStyle = hGrad(
+      c,
+      px,
+      px + pw2,
+      px === 0 ? '#4e3626' : WALNUT_L,
+      px === 0 ? WALNUT_L : '#4e3626'
+    );
     c.fillRect(px, 0, pw2, f);
-    c.fillStyle = 'rgba(255,255,255,0.12)';
+    c.fillStyle = 'rgba(255,255,255,0.14)';
     c.fillRect(px + (px === 0 ? pw2 - 2 : 0), 0, 2, f);
+    // post shadow onto the wall
+    if (px === 0) c.fillStyle = hGrad(c, pw2, pw2 + 10, AO(0.18), AO0);
+    else c.fillStyle = hGrad(c, px - 10, px, AO0, AO(0.18));
+    c.fillRect(px === 0 ? pw2 : px - 10, 0, 10, f);
   }
 }
 
@@ -662,53 +834,59 @@ function drawFloor(c: Ctx, W: number, g: Geo, bottom: number, id: string) {
       break;
     }
     default: {
-      // light oak planks with perspective: back rows thinner, seams converge
-      c.fillStyle = vGrad(c, floorY, bottom, '#e6c7a0', '#d4aa7c');
+      // light oak planks with perspective: back rows thinner, seams converge and fade
+      c.fillStyle = vGrad(c, floorY, bottom, '#e4c7a3', '#d2a677');
       c.fillRect(0, floorY, W, h);
       const r = rng(91);
       let y = floorY;
       let i = 0;
       while (y < bottom) {
-        const ph = 9 + ((y - floorY) / h) * 30;
+        const d = (y - floorY) / h; // 0 = far, 1 = near
+        const ph = 9 + d * 30;
         c.fillStyle = `rgba(120,80,40,${0.02 + r() * 0.07})`;
         c.fillRect(0, y, W, ph);
-        c.strokeStyle = 'rgba(120,80,40,0.2)';
+        const seamA = 0.08 + d * 0.16;
+        c.strokeStyle = `rgba(110,70,35,${seamA})`;
         c.lineWidth = 1.2;
         c.beginPath();
         c.moveTo(0, y);
         c.lineTo(W, y);
         c.stroke();
-        c.strokeStyle = 'rgba(255,240,220,0.18)';
+        c.strokeStyle = `rgba(255,240,220,${0.08 + d * 0.14})`;
         c.beginPath();
         c.moveTo(0, y + 1.2);
         c.lineTo(W, y + 1.2);
         c.stroke();
         const pl = Math.max(170, W / 5.5);
-        c.strokeStyle = 'rgba(120,80,40,0.2)';
+        c.strokeStyle = `rgba(110,70,35,${seamA})`;
         for (let x = (i % 2) * pl * 0.5 - r() * 50; x < W + pl; x += pl) {
           c.beginPath();
           c.moveTo(px(x, y), y);
           c.lineTo(px(x, y + ph), y + ph);
           c.stroke();
         }
-        grainLines(c, 0, y + 1, W, ph - 2, 100 + i, 16, 'rgba(120,80,40,0.09)');
+        grainLines(c, 0, y + 1, W, ph - 2, 100 + i, 16, `rgba(120,80,40,${0.04 + d * 0.07})`);
         y += ph;
         i++;
       }
     }
   }
-  // contact shadow under the wall and a soft sheen toward the counter
-  c.fillStyle = vGrad(c, floorY, floorY + 30, 'rgba(60,35,20,0.2)', 'rgba(60,35,20,0)');
-  c.fillRect(0, floorY, W, 30);
-  c.fillStyle = vGrad(c, bottom - h * 0.4, bottom, 'rgba(255,245,230,0)', 'rgba(255,245,230,0.12)');
-  c.fillRect(0, bottom - h * 0.4, W, h * 0.4);
+  // contact shadow under the wall, atmospheric lightening at the back,
+  // and a soft lacquer sheen toward the counter
+  c.fillStyle = vGrad(c, floorY, floorY + 36, 'rgba(45,28,18,0.26)', 'rgba(45,28,18,0)');
+  c.fillRect(0, floorY, W, 36);
+  c.fillStyle = vGrad(c, floorY, floorY + h * 0.6, 'rgba(240,232,222,0.16)', 'rgba(240,232,222,0)');
+  c.fillRect(0, floorY, W, h * 0.6);
+  c.fillStyle = vGrad(c, bottom - h * 0.45, bottom, 'rgba(255,245,230,0)', 'rgba(255,245,230,0.1)');
+  c.fillRect(0, bottom - h * 0.45, W, h * 0.45);
+  sheen(c, W * 0.1, floorY, W * 0.8, h, 0.05);
 }
 
 // ---------- window + sakura tree ----------
 function sakuraTree(c: Ctx, x: number, y: number, w: number, h: number, night: boolean) {
   // trunk/branches enter from the top-right corner and reach across the glass
-  const bark = night ? '#3b2d2a' : '#5a3f32';
-  c.strokeStyle = bark;
+  const bark = night ? '#3b2d2a' : '#55392c';
+  const barkLit = night ? 'rgba(120,100,110,0.35)' : 'rgba(170,130,105,0.55)';
   c.lineCap = 'round';
   c.lineJoin = 'round';
   const branches: [number, number, number, number, number, number, number][] = [
@@ -722,16 +900,52 @@ function sakuraTree(c: Ctx, x: number, y: number, w: number, h: number, night: b
     [0.42, 0.14, 0.3, 0.06, 0.18, 0.02, 3],
     [0.9, 0.56, 0.7, 0.5, 0.56, 0.52, 3],
   ];
+  // a soft pink haze behind the canopy so the clusters sit in depth
+  const r = rng(505);
+  const puffR = w * 0.036;
+  for (const [x0, y0, cxx, cyy, x1, y1] of branches) {
+    for (let k = 0; k < 3; k++) {
+      const tt = 0.15 + r() * 0.8;
+      const bx = (1 - tt) * (1 - tt) * x0 + 2 * (1 - tt) * tt * cxx + tt * tt * x1;
+      const by = (1 - tt) * (1 - tt) * y0 + 2 * (1 - tt) * tt * cyy + tt * tt * y1;
+      glow(c, x + bx * w, y + by * h, puffR * 3.2, night ? '150,110,140' : '240,170,195', 0.35);
+    }
+  }
   for (const [x0, y0, cxx, cyy, x1, y1, lw] of branches) {
-    c.lineWidth = lw * (w / 470);
+    branch(
+      c,
+      x + x0 * w,
+      y + y0 * h,
+      x + cxx * w,
+      y + cyy * h,
+      x + x1 * w,
+      y + y1 * h,
+      lw * (w / 470),
+      bark,
+      barkLit
+    );
+  }
+  // twigs
+  c.strokeStyle = bark;
+  c.lineWidth = Math.max(1, w / 400);
+  for (let i = 0; i < 14; i++) {
+    const b = branches[Math.floor(r() * branches.length)];
+    const tt = 0.2 + r() * 0.7;
+    const bx = x + ((1 - tt) * (1 - tt) * b[0] + 2 * (1 - tt) * tt * b[2] + tt * tt * b[4]) * w;
+    const by = y + ((1 - tt) * (1 - tt) * b[1] + 2 * (1 - tt) * tt * b[3] + tt * tt * b[5]) * h;
+    const a = r() * Math.PI * 2;
+    const len = puffR * (1.2 + r() * 1.5);
     c.beginPath();
-    c.moveTo(x + x0 * w, y + y0 * h);
-    c.quadraticCurveTo(x + cxx * w, y + cyy * h, x + x1 * w, y + y1 * h);
+    c.moveTo(bx, by);
+    c.quadraticCurveTo(
+      bx + Math.cos(a) * len * 0.5,
+      by + Math.sin(a) * len * 0.5 - len * 0.3,
+      bx + Math.cos(a) * len,
+      by + Math.sin(a) * len - len * 0.2
+    );
     c.stroke();
   }
   // blossom clusters along the branches
-  const r = rng(505);
-  const puffR = w * 0.036;
   let seed = 1;
   for (const [x0, y0, cxx, cyy, x1, y1] of branches) {
     for (let k = 0; k < 7; k++) {
@@ -748,19 +962,26 @@ function sakuraTree(c: Ctx, x: number, y: number, w: number, h: number, night: b
         );
     }
   }
-  // a few crisp flowers in front for detail
-  for (let i = 0; i < 16; i++) {
+  // crisp flowers + buds in front for detail
+  for (let i = 0; i < 22; i++) {
     const b = branches[Math.floor(r() * branches.length)];
     const tt = 0.2 + r() * 0.8;
     const bx = (1 - tt) * (1 - tt) * b[0] + 2 * (1 - tt) * tt * b[2] + tt * tt * b[4];
     const by = (1 - tt) * (1 - tt) * b[1] + 2 * (1 - tt) * tt * b[3] + tt * tt * b[5];
-    blossom(
-      c,
-      x + bx * w + (r() - 0.5) * puffR * 2,
-      y + by * h + (r() - 0.5) * puffR * 2,
-      puffR * 0.5,
-      r() < 0.5 ? PINK_L : PINK_X
-    );
+    const fx = x + bx * w + (r() - 0.5) * puffR * 2.2;
+    const fy = y + by * h + (r() - 0.5) * puffR * 2.2;
+    const k = r();
+    if (k < 0.2) {
+      // bud: a small deep-pink drop
+      c.fillStyle = '#e48aa6';
+      ellipse(c, fx, fy, puffR * 0.14, puffR * 0.2);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.5)';
+      ellipse(c, fx - puffR * 0.04, fy - puffR * 0.06, puffR * 0.05, puffR * 0.07);
+      c.fill();
+    } else {
+      blossom(c, fx, fy, puffR * (0.42 + r() * 0.2), k < 0.6 ? PINK_L : PINK, true, r() * 1.2);
+    }
   }
   if (night) {
     c.fillStyle = 'rgba(40,40,80,0.35)';
@@ -774,17 +995,25 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
   const night = tod === 'aksam';
   const dusk = tod === 'gunbatimi';
   const fr = Math.max(10, w * 0.028);
-  // wall shadow around the frame
-  c.fillStyle = 'rgba(60,35,20,0.12)';
+  // wall shadow around the frame: soft, offset down-right, two layers
+  c.fillStyle = 'rgba(45,28,18,0.07)';
+  roundRect(c, x - fr - 14, y - fr - 4, w + fr * 2 + 28, h + fr * 2 + 26, 10);
+  c.fill();
+  c.fillStyle = 'rgba(45,28,18,0.12)';
   roundRect(c, x - fr - 6, y - fr + 2, w + fr * 2 + 12, h + fr * 2 + 12, 6);
   c.fill();
-  // frame
-  c.fillStyle = vGrad(c, y - fr, y + h + fr, WALNUT_L, WALNUT);
+  // daylight spill onto the wall around the window (the wall is lit by it)
+  if (!night) glow(c, x + w / 2, y + h / 2, w * 0.75, '255,250,240', 0.16);
+  // frame with wood grain + lit top edge
+  c.fillStyle = vGrad(c, y - fr, y + h + fr, '#7f5b40', '#52382a');
   roundRect(c, x - fr, y - fr, w + fr * 2, h + fr * 2, 4);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(255,255,255,0.12)';
-  c.fillRect(x - fr, y - fr, w + fr * 2, 2);
+  grainLines(c, x - fr, y - fr + 2, w + fr * 2, fr - 4, 401, 10, 'rgba(255,230,200,0.12)');
+  grainLines(c, x - fr, y + h + 2, w + fr * 2, fr - 4, 402, 10, 'rgba(255,230,200,0.1)');
+  hiLine(c, x - fr, y - fr, w + fr * 2, 0.22);
+  c.fillStyle = 'rgba(255,255,255,0.08)';
+  c.fillRect(x - fr, y - fr, 2, h + fr * 2);
   // glass
   c.save();
   c.beginPath();
@@ -792,6 +1021,11 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
   c.clip();
   c.fillStyle = vGrad(c, y, y + h, sky[0], sky[1]);
   c.fillRect(x, y, w, h);
+  if (tod === 'sabah') {
+    // cool-pink dawn: soft horizon warmth
+    c.fillStyle = vGrad(c, y + h * 0.35, y + h, 'rgba(255,214,210,0)', 'rgba(255,214,210,0.55)');
+    c.fillRect(x, y, w, h);
+  }
   if (night) {
     const r = rng(7);
     c.fillStyle = 'rgba(255,255,255,0.85)';
@@ -799,10 +1033,20 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
       circle(c, x + r() * w, y + r() * h * 0.55, 0.5 + r() * 1);
       c.fill();
     }
+    glow(c, x + w * 0.22, y + h * 0.2, h * 0.45, '220,225,255', 0.3);
     c.fillStyle = '#fff5d6';
     circle(c, x + w * 0.22, y + h * 0.2, h * 0.07);
     c.fill();
     gloss(c, x + w * 0.22, y + h * 0.2, h * 0.2, 0.35);
+    // city glow on the horizon
+    c.fillStyle = vGrad(
+      c,
+      y + h * 0.55,
+      y + h * 0.85,
+      'rgba(255,190,130,0)',
+      'rgba(255,190,130,0.22)'
+    );
+    c.fillRect(x, y + h * 0.55, w, h * 0.3);
   } else if (dusk) {
     const gr = c.createRadialGradient(
       x + w * 0.25,
@@ -848,11 +1092,18 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
     }
   }
   // distant soft hills + little town roofs
-  const hillCol = night
-    ? '#2a2e4f'
-    : dusk
-      ? mix('#8d7a9a', sky[1], 0.25)
-      : mix('#a9c3b7', sky[1], 0.35);
+  const hillBase = night ? '#2a2e4f' : dusk ? '#8d7a9a' : '#a9c3b7';
+  const hillCol = night ? hillBase : mix(hillBase, sky[1], dusk ? 0.25 : 0.35);
+  // far ridge (hazier) then the near hills
+  c.fillStyle = mix(hillBase, sky[1], night ? 0.25 : 0.6);
+  c.beginPath();
+  c.moveTo(x, y + h * 0.7);
+  c.quadraticCurveTo(x + w * 0.25, y + h * 0.48, x + w * 0.5, y + h * 0.62);
+  c.quadraticCurveTo(x + w * 0.75, y + h * 0.42, x + w, y + h * 0.6);
+  c.lineTo(x + w, y + h);
+  c.lineTo(x, y + h);
+  c.closePath();
+  c.fill();
   c.fillStyle = hillCol;
   c.beginPath();
   c.moveTo(x, y + h * 0.78);
@@ -863,6 +1114,15 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
   c.lineTo(x, y + h);
   c.closePath();
   c.fill();
+  // haze between hills and town
+  c.fillStyle = vGrad(
+    c,
+    y + h * 0.6,
+    y + h * 0.84,
+    rgba('#ffffff', 0),
+    rgba('#ffffff', night ? 0.04 : 0.22)
+  );
+  c.fillRect(x, y + h * 0.6, w, h * 0.24);
   // roofs (kawara silhouettes) on the ground line
   const r2 = rng(13);
   const groundY = y + h * 0.84;
@@ -894,36 +1154,81 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
   c.fillRect(x, groundY, w, h - (groundY - y));
   // the sakura tree
   sakuraTree(c, x, y, w, h, night);
-  // rain: misty glass + static droplets (streaks are per frame)
+  // rain: misty glass, wet streaks that catch the light, static droplets (moving streaks are per frame)
   if (rain) {
-    c.fillStyle = 'rgba(190,205,220,0.28)';
+    c.fillStyle = 'rgba(180,195,212,0.3)';
     c.fillRect(x, y, w, h);
     const r3 = rng(17);
-    for (let i = 0; i < 80; i++) {
+    // long wet trails with a bright edge
+    for (let i = 0; i < 18; i++) {
+      const tx = x + r3() * w;
+      const ty = y + r3() * h * 0.6;
+      const len = h * (0.15 + r3() * 0.35);
+      c.strokeStyle = 'rgba(255,255,255,0.18)';
+      c.lineWidth = 1.5 + r3() * 1.5;
+      c.beginPath();
+      c.moveTo(tx, ty);
+      c.quadraticCurveTo(tx + (r3() - 0.5) * 6, ty + len * 0.5, tx + (r3() - 0.5) * 4, ty + len);
+      c.stroke();
+    }
+    for (let i = 0; i < 90; i++) {
       const dx = x + r3() * w;
       const dy = y + r3() * h;
       const s = 1.5 + r3() * 3;
-      c.fillStyle = 'rgba(255,255,255,0.5)';
-      ellipse(c, dx, dy, s * 0.6, s);
+      // refraction-ish: dark rim, bright core, small highlight
+      c.fillStyle = 'rgba(70,80,105,0.22)';
+      ellipse(c, dx, dy + s * 0.3, s * 0.65, s * 0.9);
       c.fill();
-      c.fillStyle = 'rgba(80,90,110,0.15)';
-      ellipse(c, dx, dy + s * 0.5, s * 0.4, s * 0.5);
+      c.fillStyle = 'rgba(255,255,255,0.45)';
+      ellipse(c, dx, dy, s * 0.55, s * 0.8);
+      c.fill();
+      c.fillStyle = 'rgba(255,255,255,0.8)';
+      ellipse(c, dx - s * 0.2, dy - s * 0.35, s * 0.18, s * 0.25);
       c.fill();
     }
   }
-  // glass sheen
-  c.fillStyle = 'rgba(255,255,255,0.09)';
-  c.beginPath();
-  c.moveTo(x + w * 0.05, y + h);
-  c.lineTo(x + w * 0.28, y);
-  c.lineTo(x + w * 0.4, y);
-  c.lineTo(x + w * 0.17, y + h);
-  c.closePath();
-  c.fill();
+  // glass: faint sky tint on the whole pane + two diagonal reflections
+  c.fillStyle = night ? 'rgba(120,140,200,0.06)' : 'rgba(205,228,240,0.1)';
+  c.fillRect(x, y, w, h);
+  const refl = (x0: number, x1: number, a: number) => {
+    const gr = c.createLinearGradient(x + w * x0, y + h, x + w * x1, y);
+    gr.addColorStop(0, 'rgba(255,255,255,0)');
+    gr.addColorStop(0.5, `rgba(255,255,255,${a})`);
+    gr.addColorStop(1, 'rgba(255,255,255,0)');
+    c.fillStyle = gr;
+    c.beginPath();
+    c.moveTo(x + w * x0, y + h);
+    c.lineTo(x + w * (x0 + 0.23), y);
+    c.lineTo(x + w * (x0 + 0.33), y);
+    c.lineTo(x + w * (x0 + 0.1), y + h);
+    c.closePath();
+    c.fill();
+  };
+  refl(0.02, 0.35, rain ? 0.2 : 0.13);
+  refl(0.52, 0.85, rain ? 0.12 : 0.07);
+  // the pane darkens slightly toward the frame (reveal occlusion)
+  innerAO(c, x, y, w, h, Math.max(14, w * 0.05), night ? 0.3 : 0.2);
   c.restore();
-  // kumiko lattice: two thin verticals, one horizontal, framed in walnut
-  c.strokeStyle = WALNUT;
-  c.lineWidth = Math.max(4, w * 0.012);
+  // kumiko lattice: two thin verticals, one horizontal, each casting a soft shadow on the glass
+  const lw = Math.max(4, w * 0.012);
+  c.save();
+  c.beginPath();
+  c.rect(x, y, w, h);
+  c.clip();
+  c.strokeStyle = 'rgba(45,28,18,0.13)';
+  c.lineWidth = lw * 2.4;
+  c.lineCap = 'butt';
+  c.beginPath();
+  for (const fx of [1 / 3, 2 / 3]) {
+    c.moveTo(x + w * fx + lw * 0.6, y);
+    c.lineTo(x + w * fx + lw * 0.6, y + h);
+  }
+  c.moveTo(x, y + h * 0.3 + lw * 0.8);
+  c.lineTo(x + w, y + h * 0.3 + lw * 0.8);
+  c.stroke();
+  c.restore();
+  c.strokeStyle = '#4e3626';
+  c.lineWidth = lw;
   c.beginPath();
   for (const fx of [1 / 3, 2 / 3]) {
     c.moveTo(x + w * fx, y);
@@ -932,29 +1237,33 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
   c.moveTo(x, y + h * 0.3);
   c.lineTo(x + w, y + h * 0.3);
   c.stroke();
-  c.strokeStyle = 'rgba(255,255,255,0.14)';
+  c.strokeStyle = 'rgba(255,235,210,0.3)';
   c.lineWidth = 1;
   c.beginPath();
   for (const fx of [1 / 3, 2 / 3]) {
-    c.moveTo(x + w * fx + 2.5, y);
-    c.lineTo(x + w * fx + 2.5, y + h);
+    c.moveTo(x + w * fx - lw * 0.5 + 0.5, y);
+    c.lineTo(x + w * fx - lw * 0.5 + 0.5, y + h);
   }
+  c.moveTo(x, y + h * 0.3 - lw * 0.5 + 0.5);
+  c.lineTo(x + w, y + h * 0.3 - lw * 0.5 + 0.5);
   c.stroke();
-  // sill
-  c.fillStyle = vGrad(c, y + h + fr, y + h + fr + 12, WALNUT_L, WALNUT);
-  roundRect(c, x - fr - 10, y + h + fr - 2, w + fr * 2 + 20, 12, 3);
+  // sill: a thick lit plank with grain, a shadow beneath, and a few fallen petals
+  const sy0 = y + h + fr - 2;
+  c.fillStyle = vGrad(c, sy0, sy0 + 13, '#8a6446', '#5b3f2c');
+  roundRect(c, x - fr - 10, sy0, w + fr * 2 + 20, 13, 3);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(255,255,255,0.15)';
-  c.fillRect(x - fr - 8, y + h + fr - 1, w + fr * 2 + 16, 2);
-  c.fillStyle = vGrad(
-    c,
-    y + h + fr + 10,
-    y + h + fr + 22,
-    'rgba(60,35,20,0.22)',
-    'rgba(60,35,20,0)'
-  );
-  c.fillRect(x - fr - 10, y + h + fr + 10, w + fr * 2 + 20, 12);
+  grainLines(c, x - fr - 6, sy0 + 2, w + fr * 2 + 12, 8, 403, 14, 'rgba(255,230,200,0.14)');
+  hiLine(c, x - fr - 8, sy0 + 0.5, w + fr * 2 + 16, 0.28, 2);
+  dropAO(c, x - fr - 10, sy0 + 13, w + fr * 2 + 20, 16, 0.26);
+  const spr = rng(404);
+  for (let i = 0; i < 5; i++) {
+    const ppx = x + w * (0.25 + spr() * 0.7);
+    c.fillStyle = 'rgba(45,28,18,0.15)';
+    ellipse(c, ppx + 1, sy0 + 1.5, 3.2, 1.2);
+    c.fill();
+    petal(c, ppx, sy0 + 0.5, 2.6 + spr() * 1.2, spr() * 6.28, i % 2 ? PINK_L : PINK);
+  }
   // window extras
   if (decor.pencere === 'pencere-noren') {
     // short indigo valance over the top third
@@ -1008,7 +1317,12 @@ function drawWindow(c: Ctx, g: Geo, tod: Tod, decor: DecorState, rain: boolean) 
     c.fillStyle = 'rgba(60,35,20,0.14)';
     roundRect(c, x - fr + 2, ry + 6, w + fr * 2 - 4, 14, 7);
     c.fill();
-    c.fillStyle = vGrad(c, ry, ry + 18, '#dcbb86', '#a9834f');
+    const bg = c.createLinearGradient(0, ry, 0, ry + 18);
+    bg.addColorStop(0, '#c9a46f');
+    bg.addColorStop(0.3, '#e4c48f');
+    bg.addColorStop(0.7, '#b58b55');
+    bg.addColorStop(1, '#8a6436');
+    c.fillStyle = bg;
     roundRect(c, x - fr, ry, w + fr * 2, 18, 9);
     c.fill();
     stroke(c);
@@ -1050,14 +1364,20 @@ function drawDoor(c: Ctx, g: Geo, tod: Tod) {
   const sky = TOD_LIGHT[tod].sky;
   const night = tod === 'aksam';
   const fr = Math.max(8, w * 0.07);
-  c.fillStyle = 'rgba(60,35,20,0.12)';
+  c.fillStyle = 'rgba(45,28,18,0.07)';
+  roundRect(c, x - fr - 12, y - fr - 4, w + fr * 2 + 24, h + fr + 14, 8);
+  c.fill();
+  c.fillStyle = 'rgba(45,28,18,0.12)';
   roundRect(c, x - fr - 5, y - fr + 2, w + fr * 2 + 10, h + fr + 8, 5);
   c.fill();
   // frame
-  c.fillStyle = vGrad(c, y - fr, y + h, WALNUT_L, WALNUT);
+  c.fillStyle = vGrad(c, y - fr, y + h, '#7f5b40', '#52382a');
   roundRect(c, x - fr, y - fr, w + fr * 2, h + fr, 3);
   c.fill();
   stroke(c);
+  grainLines(c, x - fr + 2, y - fr, fr - 4, h + fr, 405, 8, 'rgba(255,230,200,0.12)', true);
+  grainLines(c, x + w + 2, y - fr, fr - 4, h + fr, 406, 8, 'rgba(255,230,200,0.12)', true);
+  hiLine(c, x - fr, y - fr, w + fr * 2, 0.2);
   // opening: a glimpse outside (street + steps)
   c.save();
   c.beginPath();
@@ -1088,29 +1408,49 @@ function drawDoor(c: Ctx, g: Geo, tod: Tod) {
   if (night) {
     c.fillStyle = 'rgba(255,220,150,0.9)';
     c.fillRect(x + w * 0.64, y + h * 0.44, w * 0.08, h * 0.06);
+    glow(c, x + w * 0.68, y + h * 0.47, w * 0.3, '255,210,140', 0.4);
   }
-  // noren: indigo split curtain covering the top ~58%
+  innerAO(c, x, y, w, h, Math.max(8, w * 0.12), 0.25);
+  // noren: indigo split curtain covering the top ~58%, cloth with soft vertical folds
   const nh = h * 0.58;
   const panels = 3;
   const pw = w / panels;
+  // the curtain's shadow on the scene behind
+  c.fillStyle = 'rgba(20,20,40,0.25)';
+  c.fillRect(x, y + nh - 2, w, 8);
   for (let i = 0; i < panels; i++) {
     const px0 = x + i * pw;
     const fold = c.createLinearGradient(px0, 0, px0 + pw, 0);
-    fold.addColorStop(0, INDIGO_D);
-    fold.addColorStop(0.3, INDIGO);
-    fold.addColorStop(0.7, shade(INDIGO, 0.1));
-    fold.addColorStop(1, INDIGO_D);
+    fold.addColorStop(0, '#1e2546');
+    fold.addColorStop(0.18, INDIGO);
+    fold.addColorStop(0.36, '#3a4675');
+    fold.addColorStop(0.5, INDIGO_D);
+    fold.addColorStop(0.68, '#3c4878');
+    fold.addColorStop(0.85, INDIGO);
+    fold.addColorStop(1, '#1e2546');
     c.fillStyle = fold;
     c.beginPath();
     c.moveTo(px0 + 1, y - 2);
     c.lineTo(px0 + pw - 1, y - 2);
     c.lineTo(px0 + pw - 1, y + nh - 4);
-    c.quadraticCurveTo(px0 + pw / 2, y + nh + 4, px0 + 1, y + nh - 4);
+    c.quadraticCurveTo(px0 + pw * 0.75, y + nh + 3, px0 + pw / 2, y + nh - 1);
+    c.quadraticCurveTo(px0 + pw * 0.25, y + nh + 4, px0 + 1, y + nh - 4);
     c.closePath();
     c.fill();
-    // top band shared by panels
-    seigaiha(c, px0 + 1, y + nh * 0.58, pw - 2, nh * 0.42, pw * 0.22, 'rgba(255,255,255,0.6)');
+    // cloth weave + a hem line
+    speckle(c, px0 + 1, y, pw - 2, nh, 500 + i, 90, 'rgba(255,255,255,0.05)');
+    c.fillStyle = 'rgba(255,255,255,0.1)';
+    c.fillRect(px0 + 1, y + nh - 9, pw - 2, 1);
+    seigaiha(c, px0 + 1, y + nh * 0.58, pw - 2, nh * 0.42, pw * 0.22, 'rgba(255,255,255,0.55)');
+    // the fold shading also dims the pattern
+    c.fillStyle = fold;
+    c.globalAlpha = 0.35;
+    c.fillRect(px0 + 1, y + nh * 0.58, pw - 2, nh * 0.42);
+    c.globalAlpha = 1;
   }
+  // light from above catches the top of the cloth
+  c.fillStyle = vGrad(c, y, y + nh * 0.25, 'rgba(255,255,255,0.12)', 'rgba(255,255,255,0)');
+  c.fillRect(x, y, w, nh * 0.25);
   // white brush circle (enso) with a wave on the middle panel
   c.save();
   c.translate(x + w / 2, y + nh * 0.3);
@@ -1151,20 +1491,24 @@ function drawDoor(c: Ctx, g: Geo, tod: Tod) {
   c.font = `800 10px "Baloo 2", system-ui, sans-serif`;
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText('AÇIK', sx, sy + 11.5);
+  c.fillText(SALON_LABELS.open, sx, sy + 11.5);
 }
 
 // ---------- menu board (brush calligraphy) ----------
 function drawMenuBoard(c: Ctx, g: Geo) {
   const { x, y, w, h } = g.board;
-  c.fillStyle = 'rgba(60,35,20,0.14)';
-  roundRect(c, x - 2, y + 4, w + 6, h + 6, 5);
+  c.fillStyle = 'rgba(45,28,18,0.07)';
+  roundRect(c, x - 6, y + 6, w + 14, h + 16, 8);
   c.fill();
-  c.fillStyle = vGrad(c, y, y + h, WALNUT_L, WALNUT);
+  c.fillStyle = 'rgba(45,28,18,0.14)';
+  roundRect(c, x - 1, y + 4, w + 4, h + 6, 5);
+  c.fill();
+  c.fillStyle = vGrad(c, y, y + h, '#7f5b40', '#52382a');
   roundRect(c, x, y, w, h, 5);
   c.fill();
   stroke(c);
   grainLines(c, x + 4, y + 2, w - 8, h - 4, 123, 14, 'rgba(255,230,200,0.1)');
+  hiLine(c, x + 3, y + 1, w - 6, 0.22);
   const pad = Math.max(6, h * 0.1);
   const ix = x + pad;
   const iy = y + pad;
@@ -1221,12 +1565,16 @@ function drawScroll(c: Ctx, g: Geo, id: string) {
   c.moveTo(x + w / 2, g.beam);
   c.lineTo(x + w / 2, y);
   c.stroke();
-  c.fillStyle = 'rgba(60,35,20,0.12)';
+  c.fillStyle = 'rgba(45,28,18,0.07)';
+  roundRect(c, x - 5, y + 6, w + 12, h + 14, 6);
+  c.fill();
+  c.fillStyle = 'rgba(45,28,18,0.12)';
   roundRect(c, x - 1, y + 4, w + 4, h + 6, 3);
   c.fill();
-  // silk mount (indigo bands) + paper
+  // silk mount (indigo bands with a satin sheen) + paper
   c.fillStyle = vGrad(c, y, y + h, '#44507f', INDIGO_D);
   c.fillRect(x, y, w, h);
+  sheen(c, x, y, w, h, 0.14);
   const bandT = h * 0.1;
   const bandB = h * 0.12;
   const px = x + w * 0.1;
@@ -1387,9 +1735,14 @@ function drawScroll(c: Ctx, g: Geo, id: string) {
 // ---------- low shelf: sake bottles & ceramics ----------
 function drawShelf(c: Ctx, g: Geo) {
   const { x, y, w } = g.shelf;
-  c.fillStyle = 'rgba(60,35,20,0.14)';
-  roundRect(c, x + 2, y + 6, w, 10, 3);
+  // shadow of the board on the wall (soft, two layers) + the AO band under it
+  c.fillStyle = 'rgba(45,28,18,0.08)';
+  roundRect(c, x - 2, y + 8, w + 6, 22, 4);
   c.fill();
+  c.fillStyle = 'rgba(45,28,18,0.14)';
+  roundRect(c, x + 1, y + 6, w + 2, 11, 3);
+  c.fill();
+  dropAO(c, x - 4, y + 9, w + 8, 26, 0.2);
   const k = Math.min(1.25, Math.max(0.8, w / 280));
   c.save();
   c.translate(x, y);
@@ -1399,11 +1752,11 @@ function drawShelf(c: Ctx, g: Geo) {
   const step = ww / items.length;
   items.forEach((it, i) => {
     const ix = step * (i + 0.5);
-    softShadow(c, ix, 0, 14, 3, 0.18);
+    softShadow(c, ix, 0, 16, 3.5, 0.26);
     switch (it) {
       case 'tokkuri': {
-        // sake flask + two ochoko cups
-        c.fillStyle = vGrad(c, -36, 0, '#f6efe2', '#d8ccb8');
+        // sake flask + two ochoko cups: glazed stoneware (side-lit, soft rim light)
+        c.fillStyle = hGrad(c, ix - 14, ix + 14, '#fbf6ec', '#cfc2ad');
         c.beginPath();
         c.moveTo(-5 + ix, -36);
         c.lineTo(5 + ix, -36);
@@ -1420,36 +1773,48 @@ function drawShelf(c: Ctx, g: Geo) {
         c.moveTo(ix - 7, -18);
         c.quadraticCurveTo(ix, -24, ix + 7, -16);
         c.stroke();
-        gloss(c, ix - 5, -24, 6, 0.5);
+        c.fillStyle = 'rgba(255,255,255,0.55)';
+        roundRect(c, ix - 9, -28, 2.5, 20, 1.5);
+        c.fill();
+        gloss(c, ix - 5, -24, 6, 0.45);
         for (const dx of [-20, 20]) {
-          c.fillStyle = '#f6efe2';
+          c.fillStyle = hGrad(c, ix + dx - 5, ix + dx + 5, '#fbf6ec', '#d4c7b2');
           roundRect(c, ix + dx - 5, -9, 10, 9, 2);
           c.fill();
           stroke(c);
+          hiLine(c, ix + dx - 4, -8.5, 8, 0.5, 1);
         }
         break;
       }
       case 'bottle': {
-        c.fillStyle = vGrad(c, -46, 0, '#4d6b4a', '#2f4a2e');
+        // green glass: dark body, bright edge reflections, translucent shoulder
+        c.fillStyle = hGrad(c, ix - 8, ix + 8, '#5d7f58', '#243d24');
         roundRect(c, ix - 8, -46, 16, 46, 4);
         c.fill();
-        c.fillStyle = '#2f4a2e';
+        c.fillStyle = hGrad(c, ix - 4, ix + 4, '#4d6b4a', '#1f341f');
         roundRect(c, ix - 4, -56, 8, 12, 2);
         c.fill();
         stroke(c);
+        c.fillStyle = '#c9432f';
+        roundRect(c, ix - 4.5, -57, 9, 4, 1.5);
+        c.fill();
         c.fillStyle = PAL.paper;
         roundRect(c, ix - 6, -32, 12, 18, 1.5);
         c.fill();
         brushChar(c, ix - 4, -30, 8, 61);
-        c.fillStyle = 'rgba(255,255,255,0.25)';
-        roundRect(c, ix - 6, -44, 3, 40, 1.5);
+        c.fillStyle = 'rgba(255,255,255,0.45)';
+        roundRect(c, ix - 6.5, -44, 2.2, 40, 1.2);
+        c.fill();
+        c.fillStyle = 'rgba(255,255,255,0.18)';
+        roundRect(c, ix + 4, -42, 1.5, 36, 1);
         c.fill();
         break;
       }
       case 'bowls': {
         for (let j = 0; j < 3; j++) {
           const by = -j * 7;
-          c.fillStyle = [PAL.tomato, '#3a3f4a', PAL.sage][j];
+          const base = [PAL.tomato, '#3a3f4a', PAL.sage][j];
+          c.fillStyle = hGrad(c, ix - 14, ix + 14, shade(base, 0.18), shade(base, -0.25));
           c.beginPath();
           c.moveTo(ix - 14, by - 7);
           c.quadraticCurveTo(ix - 12, by, ix, by);
@@ -1457,9 +1822,10 @@ function drawShelf(c: Ctx, g: Geo) {
           c.closePath();
           c.fill();
           stroke(c);
-          c.fillStyle = PAL.paper;
+          c.fillStyle = vGrad(c, by - 9, by - 5, '#fdf8ee', '#e3d8c6');
           ellipse(c, ix, by - 7, 14, 2.5);
           c.fill();
+          hiLine(c, ix - 10, by - 5.5, 7, 0.5, 1);
         }
         break;
       }
@@ -1468,12 +1834,15 @@ function drawShelf(c: Ctx, g: Geo) {
           [-10, INDIGO],
           [6, '#b9c9a7'],
         ] as [number, string][]) {
-          c.fillStyle = col;
+          c.fillStyle = hGrad(c, ix + dx - 6, ix + dx + 6, shade(col, 0.15), shade(col, -0.3));
           roundRect(c, ix + dx - 6, -15, 12, 15, 3);
           c.fill();
           stroke(c);
-          c.fillStyle = 'rgba(255,255,255,0.3)';
-          roundRect(c, ix + dx - 4, -13, 3, 10, 1.5);
+          c.fillStyle = 'rgba(255,255,255,0.4)';
+          roundRect(c, ix + dx - 4, -13, 2.2, 10, 1.2);
+          c.fill();
+          c.fillStyle = shade(col, 0.25);
+          ellipse(c, ix + dx, -14.5, 5.5, 1.6);
           c.fill();
         }
         break;
@@ -1505,10 +1874,17 @@ function drawShelf(c: Ctx, g: Geo) {
         break;
       }
       case 'teapot': {
-        c.fillStyle = vGrad(c, -22, 0, '#8c6b5a', '#5f4536');
+        const tg = c.createRadialGradient(ix - 6, -16, 2, ix, -11, 18);
+        tg.addColorStop(0, '#a38374');
+        tg.addColorStop(0.6, '#6e5040');
+        tg.addColorStop(1, '#4a3328');
+        c.fillStyle = tg;
         ellipse(c, ix, -11, 15, 11);
         c.fill();
         stroke(c);
+        c.fillStyle = 'rgba(255,240,220,0.18)';
+        ellipse(c, ix + 7, -6, 4, 6);
+        c.fill();
         c.fillStyle = '#5f4536';
         c.beginPath();
         c.moveTo(ix + 12, -14);
@@ -1563,12 +1939,21 @@ function drawLamp(c: Ctx, x: number, y: number, id: string, on: boolean, beam: n
   c.fill();
   switch (id) {
     case 'lamba-kagit': {
-      // round white paper lantern with ribs
+      // round white paper lantern with ribs; lit from inside when on
       const r = 27;
       const cy = y + r;
-      c.fillStyle = on
-        ? vGrad(c, cy - r, cy + r, '#fff6dd', '#ffe3b0')
-        : vGrad(c, cy - r, cy + r, '#fdfaf3', '#e9e2d6');
+      if (on) glow(c, x, cy, r * 2.6, '255,225,170', 0.5);
+      const lg = c.createRadialGradient(x - r * 0.1, cy - r * 0.05, r * 0.1, x, cy, r);
+      if (on) {
+        lg.addColorStop(0, '#fffaf0');
+        lg.addColorStop(0.55, '#ffeec8');
+        lg.addColorStop(1, '#f4c98a');
+      } else {
+        lg.addColorStop(0, '#fffdf8');
+        lg.addColorStop(0.6, '#f3ece0');
+        lg.addColorStop(1, '#d9d0c2');
+      }
+      c.fillStyle = lg;
       circle(c, x, cy, r);
       c.fill();
       stroke(c, 'rgba(60,35,20,0.18)');
@@ -1597,9 +1982,18 @@ function drawLamp(c: Ctx, x: number, y: number, id: string, on: boolean, beam: n
     }
     case 'lamba-chochin': {
       const cy = y + 32;
-      c.fillStyle = on
-        ? vGrad(c, cy - 32, cy + 32, '#ff8468', '#e0553f')
-        : vGrad(c, cy - 32, cy + 32, '#e2654d', '#c4432f');
+      if (on) glow(c, x, cy, 70, '255,150,110', 0.45);
+      const cg = c.createRadialGradient(x - 4, cy - 4, 4, x, cy, 32);
+      if (on) {
+        cg.addColorStop(0, '#ffb08f');
+        cg.addColorStop(0.5, '#ff7a5c');
+        cg.addColorStop(1, '#c94530');
+      } else {
+        cg.addColorStop(0, '#ee7a62');
+        cg.addColorStop(0.6, '#d8533d');
+        cg.addColorStop(1, '#a8392a');
+      }
+      c.fillStyle = cg;
       ellipse(c, x, cy, 22, 32);
       c.fill();
       stroke(c);
@@ -1631,7 +2025,8 @@ function drawLamp(c: Ctx, x: number, y: number, id: string, on: boolean, beam: n
       break;
     }
     case 'lamba-pirinc': {
-      c.fillStyle = vGrad(c, y, y + 38, '#e9c884', '#b48434');
+      if (on) glow(c, x, y + 44, 60, '255,225,160', 0.45);
+      c.fillStyle = hGrad(c, x - 28, x + 28, '#8d6a2a', '#f0d496');
       c.beginPath();
       c.moveTo(x - 6, y);
       c.lineTo(x + 6, y);
@@ -1660,13 +2055,30 @@ function drawLamp(c: Ctx, x: number, y: number, id: string, on: boolean, beam: n
     }
     default: {
       // Edison bulb with a brass cap
-      c.fillStyle = vGrad(c, y - 2, y + 16, '#d8b56a', '#a67c35');
+      if (on) glow(c, x, y + 32, 52, '255,220,150', 0.5);
+      c.fillStyle = hGrad(c, x - 7, x + 7, '#8f6a2c', '#e6c67e');
       roundRect(c, x - 7, y - 2, 14, 16, 3);
       c.fill();
       stroke(c, 'rgba(60,35,20,0.2)');
-      c.fillStyle = on
-        ? vGrad(c, y + 12, y + 48, '#fff3cf', '#ffd98a')
-        : vGrad(c, y + 12, y + 48, '#faf6ee', '#e6ded2');
+      c.strokeStyle = 'rgba(80,55,20,0.3)';
+      c.lineWidth = 1;
+      for (let yy = y + 2; yy < y + 13; yy += 3) {
+        c.beginPath();
+        c.moveTo(x - 6, yy);
+        c.lineTo(x + 6, yy);
+        c.stroke();
+      }
+      const bg = c.createRadialGradient(x - 5, y + 26, 2, x, y + 32, 20);
+      if (on) {
+        bg.addColorStop(0, '#fffbea');
+        bg.addColorStop(0.6, '#ffe9b4');
+        bg.addColorStop(1, '#f2c470');
+      } else {
+        bg.addColorStop(0, '#fdfbf6');
+        bg.addColorStop(0.7, '#ece6da');
+        bg.addColorStop(1, '#d5ccc0');
+      }
+      c.fillStyle = bg;
       c.beginPath();
       c.moveTo(x - 7, y + 14);
       c.quadraticCurveTo(x - 20, y + 20, x - 18, y + 36);
@@ -1818,7 +2230,12 @@ function drawPlant(c: Ctx, g: Geo, id: string) {
   }
   // pot / vase
   if (id === 'bitki-sakura') {
-    c.fillStyle = vGrad(c, -60, 0, '#6f7fa8', '#44507f');
+    const vg = c.createLinearGradient(-30, 0, 30, 0);
+    vg.addColorStop(0, '#3a4573');
+    vg.addColorStop(0.3, '#7d8db8');
+    vg.addColorStop(0.7, '#4c598c');
+    vg.addColorStop(1, '#2d365e');
+    c.fillStyle = vg;
     c.beginPath();
     c.moveTo(-12, -60);
     c.quadraticCurveTo(-32, -30, -22, 0);
@@ -1827,9 +2244,17 @@ function drawPlant(c: Ctx, g: Geo, id: string) {
     c.closePath();
     c.fill();
     stroke(c);
-    gloss(c, -8, -30, 14, 0.35);
+    c.fillStyle = 'rgba(255,255,255,0.3)';
+    roundRect(c, -16, -50, 4, 36, 2);
+    c.fill();
+    gloss(c, -8, -30, 14, 0.25);
   } else {
-    c.fillStyle = vGrad(c, -48, 0, '#e8c3a8', '#c58b6c');
+    const pg = c.createLinearGradient(-30, 0, 30, 0);
+    pg.addColorStop(0, '#b97f62');
+    pg.addColorStop(0.3, '#e6bea2');
+    pg.addColorStop(0.75, '#d19c7c');
+    pg.addColorStop(1, '#a86f52');
+    c.fillStyle = pg;
     c.beginPath();
     c.moveTo(-30, -48);
     c.lineTo(30, -48);
@@ -1838,12 +2263,13 @@ function drawPlant(c: Ctx, g: Geo, id: string) {
     c.closePath();
     c.fill();
     stroke(c);
-    c.fillStyle = '#dca68a';
+    c.fillStyle = vGrad(c, -52, -42, '#e9c4a9', '#c88f70');
     roundRect(c, -33, -52, 66, 10, 3);
     c.fill();
     stroke(c);
-    c.fillStyle = 'rgba(255,255,255,0.2)';
-    roundRect(c, -24, -40, 8, 34, 4);
+    dropAO(c, -30, -42, 60, 8, 0.2);
+    c.fillStyle = 'rgba(255,255,255,0.22)';
+    roundRect(c, -22, -40, 6, 34, 3);
     c.fill();
   }
   c.restore();
@@ -1869,28 +2295,29 @@ function tableSprite(w: number, h: number, style: string, sus: string): HTMLCanv
     c.translate(10, 10);
     const col = tableColors(style);
     const topH = h * 0.26;
-    // legs
-    c.fillStyle = col.leg;
+    // legs (rounded, lit on the left)
     for (const lx of [w * 0.1, w * 0.84]) {
+      c.fillStyle = hGrad(c, lx, lx + w * 0.06, shade(col.leg, 0.12), shade(col.leg, -0.25));
       roundRect(c, lx, topH, w * 0.06, h - topH, 3);
       c.fill();
       stroke(c);
     }
-    // apron shadow
-    c.fillStyle = 'rgba(60,35,20,0.12)';
-    roundRect(c, w * 0.06, topH * 0.9, w * 0.88, topH * 0.5, 4);
+    // apron shadow (the underside of the top is in shade)
+    c.fillStyle = vGrad(c, topH * 0.9, topH * 1.5, AO(0.24), AO0);
+    roundRect(c, w * 0.04, topH * 0.9, w * 0.92, topH * 0.6, 4);
     c.fill();
     // slab edge + top
-    c.fillStyle = col.edge;
+    c.fillStyle = vGrad(c, topH * 0.45, topH * 1.15, shade(col.edge, 0.05), shade(col.edge, -0.2));
     roundRect(c, 0, topH * 0.45, w, topH * 0.7, topH * 0.3);
     c.fill();
     stroke(c);
-    c.fillStyle = vGrad(c, 0, topH, shade(col.top, 0.14), col.top);
+    c.fillStyle = vGrad(c, 0, topH, shade(col.top, 0.16), shade(col.top, -0.04));
     roundRect(c, 0, 0, w, topH * 0.75, topH * 0.35);
     c.fill();
     stroke(c);
-    c.fillStyle = 'rgba(255,255,255,0.22)';
-    roundRect(c, w * 0.04, 2, w * 0.92, 3, 2);
+    sheen(c, w * 0.1, 0, w * 0.8, topH * 0.75, style === 'stil-lake' ? 0.3 : 0.16);
+    c.fillStyle = 'rgba(255,255,255,0.26)';
+    roundRect(c, w * 0.04, 1.5, w * 0.92, 2.5, 2);
     c.fill();
     if (style === 'stil-mermer') {
       c.strokeStyle = 'rgba(140,140,150,0.35)';
@@ -1994,26 +2421,41 @@ function tableSprite(w: number, h: number, style: string, sus: string): HTMLCanv
 }
 
 /** Low bench with an indigo zabuton cushion. */
-function drawBench(c: Ctx, x: number, bottom: number, size: number, style: string) {
+function paintBench(c: Ctx, x: number, bottom: number, size: number, style: string) {
   const col = tableColors(style);
   const w = size * 0.62;
   const h = size * 0.22;
   const cushion = size * 0.14;
-  softShadow(c, x, bottom, w * 0.6, w * 0.12, 0.2);
-  c.fillStyle = col.leg;
+  softShadow(c, x, bottom, w * 0.62, w * 0.13, 0.28);
+  c.fillStyle = vGrad(c, bottom - h, bottom, shade(col.leg, 0.08), shade(col.leg, -0.22));
   roundRect(c, x - w / 2, bottom - h, w, h, 5);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(255,255,255,0.12)';
-  roundRect(c, x - w / 2 + 4, bottom - h + 3, w - 8, 3, 2);
+  grainLines(
+    c,
+    x - w / 2 + 3,
+    bottom - h + 4,
+    w - 6,
+    h - 8,
+    Math.round(x),
+    6,
+    'rgba(60,35,20,0.12)'
+  );
+  c.fillStyle = 'rgba(255,255,255,0.16)';
+  roundRect(c, x - w / 2 + 4, bottom - h + 2, w - 8, 2.5, 2);
   c.fill();
-  // cushion
-  c.fillStyle = vGrad(c, bottom - h - cushion, bottom - h + 2, '#4b5a8f', INDIGO_D);
+  // cushion: soft puffed zabuton with a shaded underside
+  dropAO(c, x - w / 2 + 4, bottom - h, w - 8, 8, 0.22);
+  const cg = c.createLinearGradient(0, bottom - h - cushion, 0, bottom - h + 2);
+  cg.addColorStop(0, '#5a6ba3');
+  cg.addColorStop(0.5, '#3d4a80');
+  cg.addColorStop(1, INDIGO_D);
+  c.fillStyle = cg;
   roundRect(c, x - w / 2 + 4, bottom - h - cushion, w - 8, cushion + 4, cushion * 0.6);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(255,255,255,0.18)';
-  roundRect(c, x - w / 2 + 10, bottom - h - cushion + 3, w - 20, cushion * 0.3, 3);
+  c.fillStyle = 'rgba(255,255,255,0.2)';
+  roundRect(c, x - w / 2 + 10, bottom - h - cushion + 3, w - 20, cushion * 0.28, 3);
   c.fill();
   // tufts
   c.fillStyle = 'rgba(255,255,255,0.55)';
@@ -2145,7 +2587,7 @@ function backSprite(
   }
   return sprite(key, W, H, (c) => {
     const g = geo(W, H, decor);
-    drawWall(c, W, g, decor.duvar);
+    drawWall(c, W, g, decor.duvar, tod, lampsOn);
     drawFloor(c, W, g, H, decor.zemin);
     drawDoor(c, g, tod);
     drawWindow(c, g, tod, decor, rain);
@@ -2238,7 +2680,8 @@ export function drawSalonBack(
   const order = g.tables.map((tb, i) => ({ tb, i })).sort((a, b) => a.tb.ground - b.tb.ground);
   for (const { tb, i } of order) {
     const top = tb.ground - tb.h;
-    softShadow(c, tb.x, tb.ground, tb.w * 0.62, tb.w * 0.13, 0.24);
+    softShadow(c, tb.x, tb.ground + 2, tb.w * 0.8, tb.w * 0.2, 0.14);
+    softShadow(c, tb.x, tb.ground, tb.w * 0.62, tb.w * 0.13, 0.26);
     for (let s = 0; s < 2; s++) {
       const seatIdx = i * 2 + s;
       const seat = layout.seats[seatIdx];
@@ -2273,44 +2716,68 @@ export function drawSalonBack(
 }
 
 // ---------- counter items ----------
-function drawRegister(c: Ctx, r: Rect) {
+function paintRegister(c: Ctx, r: Rect) {
   const { x, y, w, h } = r;
-  softShadow(c, x + w / 2, y + h, w * 0.6, h * 0.1, 0.25);
-  c.fillStyle = vGrad(c, y + h * 0.3, y + h, '#f4ece0', '#dccfbb');
+  softShadow(c, x + w / 2, y + h, w * 0.62, h * 0.11, 0.3);
+  // cream enamel body: lit from the top-left, darker on the right and underneath
+  const body = c.createLinearGradient(x, y + h * 0.3, x + w, y + h);
+  body.addColorStop(0, '#f8f1e6');
+  body.addColorStop(0.5, '#efe4d3');
+  body.addColorStop(1, '#d2c2ab');
+  c.fillStyle = body;
   roundRect(c, x, y + h * 0.32, w, h * 0.68, 10);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(60,35,20,0.1)';
+  hiLine(c, x + 10, y + h * 0.32 + 1, w - 20, 0.5, 2);
+  c.fillStyle = hGrad(c, x, x + 8, 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0)');
+  roundRect(c, x, y + h * 0.32, 8, h * 0.68, 10);
+  c.fill();
+  dropAO(c, x + 2, y + h - 10, w - 4, 10, 0.1);
+  // drawer line + a brass drawer pull
+  c.fillStyle = 'rgba(45,28,18,0.1)';
   roundRect(c, x + 6, y + h * 0.82, w - 12, h * 0.1, 4);
   c.fill();
-  c.fillStyle = PAL.sage;
+  c.fillStyle = hGrad(c, x + w * 0.4, x + w * 0.6, '#f0d496', '#b48434');
   roundRect(c, x + w * 0.4, y + h * 0.84, w * 0.2, h * 0.06, 3);
   c.fill();
+  // keys with a lit top edge and a shadow below each
   const kx = x + w * 0.08;
   const ky = y + h * 0.4;
   const kw = (w * 0.56) / 4;
   const kh = (h * 0.34) / 3;
   for (let i = 0; i < 4; i++) {
     for (let j = 0; j < 3; j++) {
-      c.fillStyle = (i + j) % 2 ? '#fbf7ef' : '#f1dfc4';
-      roundRect(c, kx + i * kw + 2, ky + j * kh + 2, kw - 4, kh - 4, 3);
+      const kxx = kx + i * kw + 2;
+      const kyy = ky + j * kh + 2;
+      c.fillStyle = 'rgba(45,28,18,0.14)';
+      roundRect(c, kxx, kyy + 2, kw - 4, kh - 4, 3);
+      c.fill();
+      c.fillStyle = vGrad(c, kyy, kyy + kh - 4, '#fffaf2', (i + j) % 2 ? '#efe5d6' : '#e9d6ba');
+      roundRect(c, kxx, kyy, kw - 4, kh - 4, 3);
       c.fill();
       stroke(c, 'rgba(60,35,20,0.12)');
     }
   }
-  c.fillStyle = PAL.coral;
-  roundRect(c, x + w * 0.68, ky + 2, w * 0.24, kh * 1.5 - 4, 4);
-  c.fill();
-  stroke(c);
-  c.fillStyle = PAL.matcha;
-  roundRect(c, x + w * 0.68, ky + kh * 1.5 + 2, w * 0.24, kh * 1.5 - 4, 4);
-  c.fill();
-  stroke(c);
-  c.fillStyle = '#3a3d45';
+  for (const [ky2, col] of [
+    [ky + 2, PAL.coral],
+    [ky + kh * 1.5 + 2, PAL.matcha],
+  ] as [number, string][]) {
+    c.fillStyle = 'rgba(45,28,18,0.14)';
+    roundRect(c, x + w * 0.68, ky2 + 2, w * 0.24, kh * 1.5 - 4, 4);
+    c.fill();
+    c.fillStyle = vGrad(c, ky2, ky2 + kh * 1.5, shade(col, 0.22), shade(col, -0.1));
+    roundRect(c, x + w * 0.68, ky2, w * 0.24, kh * 1.5 - 4, 4);
+    c.fill();
+    stroke(c);
+    hiLine(c, x + w * 0.7, ky2 + 1.5, w * 0.2, 0.35, 1.5);
+  }
+  // display head: dark slate with a glossy glass pane
+  c.fillStyle = vGrad(c, y, y + h * 0.36, '#4a4e58', '#2a2d35');
   roundRect(c, x + w * 0.12, y, w * 0.76, h * 0.36, 7);
   c.fill();
   stroke(c);
-  c.fillStyle = '#243b33';
+  hiLine(c, x + w * 0.15, y + 1, w * 0.7, 0.28, 1.5);
+  c.fillStyle = vGrad(c, y + h * 0.06, y + h * 0.28, '#2a4a3f', '#1c3029');
   roundRect(c, x + w * 0.18, y + h * 0.06, w * 0.64, h * 0.22, 4);
   c.fill();
   c.fillStyle = '#9ff0b0';
@@ -2318,40 +2785,97 @@ function drawRegister(c: Ctx, r: Rect) {
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.fillText('NODDLES', x + w / 2, y + h * 0.17);
-  c.fillStyle = 'rgba(255,255,255,0.1)';
-  roundRect(c, x + w * 0.2, y + h * 0.07, w * 0.2, h * 0.08, 3);
+  c.fillStyle = 'rgba(159,240,176,0.25)';
+  c.fillText('NODDLES', x + w / 2, y + h * 0.17);
+  c.save();
+  roundRect(c, x + w * 0.18, y + h * 0.06, w * 0.64, h * 0.22, 4);
+  c.clip();
+  c.fillStyle = 'rgba(255,255,255,0.12)';
+  c.beginPath();
+  c.moveTo(x + w * 0.18, y + h * 0.28);
+  c.lineTo(x + w * 0.36, y + h * 0.06);
+  c.lineTo(x + w * 0.48, y + h * 0.06);
+  c.lineTo(x + w * 0.3, y + h * 0.28);
+  c.closePath();
   c.fill();
+  c.restore();
 }
 
-function drawTipJar(c: Ctx, j: Rect, coins: number) {
+function paintTipJar(c: Ctx, j: Rect, coins: number) {
   const { x, y, w, h } = j;
-  softShadow(c, x + w / 2, y + h, w * 0.55, w * 0.14, 0.22);
+  softShadow(c, x + w / 2, y + h, w * 0.58, w * 0.15, 0.26);
+  // the glass bends light: a bright caustic patch on the counter in front of the jar
+  const cau = c.createRadialGradient(x + w * 0.55, y + h + 2, 0, x + w * 0.55, y + h + 2, w * 0.4);
+  cau.addColorStop(0, 'rgba(255,250,235,0.35)');
+  cau.addColorStop(1, 'rgba(255,250,235,0)');
+  c.fillStyle = cau;
+  ellipse(c, x + w * 0.55, y + h + 2, w * 0.4, w * 0.12);
+  c.fill();
+  // inside shading of the glass body (back wall of the jar)
+  const gy = y + h * 0.12;
+  const gh = h * 0.88;
+  c.fillStyle = hGrad(c, x, x + w, 'rgba(190,215,225,0.3)', 'rgba(120,150,165,0.32)');
+  roundRect(c, x, gy, w, gh, w * 0.22);
+  c.fill();
   const n = clamp(Math.floor(coins), 0, 14);
   for (let i = 0; i < n; i++) {
     const row = Math.floor(i / 2);
     const col = i % 2;
     const cy = y + h - 6 - row * 7;
     const cx = x + w * (0.33 + col * 0.34) + (row % 2) * 4;
-    c.fillStyle = i % 3 === 0 ? '#e8b35a' : '#f3cf7a';
+    c.fillStyle = 'rgba(100,65,15,0.3)';
+    ellipse(c, cx, cy + 1.5, w * 0.19, 4);
+    c.fill();
+    c.fillStyle = hGrad(
+      c,
+      cx - w * 0.19,
+      cx + w * 0.19,
+      '#f6dc96',
+      i % 3 === 0 ? '#d9a240' : '#e9b957'
+    );
     ellipse(c, cx, cy, w * 0.19, 4);
     c.fill();
     stroke(c, 'rgba(120,80,20,0.35)', 1);
-    c.fillStyle = 'rgba(255,255,255,0.4)';
-    ellipse(c, cx - 2, cy - 1, w * 0.08, 1.5);
+    c.fillStyle = 'rgba(255,255,255,0.55)';
+    ellipse(c, cx - 2, cy - 1.2, w * 0.08, 1.3);
     c.fill();
   }
-  c.fillStyle = 'rgba(215,235,240,0.35)';
-  roundRect(c, x, y + h * 0.12, w, h * 0.88, w * 0.22);
+  // front glass: faint sky tint, dark rim on the right, long bright reflection on the left
+  c.fillStyle = vGrad(c, gy, gy + gh, 'rgba(225,240,245,0.22)', 'rgba(200,225,235,0.3)');
+  roundRect(c, x, gy, w, gh, w * 0.22);
   c.fill();
-  stroke(c, 'rgba(60,35,20,0.3)');
+  c.save();
+  roundRect(c, x, gy, w, gh, w * 0.22);
+  c.clip();
+  c.fillStyle = hGrad(c, x + w * 0.75, x + w, 'rgba(60,80,95,0)', 'rgba(60,80,95,0.22)');
+  c.fillRect(x + w * 0.75, gy, w * 0.25, gh);
+  c.fillStyle = hGrad(c, x, x + w * 0.12, 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0)');
+  c.fillRect(x, gy, w * 0.12, gh);
+  const rf = c.createLinearGradient(0, gy, 0, gy + gh);
+  rf.addColorStop(0, 'rgba(255,255,255,0.65)');
+  rf.addColorStop(0.5, 'rgba(255,255,255,0.3)');
+  rf.addColorStop(1, 'rgba(255,255,255,0.05)');
+  c.fillStyle = rf;
+  roundRect(c, x + w * 0.12, gy + h * 0.08, w * 0.13, gh * 0.7, 4);
+  c.fill();
   c.fillStyle = 'rgba(255,255,255,0.35)';
-  roundRect(c, x + w * 0.12, y + h * 0.2, w * 0.14, h * 0.6, 4);
+  roundRect(c, x + w * 0.3, gy + h * 0.1, w * 0.04, gh * 0.35, 2);
   c.fill();
-  c.fillStyle = WALNUT_L;
+  // bottom refraction: a bright crescent where the glass thickens
+  c.fillStyle = 'rgba(255,255,255,0.28)';
+  c.beginPath();
+  c.ellipse(x + w / 2, y + h - 3, w * 0.42, 4, 0, 0, Math.PI);
+  c.fill();
+  c.restore();
+  stroke(c, 'rgba(60,35,20,0.3)');
+  // wooden lid with a knob
+  c.fillStyle = vGrad(c, y + h * 0.04, y + h * 0.16, '#8f6a4c', '#5b3f2c');
   roundRect(c, x - 2, y + h * 0.04, w + 4, h * 0.12, 4);
   c.fill();
   stroke(c);
-  c.fillStyle = WALNUT;
+  hiLine(c, x, y + h * 0.04 + 1, w, 0.3, 1.5);
+  dropAO(c, x, y + h * 0.16, w, 8, 0.2);
+  c.fillStyle = hGrad(c, x + w * 0.35, x + w * 0.65, '#8f6a4c', '#4e3626');
   roundRect(c, x + w * 0.35, y, w * 0.3, h * 0.08, 3);
   c.fill();
   c.fillStyle = PAL.paper;
@@ -2362,7 +2886,7 @@ function drawTipJar(c: Ctx, j: Rect, coins: number) {
   c.font = `800 ${Math.round(h * 0.11)}px "Baloo 2", system-ui, sans-serif`;
   c.textAlign = 'center';
   c.textBaseline = 'middle';
-  c.fillText('bahşiş', x + w / 2, y + h * 0.51);
+  c.fillText(SALON_LABELS.tips, x + w / 2, y + h * 0.51);
 }
 
 /** Sleek tablet on a small wooden stand, showing the order app. */
@@ -2388,24 +2912,31 @@ function drawTablet(c: Ctx, p: Rect, ringing: boolean, t: number) {
   c.fillStyle = vGrad(c, y + h * 0.3, y + h * 0.9, WALNUT_L, WALNUT);
   roundRect(c, x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.6, 4);
   c.fill();
-  c.fillStyle = vGrad(c, y + h * 0.84, y + h, '#8a6648', WALNUT);
+  c.fillStyle = vGrad(c, y + h * 0.84, y + h, '#9a7452', '#54392a');
   roundRect(c, x + w * 0.06, y + h * 0.84, w * 0.88, h * 0.16, 5);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(255,255,255,0.18)';
-  roundRect(c, x + w * 0.08, y + h * 0.85, w * 0.84, 2, 1);
-  c.fill();
+  grainLines(c, x + w * 0.08, y + h * 0.86, w * 0.84, h * 0.12, 707, 8, 'rgba(255,230,200,0.14)');
+  hiLine(c, x + w * 0.08, y + h * 0.85, w * 0.84, 0.3, 2);
+  dropAO(c, x + w * 0.1, y + h * 0.8, w * 0.8, h * 0.06, 0.2);
   // body, slightly leaning back (drawn as a rounded slab with a thin lit top edge)
   const bx = x + w * 0.04;
   const by = y;
   const bw = w * 0.92;
   const bh = h * 0.8;
-  c.fillStyle = vGrad(c, by, by + bh, '#4a4e58', '#20232a');
+  const bodyG = c.createLinearGradient(bx, by, bx + bw, by + bh);
+  bodyG.addColorStop(0, '#565b66');
+  bodyG.addColorStop(0.5, '#2e323a');
+  bodyG.addColorStop(1, '#1b1d23');
+  c.fillStyle = bodyG;
   roundRect(c, bx, by, bw, bh, 7);
   c.fill();
   stroke(c, 'rgba(60,35,20,0.35)');
-  c.fillStyle = 'rgba(255,255,255,0.28)';
+  c.fillStyle = 'rgba(255,255,255,0.32)';
   roundRect(c, bx + 4, by + 1, bw - 8, 1.6, 1);
+  c.fill();
+  c.fillStyle = hGrad(c, bx, bx + 3, 'rgba(255,255,255,0.2)', 'rgba(255,255,255,0)');
+  roundRect(c, bx, by, 3, bh, 7);
   c.fill();
   // screen
   const sx = bx + 5;
@@ -2478,7 +3009,7 @@ function drawTablet(c: Ctx, p: Rect, ringing: boolean, t: number) {
     c.fillStyle = PAL.ink;
     c.font = `800 ${Math.round(sh * 0.11)}px "Baloo 2", system-ui, sans-serif`;
     c.textAlign = 'left';
-    c.fillText('Yeni sipariş!', sx + sw * 0.3, ny + sh * 0.13);
+    c.fillText(SALON_LABELS.newOrder, sx + sw * 0.3, ny + sh * 0.13);
     c.fillStyle = 'rgba(60,35,20,0.3)';
     roundRect(c, sx + sw * 0.3, ny + sh * 0.22, sw * 0.42, sh * 0.035, 1.5);
     c.fill();
@@ -2518,16 +3049,45 @@ function drawTablet(c: Ctx, p: Rect, ringing: boolean, t: number) {
   }
 }
 
-function drawDeliveryBox(c: Ctx, b: Rect, open: boolean) {
+function paintDeliveryBox(c: Ctx, b: Rect, open: boolean) {
   const { x, y, w, h } = b;
-  softShadow(c, x + w / 2, y + h, w * 0.6, w * 0.1, 0.25);
+  softShadow(c, x + w / 2, y + h, w * 0.62, w * 0.11, 0.3);
   const top = y + h * 0.3;
-  c.fillStyle = vGrad(c, top, y + h, '#dcb993', '#bf9568');
-  roundRect(c, x, top, w, h - (top - y), 6);
+  const bh = h - (top - y);
+  // kraft cardboard: warm tan, lit on the left, fibrous speckle + faint corrugation lines
+  const kg = c.createLinearGradient(x, top, x + w, y + h);
+  kg.addColorStop(0, '#e0bf98');
+  kg.addColorStop(0.55, '#cfa87c');
+  kg.addColorStop(1, '#b58a5c');
+  c.fillStyle = kg;
+  roundRect(c, x, top, w, bh, 6);
   c.fill();
   stroke(c);
-  c.fillStyle = 'rgba(60,35,20,0.08)';
-  c.fillRect(x + w * 0.5 - 1, top + 6, 2, h - (top - y) - 12);
+  c.save();
+  roundRect(c, x, top, w, bh, 6);
+  c.clip();
+  speckle(c, x, top, w, bh, 611, 260, 'rgba(90,55,25,0.07)');
+  speckle(c, x, top, w, bh, 612, 160, 'rgba(255,240,220,0.18)');
+  c.strokeStyle = 'rgba(90,55,25,0.06)';
+  c.lineWidth = 1;
+  for (let yy = top + 5; yy < y + h; yy += 4) {
+    c.beginPath();
+    c.moveTo(x, yy);
+    c.lineTo(x + w, yy);
+    c.stroke();
+  }
+  // packing tape strip down the middle, slightly glossy
+  c.fillStyle = 'rgba(230,205,170,0.5)';
+  c.fillRect(x + w * 0.5 - 7, top, 14, bh);
+  c.fillStyle = 'rgba(255,255,255,0.22)';
+  c.fillRect(x + w * 0.5 - 6, top, 3, bh);
+  c.fillStyle = 'rgba(60,35,20,0.1)';
+  c.fillRect(x + w * 0.5 + 6, top, 1, bh);
+  // the front face reads as slightly folded: a darker right-hand side
+  c.fillStyle = hGrad(c, x + w * 0.8, x + w, 'rgba(60,35,20,0)', 'rgba(60,35,20,0.12)');
+  c.fillRect(x + w * 0.8, top, w * 0.2, bh);
+  c.restore();
+  hiLine(c, x + 4, top + 1, w - 8, 0.3, 1.5);
   c.save();
   c.translate(x + w * 0.5, y + h * 0.68);
   c.rotate(-0.06);
@@ -2567,13 +3127,13 @@ function drawDeliveryBox(c: Ctx, b: Rect, open: boolean) {
     c.fill();
     stroke(c);
   } else {
-    c.fillStyle = vGrad(c, top - h * 0.2, top, '#e6c8a4', '#cfa77d');
+    dropAO(c, x, top, w, 10, 0.2);
+    c.fillStyle = vGrad(c, top - h * 0.2, top, '#ead0ad', '#c89d70');
     roundRect(c, x - 3, top - h * 0.2, w + 6, h * 0.22, 5);
     c.fill();
     stroke(c);
-    c.fillStyle = 'rgba(255,255,255,0.2)';
-    roundRect(c, x + 6, top - h * 0.17, w * 0.4, h * 0.05, 2);
-    c.fill();
+    speckle(c, x - 3, top - h * 0.2, w + 6, h * 0.22, 613, 60, 'rgba(90,55,25,0.07)');
+    hiLine(c, x + 2, top - h * 0.2 + 1, w - 4, 0.4, 2);
     c.fillStyle = 'rgba(60,35,20,0.3)';
     roundRect(c, x + w * 0.38, top - h * 0.1, w * 0.24, h * 0.05, 3);
     c.fill();
@@ -2752,23 +3312,84 @@ function drawCash(c: Ctx, x: number, y: number, iw: number) {
   c.restore();
 }
 
+/** Static counter props are painted once into sprites (padding leaves room for shadows/lids). */
+function cachedProp(
+  key: string,
+  r: Rect,
+  pad: number,
+  paint: (c: Ctx, r: Rect) => void
+): HTMLCanvasElement {
+  return sprite(`${key}:${Math.round(r.w)}x${Math.round(r.h)}`, r.w + pad * 2, r.h + pad * 2, (c) =>
+    paint(c, { x: pad, y: pad, w: r.w, h: r.h })
+  );
+}
+
+function drawRegister(c: Ctx, r: Rect) {
+  const pad = 20;
+  c.drawImage(
+    cachedProp('salon:register', r, pad, paintRegister),
+    r.x - pad,
+    r.y - pad,
+    r.w + pad * 2,
+    r.h + pad * 2
+  );
+}
+
+function drawTipJar(c: Ctx, j: Rect, coins: number) {
+  const pad = 24;
+  const n = clamp(Math.floor(coins), 0, 14);
+  c.drawImage(
+    cachedProp(`salon:tipjar:${n}`, j, pad, (cc, r) => paintTipJar(cc, r, n)),
+    j.x - pad,
+    j.y - pad,
+    j.w + pad * 2,
+    j.h + pad * 2
+  );
+}
+
+function drawDeliveryBox(c: Ctx, b: Rect, open: boolean) {
+  const pad = Math.round(b.h * 0.9);
+  c.drawImage(
+    cachedProp(`salon:box:${open ? 1 : 0}`, b, pad, (cc, r) => paintDeliveryBox(cc, r, open)),
+    b.x - pad,
+    b.y - pad,
+    b.w + pad * 2,
+    b.h + pad * 2
+  );
+}
+
+function drawBench(c: Ctx, x: number, bottom: number, size: number, style: string) {
+  const w = size * 0.62;
+  const h = size * 0.4;
+  const padB = size * 0.1;
+  const key = `salon:bench:${Math.round(size)}:${style}`;
+  const sp = sprite(key, w + 24, h + padB, (cc) => paintBench(cc, w / 2 + 12, h, size, style));
+  c.drawImage(sp, x - w / 2 - 12, bottom - h, w + 24, h + padB);
+}
+
 function counterSprite(W: number, H: number, g: Geo, L: SalonLayout) {
   return sprite(`salon:counter:${W}x${H}`, W, H - g.counterTop + 10, (c) => {
     c.translate(0, -g.counterTop + 10);
     const top = g.counterTop;
     const band = g.counterSurf - top;
-    // front: vertical hinoki slats (tambour) with soft gaps
-    c.fillStyle = vGrad(c, top + band, H, '#e6c9a4', '#cfa97c');
+    // front: vertical hinoki slats (tambour) with soft gaps, warmer and darker toward the floor
+    c.fillStyle = vGrad(c, top + band, H, '#e4c6a0', '#c49a6c');
     c.fillRect(0, top + band, W, H - top - band);
     const sw = Math.max(14, W / 70);
     const r = rng(300);
     for (let x = 0; x < W; x += sw) {
-      c.fillStyle = `rgba(120,80,40,${0.02 + r() * 0.06})`;
+      c.fillStyle = hGrad(
+        c,
+        x,
+        x + sw,
+        `rgba(255,240,220,${0.04 + r() * 0.06})`,
+        `rgba(120,80,40,${0.04 + r() * 0.08})`
+      );
       c.fillRect(x, top + band, sw, H - top - band);
-      c.fillStyle = 'rgba(60,35,20,0.2)';
-      c.fillRect(x, top + band + 10, 1.6, H);
-      c.fillStyle = 'rgba(255,245,230,0.22)';
-      c.fillRect(x + 1.6, top + band + 10, 1.6, H);
+      c.fillStyle = 'rgba(45,28,18,0.22)';
+      c.fillRect(x, top + band + 10, 1.8, H);
+      c.fillStyle = 'rgba(255,245,230,0.28)';
+      c.fillRect(x + 1.8, top + band + 10, 1.4, H);
       grainLines(
         c,
         x + 3,
@@ -2781,52 +3402,53 @@ function counterSprite(W: number, H: number, g: Geo, L: SalonLayout) {
         true
       );
     }
-    // kick plinth at the very bottom + a thin rail line
-    c.fillStyle = vGrad(c, H - 18, H, WALNUT_L, WALNUT);
+    // a broad satin light band across the slats (the room's light catches the front)
+    sheen(c, W * 0.05, top + band, W * 0.9, H - top - band, 0.07);
+    // kick plinth at the very bottom + its shadow line
+    dropAO(c, 0, H - 26, W, 8, 0.12);
+    c.fillStyle = vGrad(c, H - 18, H, '#7a563d', '#4a3222');
     c.fillRect(0, H - 18, W, 18);
-    c.fillStyle = 'rgba(255,255,255,0.14)';
-    c.fillRect(0, H - 18, W, 1.5);
-    // dark trim under the top + its shadow
-    c.fillStyle = vGrad(c, top + band, top + band + 12, WALNUT_L, WALNUT);
+    hiLine(c, 0, H - 18, W, 0.16);
+    // dark trim under the top + the deep AO it casts on the slats
+    c.fillStyle = vGrad(c, top + band, top + band + 12, '#7f5b40', '#4e3626');
     c.fillRect(0, top + band, W, 12);
-    c.fillStyle = vGrad(
-      c,
-      top + band + 12,
-      top + band + 26,
-      'rgba(60,35,20,0.3)',
-      'rgba(60,35,20,0)'
-    );
-    c.fillRect(0, top + band + 12, W, 14);
-    // oak top (perspective band) with a lacquered edge
-    c.fillStyle = vGrad(c, top, top + band, '#e2b687', '#c9975f');
+    hiLine(c, 0, top + band, W, 0.14, 1);
+    dropAO(c, 0, top + band + 12, W, 30, 0.36);
+    // oak top (perspective band): grain gradient, lacquer sheen, crisp lit front edge
+    c.fillStyle = vGrad(c, top, top + band, '#e6bf90', '#c8945c');
     c.fillRect(0, top, W, band);
     grainLines(c, 0, top + 3, W, band - 6, 311, 44, 'rgba(120,70,30,0.15)');
-    c.fillStyle = 'rgba(255,255,255,0.3)';
-    c.fillRect(0, top, W, 3);
-    c.fillStyle = 'rgba(255,240,220,0.14)';
-    c.fillRect(0, top + 3, W, band * 0.4);
-    c.fillStyle = vGrad(c, top + band - 8, top + band, 'rgba(60,35,20,0)', 'rgba(60,35,20,0.28)');
-    c.fillRect(0, top + band - 8, W, 8);
-    // a few landed sakura petals near the tablet
+    grainLines(c, 0, top + 3, W, band - 6, 312, 30, 'rgba(255,235,210,0.14)');
+    const lac = c.createLinearGradient(0, top, 0, top + band);
+    lac.addColorStop(0, 'rgba(255,245,230,0.32)');
+    lac.addColorStop(0.35, 'rgba(255,245,230,0.1)');
+    lac.addColorStop(0.7, 'rgba(255,245,230,0)');
+    lac.addColorStop(1, 'rgba(45,28,18,0.3)');
+    c.fillStyle = lac;
+    c.fillRect(0, top, W, band);
+    sheen(c, W * 0.2, top, W * 0.6, band, 0.12);
+    hiLine(c, 0, top, W, 0.5, 2.5);
+    c.fillStyle = 'rgba(45,28,18,0.1)';
+    c.fillRect(0, top - 1, W, 1);
+    // a few landed sakura petals with contact shadows near the tablet and by the jar
     const pr = rng(515);
-    for (let i = 0; i < 4; i++) {
-      petal(
-        c,
-        L.phone.x + L.phone.w + 10 + pr() * 60,
-        top + band * (0.35 + pr() * 0.5),
-        3 + pr() * 1.5,
-        pr() * 6.28,
-        i % 2 ? PINK_L : PINK
-      );
+    for (let i = 0; i < 6; i++) {
+      const ppx = i < 4 ? L.phone.x + L.phone.w + 10 + pr() * 70 : L.tipJar.x - 90 + pr() * 40;
+      const ppy = top + band * (0.3 + pr() * 0.55);
+      c.fillStyle = 'rgba(45,28,18,0.14)';
+      ellipse(c, ppx + 1, ppy + 1.2, 3.6, 1.3);
+      c.fill();
+      petal(c, ppx, ppy, 3 + pr() * 1.5, pr() * 6.28, i % 2 ? PINK_L : PINK);
     }
     // a small bamboo tray with chopsticks beside the register
     const tx = L.tipJar.x - 50;
     const ty = L.register.y + L.register.h;
-    softShadow(c, tx, ty, 26, 5, 0.18);
-    c.fillStyle = vGrad(c, ty - 8, ty, '#d9b07a', '#b58b4e');
+    softShadow(c, tx, ty, 26, 5, 0.22);
+    c.fillStyle = vGrad(c, ty - 8, ty, '#dcb67f', '#ad8347');
     roundRect(c, tx - 24, ty - 8, 48, 8, 2);
     c.fill();
     stroke(c);
+    hiLine(c, tx - 22, ty - 7.5, 44, 0.3, 1);
     c.strokeStyle = '#8a5e3e';
     c.lineWidth = 1.6;
     c.lineCap = 'round';
@@ -2862,19 +3484,68 @@ export function drawSalonFront(
   c.restore();
 }
 
+/** The window's light patch on the floor/counter: a trapezoid from the sill, split by the lattice bars. */
+function lightPatch(
+  lc: Ctx,
+  g: Geo,
+  H: number,
+  col: string,
+  spread: number,
+  shift: number,
+  barAlpha: number
+) {
+  const { x, y, w, h } = g.win;
+  const top = y + h;
+  const bl = x - w * spread + w * shift;
+  const br = x + w + w * spread + w * shift;
+  // the patch fades with distance from the window (softer near the counter)
+  const a = Number(/([\d.]+)\)$/.exec(col)?.[1] ?? '0.2');
+  const rgb = col.slice(0, col.lastIndexOf(','));
+  const gr = lc.createLinearGradient(0, top, 0, H);
+  gr.addColorStop(0, `${rgb},${a})`);
+  gr.addColorStop(0.55, `${rgb},${a * 0.6})`);
+  gr.addColorStop(1, `${rgb},${a * 0.15})`);
+  lc.fillStyle = gr;
+  lc.beginPath();
+  lc.moveTo(x, top);
+  lc.lineTo(x + w, top);
+  lc.lineTo(br, H);
+  lc.lineTo(bl, H);
+  lc.closePath();
+  lc.fill();
+  if (barAlpha > 0) {
+    // shadows of the two vertical bars and the horizontal one
+    lc.strokeStyle = `rgba(45,28,18,${barAlpha})`;
+    lc.lineWidth = w * 0.014;
+    for (const fx of [1 / 3, 2 / 3]) {
+      lc.beginPath();
+      lc.moveTo(x + w * fx, top);
+      lc.lineTo(bl + (br - bl) * fx, H);
+      lc.stroke();
+    }
+    const hy = top + (H - top) * 0.45;
+    lc.lineWidth = w * 0.01;
+    lc.beginPath();
+    lc.moveTo(x + (bl - x) * 0.45, hy);
+    lc.lineTo(x + w + (br - x - w) * 0.45, hy);
+    lc.stroke();
+  }
+}
+
 export function drawSalonLight(c: Ctx, W: number, H: number, decor: DecorState, tod: Tod): void {
   const L = TOD_LIGHT[tod];
   const g = geo(W, H, decor);
   const base = `salon:light:${W}x${H}:${tod}:${decor.lamba}:${g.lamps.length}`;
   const dark = tod === 'aksam' || tod === 'gunbatimi';
-  // layer 1 (multiply): ambient colour + cool corners at dusk/night
+  const { x, y, w, h } = g.win;
+  // layer 1 (multiply): ambient colour + cool corners at dusk/night, lantern pools kept bright
   const mul = dark
     ? sprite(
         base + ':mul',
         W,
         H,
         (lc) => {
-          lc.fillStyle = tod === 'aksam' ? '#8f97c9' : '#f3c9a5';
+          lc.fillStyle = tod === 'aksam' ? '#737cb3' : '#f5cfae';
           lc.fillRect(0, 0, W, H);
           for (const [cx, cy] of [
             [0, 0],
@@ -2888,65 +3559,83 @@ export function drawSalonLight(c: Ctx, W: number, H: number, decor: DecorState, 
             lc.fillStyle = gr;
             lc.fillRect(0, 0, W, H);
           }
-          // the lantern pools stay bright in the multiply layer
           for (const l of g.lamps) {
             const ly = l.y + 30;
-            const gr = lc.createRadialGradient(l.x, ly, 0, l.x, ly, Math.min(W, H) * 0.5);
-            gr.addColorStop(0, `rgba(255,240,215,${0.9 * L.lamp})`);
-            gr.addColorStop(0.5, `rgba(255,235,205,${0.35 * L.lamp})`);
-            gr.addColorStop(1, 'rgba(255,235,205,0)');
+            const gr = lc.createRadialGradient(l.x, ly, 0, l.x, ly, Math.min(W, H) * 0.6);
+            gr.addColorStop(0, `rgba(255,236,205,${0.98 * L.lamp})`);
+            gr.addColorStop(0.35, `rgba(255,230,195,${0.6 * L.lamp})`);
+            gr.addColorStop(0.7, `rgba(255,225,190,${0.2 * L.lamp})`);
+            gr.addColorStop(1, 'rgba(255,225,190,0)');
             lc.fillStyle = gr;
             lc.fillRect(0, 0, W, H);
+          }
+          if (tod === 'gunbatimi') {
+            // the sun patch stays fully bright in the multiply layer
+            lightPatch(lc, g, H, 'rgba(255,250,235,0.9)', 0.65, -0.55, 0);
           }
         },
         0.25
       )
     : null;
-  // layer 2 (normal): window light patch, warm glows, vignette
+  // layer 2 (normal): window light patch, god-rays, warm glows, vignette
   const over = sprite(
     base + ':over',
     W,
     H,
     (lc) => {
       if (tod === 'sabah') {
-        lc.fillStyle = rgba(L.tint, L.alpha * 0.8);
+        // cool-pink morning: a pale tint, soft long light from the window
+        lc.fillStyle = 'rgba(255,228,222,0.1)';
         lc.fillRect(0, 0, W, H);
-      }
-      const { x, y, w, h } = g.win;
-      const patch: Record<Tod, [string, number, number]> = {
-        sabah: ['rgba(255,236,200,0.22)', 0.25, 0.0],
-        ogle: ['rgba(255,255,245,0.14)', 0.1, 0.0],
-        gunbatimi: ['rgba(255,190,120,0.32)', 0.65, -0.55],
-        aksam: ['rgba(150,180,235,0.12)', 0.2, -0.1],
-      };
-      const [pc, spread, shift] = patch[tod];
-      lc.fillStyle = pc;
-      lc.beginPath();
-      lc.moveTo(x, y + h);
-      lc.lineTo(x + w, y + h);
-      lc.lineTo(x + w + w * spread + w * shift, H);
-      lc.lineTo(x - w * spread + w * shift, H);
-      lc.closePath();
-      lc.fill();
-      if (tod === 'gunbatimi' || tod === 'sabah') {
-        lc.strokeStyle = 'rgba(60,35,20,0.08)';
-        lc.lineWidth = w * 0.012;
-        for (const fx of [1 / 3, 2 / 3]) {
+        lightPatch(lc, g, H, 'rgba(255,236,215,0.24)', 0.45, -0.25, 0.035);
+      } else if (tod === 'ogle') {
+        lightPatch(lc, g, H, 'rgba(255,255,248,0.14)', 0.12, 0, 0.04);
+      } else if (tod === 'gunbatimi') {
+        lightPatch(lc, g, H, 'rgba(255,196,130,0.34)', 0.65, -0.55, 0.08);
+        // god-rays: soft golden shafts from the pane, through the lattice, into the room
+        lc.save();
+        lc.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 3; i++) {
+          const fx0 = i / 3 + 0.03;
+          const fx1 = (i + 1) / 3 - 0.03;
+          const gr = lc.createLinearGradient(x + w * 0.5, y + h * 0.3, x - w * 0.9, H);
+          gr.addColorStop(0, 'rgba(255,210,150,0.2)');
+          gr.addColorStop(0.5, 'rgba(255,195,125,0.09)');
+          gr.addColorStop(1, 'rgba(255,190,120,0)');
+          lc.fillStyle = gr;
           lc.beginPath();
-          lc.moveTo(x + w * fx, y + h);
-          lc.lineTo(x + w * fx + (w * shift + (fx - 0.5) * w * spread * 2), H);
-          lc.stroke();
+          lc.moveTo(x + w * fx0, y + h * 0.3);
+          lc.lineTo(x + w * fx1, y + h * 0.3);
+          lc.lineTo(x + w * fx1 - w * 1.0, H);
+          lc.lineTo(x + w * fx0 - w * 1.25, H);
+          lc.closePath();
+          lc.fill();
         }
+        lc.restore();
+        glow(lc, x + w * 0.25, y + h * 0.5, w * 0.6, '255,220,170', 0.22);
+      } else {
+        lightPatch(lc, g, H, 'rgba(150,180,235,0.1)', 0.2, -0.1, 0);
       }
       if (L.lamp > 0) {
         for (const l of g.lamps) {
           const ly = l.y + 30;
-          const gr = lc.createRadialGradient(l.x, ly, 0, l.x, ly, Math.min(W, H) * 0.32);
-          gr.addColorStop(0, `rgba(255,220,150,${0.5 * L.lamp})`);
-          gr.addColorStop(0.4, `rgba(255,210,140,${0.18 * L.lamp})`);
+          const gr = lc.createRadialGradient(l.x, ly, 0, l.x, ly, Math.min(W, H) * 0.36);
+          gr.addColorStop(0, `rgba(255,224,165,${0.6 * L.lamp})`);
+          gr.addColorStop(0.35, `rgba(255,212,145,${0.24 * L.lamp})`);
           gr.addColorStop(1, 'rgba(255,200,120,0)');
           lc.fillStyle = gr;
           lc.fillRect(0, 0, W, H);
+          // warm pool on the floor / counter below the lamp (an elongated ellipse)
+          const py = g.floorY + g.depth * 0.7;
+          lc.save();
+          lc.translate(l.x, py);
+          lc.scale(1, 0.45);
+          const pg = lc.createRadialGradient(0, 0, 0, 0, 0, W * 0.26);
+          pg.addColorStop(0, `rgba(255,218,155,${0.3 * L.lamp})`);
+          pg.addColorStop(1, 'rgba(255,218,155,0)');
+          lc.fillStyle = pg;
+          lc.fillRect(-W * 0.3, -W * 0.3, W * 0.6, W * 0.6);
+          lc.restore();
         }
       }
       lc.fillStyle = vGrad(lc, 0, H * 0.4, 'rgba(255,240,215,0.08)', 'rgba(255,240,215,0)');
@@ -2954,13 +3643,13 @@ export function drawSalonLight(c: Ctx, W: number, H: number, decor: DecorState, 
       const v = lc.createRadialGradient(
         W / 2,
         H / 2,
-        Math.min(W, H) * 0.45,
+        Math.min(W, H) * 0.42,
         W / 2,
         H / 2,
-        Math.max(W, H) * 0.78
+        Math.max(W, H) * 0.8
       );
-      v.addColorStop(0, 'rgba(60,35,20,0)');
-      v.addColorStop(1, `rgba(60,35,20,${dark ? 0.3 : 0.2})`);
+      v.addColorStop(0, 'rgba(45,28,18,0)');
+      v.addColorStop(1, `rgba(45,28,18,${dark ? 0.34 : 0.22})`);
       lc.fillStyle = v;
       lc.fillRect(0, 0, W, H);
     },

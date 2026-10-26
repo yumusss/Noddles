@@ -196,7 +196,13 @@ interface CatState {
   timer: number;
 }
 
-type DinerX = Diner & { leaveT: number; cuId?: number; mi?: number; seed: number; hidden?: boolean };
+type DinerX = Diner & {
+  leaveT: number;
+  cuId?: number;
+  mi?: number;
+  seed: number;
+  hidden?: boolean;
+};
 
 const COOK_RATE = 8.2;
 const FILL_RATE = 0.62;
@@ -232,6 +238,7 @@ export class DaySession {
     bowl: BowlState | null;
   } | null = null;
   groups = new Map<number, GroupState>();
+  delivery: { cu: Customer; score: number; tone: Bubble['tone']; t: number } | null = null;
   nextId = 0;
   spawnT = 2;
   ledger: DayLedger;
@@ -449,7 +456,15 @@ export class DaySession {
     for (const m of cu.members)
       preloadAvatar(m.look, ['neutral', 'happy', 'love', 'angry', 'worried']);
     if (cu.phone) {
-      if (this.ringing || this.open.length >= MAX_OPEN) return; // try again later
+      // the tablet only rings while nobody is at the counter and no bowl is being judged/paid
+      if (
+        this.ringing ||
+        this.open.length >= MAX_OPEN ||
+        this.counter ||
+        this.pick ||
+        this.delivery
+      )
+        return;
       const m = cu.members[0];
       this.ringing = { id: this.slotId++, cu, mi: 0, waitT: 0, lines: orderLines(m.order) };
       this.ringT = 0;
@@ -645,17 +660,9 @@ export class DaySession {
       this.ledger.tips += complaint ? 0 : tp;
       this.earned += pay + (complaint ? 0 : tp);
       if (!complaint && tp > 0) this.tipCoins += 1;
-      this.pick = {
-        cu,
-        mi: s.mi,
-        phase: 'delivering',
-        t: 0,
-        score: v.score,
-        notes: v.notes,
-        tone,
-        bowl: null,
-      };
+      this.delivery = { cu, score: v.score, tone, t: 0 };
       this.groups.delete(cu.id);
+      this.resetBowl();
     } else {
       this.bowlAt = 'counter';
       this.diners = this.diners.filter((d) => !(d.cuId === cu.id && d.mi === s.mi));
@@ -1081,7 +1088,12 @@ export class DaySession {
       const [px, py] = target.slice(8).split(',').map(Number);
       const b = this.bowlSpace(px, py);
       if (b && inBowl(b.x, b.y, 6))
-        this.place(this.held, b, Math.floor(Math.random() * (PIECE_VARIANTS[this.held] ?? 1)), (Math.random() - 0.5) * 1.2);
+        this.place(
+          this.held,
+          b,
+          Math.floor(Math.random() * (PIECE_VARIANTS[this.held] ?? 1)),
+          (Math.random() - 0.5) * 1.2
+        );
       return;
     }
     if (target.startsWith('tray:')) {
@@ -1165,7 +1177,7 @@ export class DaySession {
           this.target !== null
             ? (phoneSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(phoneSlots))
             : this.pickSlotFromList(phoneSlots);
-        if (s) {
+        if (s && !this.delivery) {
           this.bowlPos = {
             x: S.deliveryBox.x + S.deliveryBox.w / 2,
             y: S.deliveryBox.y + S.deliveryBox.h / 2,
@@ -1180,7 +1192,7 @@ export class DaySession {
           this.target !== null
             ? (walkSlots.find((q) => q.id === this.target) ?? this.pickSlotFromList(walkSlots))
             : this.pickSlotFromList(walkSlots);
-        if (s) {
+        if (s && (!this.pick || this.pick.phase === 'leave')) {
           this.bowlPos = { x: this.pickupX() + S.customer.size * 0.42, y: S.counterTop + 30 };
           this.serve(s, false);
           return;
@@ -1484,6 +1496,7 @@ export class DaySession {
     this.updateCounter(dt);
     // pickup flow
     this.updatePickup(dt);
+    this.updateDelivery(dt);
     // diners
     for (const d of this.diners) {
       d.leaveT -= dt;
@@ -1650,26 +1663,30 @@ export class DaySession {
         }
         break;
       case 'delivering':
-        if (this.scooter) {
-          this.scooter.t += dt;
-          this.scooter.x += dt * 420;
-        }
-        if (pk.t > 1.4 && pk.t - dt <= 1.4)
-          this.setBubble(
-            L('Rüzgar'),
-            T('g.onTheWay') +
-              `${T('g.app')}: "${reactionLine(pk.cu, pk.score)}" ★${(pk.score / 20).toFixed(1)}`,
-            'phone',
-            pk.tone
-          );
-        if (pk.t > 4.2) {
-          this.scooter = null;
-          this.pick = null;
-          this.bowlAt = 'prep';
-          this.resetBowl();
-          this.notify();
-        }
-        break;
+        break; // handled by updateDelivery
+    }
+  }
+
+  private updateDelivery(dt: number) {
+    const d = this.delivery;
+    if (!d) return;
+    d.t += dt;
+    if (this.scooter) {
+      this.scooter.t += dt;
+      this.scooter.x += dt * 420;
+    }
+    if (d.t > 1.4 && d.t - dt <= 1.4)
+      this.setBubble(
+        L('Rüzgar'),
+        T('g.onTheWay') +
+          `${T('g.app')}: "${reactionLine(d.cu, d.score)}" ★${(d.score / 20).toFixed(1)}`,
+        'phone',
+        d.tone
+      );
+    if (d.t > 4.2) {
+      this.scooter = null;
+      this.delivery = null;
+      this.notify();
     }
   }
 
