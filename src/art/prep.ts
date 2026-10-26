@@ -98,8 +98,8 @@ function pickRows(all: Rect[], n: number): Rect[] {
 function landscape(W: number, H: number): PrepLayout {
   const cx = W / 2;
   const wallH = 150;
-  const tub = 92;
-  const gap = 12;
+  const tub = 104;
+  const gap = 10;
   // shelf with 6 bowl slots
   const slotSp = 100;
   const shelfW = 6 * slotSp + 20;
@@ -174,8 +174,8 @@ function landscape(W: number, H: number): PrepLayout {
 function portrait(W: number, H: number): PrepLayout {
   const cx = W / 2;
   const wallH = 170;
-  const tub = 78;
-  const gap = 10;
+  const tub = 88;
+  const gap = 8;
   const slotSp = Math.min(104, (W - 80) / 6);
   const shelfW = 6 * slotSp + 16;
   const shelf = {
@@ -930,9 +930,10 @@ export function drawGauge(
   c.lineTo(lx + 9, yOf(target[0]));
   c.stroke();
   const fs = Math.max(9, Math.min(11, w * 0.17));
-  label(c, 'taşma', lx + 12, yOf(1.12), fs, PAL.tomato, 800, 'left');
-  label(c, 'tam', lx + 12, yOf(1.0) + 1, fs, PAL.ink, 800, 'left');
-  label(c, 'az', lx + 12, yOf(0.3), fs, PAL.inkSoft, 800, 'left');
+  const gl = PREP_LABELS.gauge ?? ['az', 'tam', 'taşma'];
+  label(c, gl[2], lx + 12, yOf(1.12), fs, PAL.tomato, 800, 'left');
+  label(c, gl[1], lx + 12, yOf(1.0) + 1, fs, PAL.ink, 800, 'left');
+  label(c, gl[0], lx + 12, yOf(0.3), fs, PAL.inkSoft, 800, 'left');
   c.restore();
 }
 
@@ -946,8 +947,12 @@ const COOK_ZONES: { to: number; name: string; col: string }[] = [
   { to: 120, name: 'Lapa', col: PAL.tomato },
 ];
 
+/** Optional translated labels the game can set: cook zones (5) and gauge (az/tam/taşma). */
+export const PREP_LABELS = { zones: null as string[] | null, gauge: null as [string, string, string] | null };
+
 export function cookLabel(progress: number): string {
-  for (const z of COOK_ZONES) if (progress < z.to) return z.name;
+  for (let i = 0; i < COOK_ZONES.length; i++)
+    if (progress < COOK_ZONES[i].to) return PREP_LABELS.zones?.[i] ?? COOK_ZONES[i].name;
   return 'Lapa';
 }
 

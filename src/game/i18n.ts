@@ -1,6 +1,10 @@
 // Language state + UI strings. Data strings (ingredients, story, decor…) are Turkish in the
 // data files and translated through `L()` using the map in ./i18n-data.
 import { DATA_EN } from './i18n-data';
+import { clearSprites } from '../art/common';
+import { SALON_LABELS } from '../art/salon';
+import { PREP_LABELS } from '../art/prep';
+import { fmt } from './money';
 
 export type Lang = 'tr' | 'en';
 let lang: Lang = 'tr';
@@ -12,6 +16,14 @@ export function getLang(): Lang {
 export function setLang(l: Lang) {
   lang = l;
   document.documentElement.lang = l;
+  // labels painted into cached canvas scenes
+  SALON_LABELS.open = l === 'tr' ? 'AÇIK' : 'OPEN';
+  SALON_LABELS.tips = l === 'tr' ? 'bahşiş' : 'tips';
+  SALON_LABELS.newOrder = l === 'tr' ? 'Yeni sipariş!' : 'New order!';
+  PREP_LABELS.zones = l === 'tr' ? null : ['Raw', 'Firm', 'Perfect', 'Soft', 'Mushy'];
+  PREP_LABELS.gauge = l === 'tr' ? null : ['low', 'full', 'over'];
+  clearSprites('salon:');
+  clearSprites('prep:');
   for (const f of listeners) f();
 }
 export function onLang(f: () => void) {
@@ -30,8 +42,10 @@ export function T(key: keyof typeof UI, vars?: Record<string, string | number>):
   const e = UI[key];
   let s: string = lang === 'tr' ? e[0] : e[1];
   if (vars)
-    for (const [k, v] of Object.entries(vars))
+    for (const [k, v] of Object.entries(vars)) {
+      s = s.replace(new RegExp(`\\$\\{${k}\\}`, 'g'), fmt(Number(v))); // ${x} = money
       s = s.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    }
   return s;
 }
 
@@ -154,17 +168,17 @@ export const UI = {
   ],
   'g.app': ['Uygulama', 'App'],
   'g.onTheWay': ['Paket yolda! ', 'Delivery on its way! '],
-  'g.lessChange': ['Hmm, {n} ₺ olmalıydı, eksik geldi…', 'Hmm, it should be {n} ₺, that’s short…'],
+  'g.lessChange': ['Hmm, ${n} olmalıydı, eksik geldi…', 'Hmm, it should be ${n}, that’s short…'],
   'g.moreChange': ['Fazla verdin ama… teşekkürler!', 'You gave too much but… thanks!'],
   'g.tipBig': [
-    'Bahşiş kavanozuna {n} ₺ bıraktım. Harikaydı!',
-    'I left {n} ₺ in the tip jar. That was wonderful!',
+    'Bahşiş kavanozuna ${n} bıraktım. Harikaydı!',
+    'I left ${n} in the tip jar. That was wonderful!',
   ],
-  'g.tipSmall': ['Bahşiş: {n} ₺. Teşekkürler şef!', 'Tip: {n} ₺. Thanks, chef!'],
+  'g.tipSmall': ['Bahşiş: ${n}. Teşekkürler şef!', 'Tip: ${n}. Thanks, chef!'],
   'g.noTip': ['Bahşiş yok bu sefer.', 'No tip this time.'],
-  'g.bill': ['{who}Hesap {p} ₺. Buyur {g} ₺{rest}.', '{who}The bill is {p} ₺. Here’s {g} ₺{rest}.'],
+  'g.bill': ['{who}Hesap ${p}. Buyur ${g}{rest}.', '{who}The bill is ${p}. Here’s ${g}{rest}.'],
   'g.billAll': ['Hepsi benden. ', 'It’s all on me. '],
-  'g.changeWillBe': [', para üstü {n} ₺ olacak', ', change will be {n} ₺'],
+  'g.changeWillBe': [', para üstü ${n} olacak', ', change will be ${n}'],
   'g.exactMoney': [', tam para', ', exact amount'],
   'g.complain': ['Hmm, bu doğru değil: {notes}', 'Hmm, that’s not right: {notes}'],
   'g.you': ['Sen', 'You'],
@@ -179,8 +193,8 @@ export const UI = {
   'g.mine': ['Sıra bende: ', 'My turn: '],
   'g.pickup': ['Benim siparişim hazır mı? Geliyorum!', 'Is my order ready? Coming!'],
   'g.tapHint': [
-    'Malzemeyi parmağınla tutup kaseye bırak.',
-    'Pick the topping up with your finger and drop it in the bowl.',
+    'Malzemeyi seçtin. Şimdi kasede istediğin yere dokun; her dokunuş bir parça koyar.',
+    'Topping selected. Now tap anywhere in the bowl; each tap places one piece.',
   ],
   'g.bowlFull': ['Kase doldu!', 'The bowl is full!'],
   'g.bowlFirst': ['Önce kaseyi tezgâha koy.', 'Put the bowl on the counter first.'],

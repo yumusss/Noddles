@@ -6,7 +6,11 @@ import type { Order } from './orders';
 export const DENOMS = [200, 100, 50, 20, 10, 5, 1] as const;
 export type Denom = (typeof DENOMS)[number];
 
-export const fmt = (v: number) => `${v < 0 ? '−' : ''}${Math.abs(v)} ₺`;
+import { getLang } from './i18n';
+
+/** Money: ₺ after the number in Turkish, $ before it in English. */
+export const fmt = (v: number) =>
+  getLang() === 'tr' ? `${v < 0 ? '−' : ''}${Math.abs(v)} ₺` : `${v < 0 ? '−' : ''}$${Math.abs(v)}`;
 
 /** Menu price of an order. */
 export function price(o: Order): number {

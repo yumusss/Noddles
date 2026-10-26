@@ -288,7 +288,7 @@ function Overlays({
                 className={`note n${d}`}
                 disabled={cash.result === 'ok'}
                 onClick={() => s.giveDenom(d)}>
-                {d} ₺
+                {fmt(d)}
               </button>
             ))}
           </div>
@@ -301,7 +301,7 @@ function Overlays({
             )}
             {cash.giving.map((d, i) => (
               <button key={i} className={`note n${d} small`} onClick={() => s.takeBack(i)}>
-                {d} ₺ ✕
+                {fmt(d)} ✕
               </button>
             ))}
           </div>

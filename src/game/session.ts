@@ -76,7 +76,7 @@ import { tipBonus, type DecorState } from './decor';
 import { sfx, buzz } from './audio';
 import { L, T } from './i18n';
 
-export type Phase = 'idle' | 'enter' | 'greet' | 'order' | 'toTable' | 'dayEnd';
+export type Phase = 'idle' | 'enter' | 'greet' | 'order' | 'waiting' | 'toTable' | 'dayEnd';
 export type PickPhase = 'pickup' | 'served' | 'react' | 'complain' | 'pay' | 'leave' | 'delivering';
 
 export interface Bubble {
@@ -196,11 +196,11 @@ interface CatState {
   timer: number;
 }
 
-type DinerX = Diner & { leaveT: number; cuId?: number; mi?: number; seed: number };
+type DinerX = Diner & { leaveT: number; cuId?: number; mi?: number; seed: number; hidden?: boolean };
 
 const COOK_RATE = 8.2;
 const FILL_RATE = 0.62;
-const MAX_OPEN = 3;
+const MAX_OPEN = 2; // one walk-in at the counter + at most one delivery order
 const QUEUE_MAX = 2; // customers wait outside; only one is at the counter at a time
 const INTRO_LEN = 3.6;
 
@@ -277,6 +277,7 @@ export class DaySession {
   private pickY = 0;
   private dayOver = false;
   private tapHintShown = false;
+  held: string | null = null; // topping picked from a tub, placed by tapping the bowl
   onDayEnd: ((r: DayResult) => void) | null = null;
 
   constructor(
@@ -657,8 +658,13 @@ export class DaySession {
       this.groups.delete(cu.id);
     } else {
       this.bowlAt = 'counter';
-      // the member comes from the table to the counter
       this.diners = this.diners.filter((d) => !(d.cuId === cu.id && d.mi === s.mi));
+      const atCounter = this.counter === cu;
+      if (atCounter) {
+        this.counter = null;
+        this.phase = 'idle';
+        this.phaseT = -0.5;
+      }
       this.pick = {
         cu,
         mi: s.mi,
@@ -669,7 +675,7 @@ export class DaySession {
         tone,
         bowl: served,
       };
-      this.pickY = 0;
+      this.pickY = atCounter ? 1 : 0;
       sfx('place');
     }
     this.notify();
@@ -807,6 +813,10 @@ export class DaySession {
         } as DinerX);
     });
     for (const d of this.diners) if (d.cuId === pk.cu.id) d.leaveT = 50 + Math.random() * 50;
+    const mine = this.diners.find((d) => d.cuId === pk.cu.id && d.mi === pk.mi);
+    const sp = mine && mine.seat >= 0 ? this.salL.seats[mine.seat] : null;
+    this.leaveTo = sp ? { x: sp.x, y: sp.y } : { x: -200, y: this.salL.customer.y };
+    if (mine) mine.hidden = true;
     pk.phase = 'leave';
     pk.t = -1.4;
     this.notify();
@@ -863,6 +873,11 @@ export class DaySession {
     if (this.bowlAt === 'prep' || this.bowlAt === 'stove') {
       const r = this.bowlAt === 'prep' ? this.prepL.bowl.size / 2 : this.kamL.bowl.size / 2;
       if (Math.hypot(x - this.bowlPos.x, y - this.bowlPos.y) < r + 14) {
+        if (this.held && this.bowlAt === 'prep') {
+          // a tap places the held topping here; dragging still carries the bowl
+          this.drag = { kind: 'tap', target: `placeAt:${x},${y}`, sx, sy };
+          return;
+        }
         this.drag = { kind: 'bowl', ox: x - this.bowlPos.x, oy: y - this.bowlPos.y };
         this.bowlAt = 'hand';
         sfx('pick');
@@ -981,6 +996,12 @@ export class DaySession {
       d.x = x;
       d.y = y;
     } else if (d.kind === 'tap') {
+      if (d.target.startsWith('placeAt:') && Math.hypot(sx - d.sx, sy - d.sy) > 14) {
+        this.drag = { kind: 'bowl', ox: x - this.bowlPos.x, oy: y - this.bowlPos.y };
+        this.bowlAt = 'hand';
+        sfx('pick');
+        return;
+      }
       if (Math.hypot(sx - d.sx, sy - d.sy) > 14) {
         this.drag = {
           kind: 'pan',
@@ -1012,11 +1033,13 @@ export class DaySession {
     if (d.kind === 'hold') return;
     if (d.kind === 'tub') {
       if (!d.moved) {
-        if (!this.tapHintShown) {
+        this.held = this.held === d.id ? null : d.id;
+        if (this.held && !this.tapHintShown) {
           this.tapHintShown = true;
           this.showToast(T('g.tapHint'));
         }
-        sfx('tap');
+        sfx(this.held ? 'pick' : 'tap');
+        this.notify();
         return;
       }
       if (this.bowlAt !== 'prep') {
@@ -1053,6 +1076,14 @@ export class DaySession {
   }
 
   private tap(target: string) {
+    if (target.startsWith('placeAt:')) {
+      if (!this.held || this.bowlAt !== 'prep') return;
+      const [px, py] = target.slice(8).split(',').map(Number);
+      const b = this.bowlSpace(px, py);
+      if (b && inBowl(b.x, b.y, 6))
+        this.place(this.held, b, Math.floor(Math.random() * (PIECE_VARIANTS[this.held] ?? 1)), (Math.random() - 0.5) * 1.2);
+      return;
+    }
     if (target.startsWith('tray:')) {
       const id = target.slice(5);
       if (this.bowlAt !== 'prep') return this.showToast(T('g.bowlFirst'));
@@ -1482,7 +1513,7 @@ export class DaySession {
           !this.counter &&
           (!this.pick || this.pick.phase === 'delivering') &&
           this.queue.length &&
-          this.open.length < MAX_OPEN &&
+          !this.open.some((o) => !o.cu.phone) &&
           this.phaseT > 0.8
         ) {
           this.counter = this.queue.shift()!;
@@ -1523,15 +1554,14 @@ export class DaySession {
             this.mi++;
             this.startOrder();
           } else {
-            this.phase = 'toTable';
+            this.phase = 'waiting';
             this.phaseT = 0;
-            const seat = this.freeSeat();
-            const sp = seat >= 0 ? this.salL.seats[seat] : null;
-            this.leaveTo = sp ? { x: sp.x, y: sp.y } : { x: -200, y: this.salL.customer.y };
           }
           this.notify();
         }
         break;
+      case 'waiting':
+        break; // stands at the counter until the bowl arrives (serve() takes over)
       case 'toTable':
         this.counterY = Math.max(0, this.counterY - dt * 1.4);
         if (this.phaseT > 0.8 && this.counter) {
@@ -1612,8 +1642,8 @@ export class DaySession {
       case 'pay':
         break; // cash UI
       case 'leave':
-        if (pk.t > 0) this.pickY = Math.max(0, this.pickY - dt * 2.5);
-        if (pk.t > 0.6) {
+        if (pk.t > 1.0) {
+          for (const d of this.diners) if (d.cuId === pk.cu.id) d.hidden = false;
           this.pick = null;
           this.bubble = this.bubble?.at === 'pickup' ? null : this.bubble;
           this.notify();
@@ -1678,7 +1708,7 @@ export class DaySession {
     const tod = this.level.time;
     const opts = {
       rain: !!this.level.rain,
-      diners: this.diners.filter((d) => d.seat >= 0),
+      diners: this.diners.filter((d) => d.seat >= 0 && !d.hidden),
       phoneRinging: !!this.ringing,
       boxOpen: this.open.some((s) => s.cu.phone),
       tipCoins: this.tipCoins,
@@ -1780,7 +1810,18 @@ export class DaySession {
                 : 'angry';
       const size = S.customer.size * (m.look.kid ? 0.82 : 1);
       c.save();
-      c.globalAlpha = this.pickY;
+      let px = this.pickupX();
+      let py = S.customer.y + (1 - this.pickY) * 60;
+      let psize = size;
+      if (pk.phase === 'leave' && pk.t > 0 && this.leaveTo) {
+        // walks off to the table, shrinking into the room
+        const g = Math.min(1, pk.t / 0.9);
+        const ge = g * g;
+        px = lerp(px, this.leaveTo.x, ge);
+        py = lerp(py, this.leaveTo.y + 10, ge);
+        psize = lerp(size, size * 0.55, ge);
+        c.globalAlpha = 1 - Math.max(0, (ge - 0.75) * 4);
+      } else c.globalAlpha = this.pickY;
       drawAvatar(
         c,
         m.look,
@@ -1789,9 +1830,9 @@ export class DaySession {
             ? 'neutral'
             : 'happy'
           : mood,
-        this.pickupX(),
-        S.customer.y + (1 - this.pickY) * 60,
-        size,
+        px,
+        py,
+        psize,
         { pose: 'stand', eating: pk.phase === 'served', bob: Math.sin(t * 2) * 2 }
       );
       c.restore();
@@ -1894,6 +1935,17 @@ export class DaySession {
       c.restore();
       const n = this.bowl.pieces.filter((p) => p.id === id).length;
       if (n) this.countBadge(c, r, n);
+      if (this.held === id) {
+        c.save();
+        c.strokeStyle = rgba(PAL.coral, 0.95);
+        c.lineWidth = 4;
+        c.setLineDash([10, 6]);
+        c.lineDashOffset = -t * 30;
+        c.beginPath();
+        c.roundRect(r.x - 6, r.y - 6, r.w + 12, r.h + 12, 18);
+        c.stroke();
+        c.restore();
+      }
     });
     if (this.bowl.broth || this.bowl.fill > 0) {
       const g = Lp.gauge;
