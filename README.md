@@ -13,8 +13,8 @@ Tek bir dünya: **Salon · Tezgâh · Ocak** yan yana durur, parmakla sağa-sola
 3. Kaseyi parmağınla tut, sağa kaydırıp kamado ocağına koy. Zamanlayıcıyı izle: çiğ → diri → tam kıvam → yumuşak → lapa.
 4. Kaseyi al, sola kaydırıp müşterinin önüne bırak (paket siparişi kapıdaki kutuya).
 5. Müşteri yer, tepki verir, memnuniyet puanı çıkar. Nakit öder ve para üstünü söyler; çekmeceden doğru parayı sen seçersin. Memnuniyete göre bahşiş kavanoza düşer.
-7. Her gün gerçek zamanda 5–10 dakika sürer; müşteriler durmadan gelir ve her birinin sabrı vardır (başının üstündeki çubuk). Hızlı servis = mutlu müşteri, çok bekleyen çeker gider. 5. günden itibaren 2–3 kişilik arkadaş grupları gelir; sırayla sipariş verirler, hesabı tek kişi öder.
-6. Gün sonu defteri: satış, bahşiş, malzeme, israf, kira, faturalar → net kâr. Kazandığın parayla dükkânı dekore et.
+6. Her gün gerçek zamanda 5–10 dakika sürer; müşteriler durmadan gelir ve her birinin sabrı vardır (başının üstündeki çubuk). Hızlı servis = mutlu müşteri, çok bekleyen çeker gider. 5. günden itibaren 2–3 kişilik arkadaş grupları gelir; sırayla sipariş verirler, hesabı tek kişi öder.
+7. Gün sonu defteri: satış, bahşiş, malzeme, israf, kira, faturalar → net kâr. Kazandığın parayla dükkânı dekore et.
 
 ## Özellikler
 

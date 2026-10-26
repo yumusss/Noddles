@@ -426,52 +426,79 @@ const PIECES: Record<string, PieceDrawer> = {
       c.stroke();
     };
     const ph = -0.6 + v * 0.9;
-    const fat = spiralPts(2.1, 0.88, 0.1, ph, 1.2);
-    const meatLine = spiralPts(2.1, 0.74, 0.0, ph + 0.2, 1.0);
+    const fat = spiralPts(1.7, 0.9, 0.12, ph, 1.4);
+    const meatLine = spiralPts(1.7, 0.72, 0.0, ph + 0.35, 1.0);
     // darker meat seam between layers (the roll's layers)
-    strokePts(meatLine, 3.2, 'rgba(95,40,25,0.28)');
+    strokePts(meatLine, 3.6, 'rgba(95,40,25,0.3)');
+    strokePts(meatLine, 1.2, 'rgba(60,25,12,0.3)');
     // muscle fibres: short strokes roughly following the spiral tangent
     c.lineCap = 'round';
-    for (let i = 0; i < 90; i++) {
+    for (let i = 0; i < 110; i++) {
       const x = (rand() - 0.5) * rx * 2;
       const y = (rand() - 0.5) * ry * 2;
       const L = 2.5 + rand() * 6;
       const a = Math.atan2(y, x) + Math.PI / 2 + (rand() - 0.5) * 0.6;
-      c.lineWidth = 0.7 + rand() * 0.9;
-      c.strokeStyle = rand() < 0.55 ? 'rgba(80,32,20,0.25)' : 'rgba(235,185,160,0.2)';
+      c.lineWidth = 0.6 + rand() * 0.9;
+      c.strokeStyle = rand() < 0.55 ? 'rgba(80,32,20,0.26)' : 'rgba(240,190,165,0.22)';
       c.beginPath();
       c.moveTo(x, y);
       c.lineTo(x + Math.cos(a) * L, y + Math.sin(a) * L);
       c.stroke();
     }
-    // fat band: soft shadow under, cream body, pinkish translucent edge, bright core
-    strokePts(fat, 6.5, 'rgba(110,55,35,0.22)');
-    strokePts(fat, 5, 'rgba(236,205,185,0.95)');
-    strokePts(fat, 3.6, '#f5e4d6');
-    strokePts(fat, 1.4, 'rgba(255,248,240,0.75)');
-    // the band's width varies: nibble it with meat-coloured dabs
-    for (let i = 0; i < 14; i++) {
+    // fat band with varying width: drawn as overlapping segments
+    const fatBand = (pts: [number, number][], base: number, col: string, wv: number) => {
+      c.strokeStyle = col;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const t = i / pts.length;
+        const wmul = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * 17 + v * 3)) + Math.sin(t * 41) * 0.15;
+        c.lineWidth = Math.max(0.5, base * (wmul * wv + (1 - wv)));
+        c.beginPath();
+        c.moveTo(pts[i][0], pts[i][1]);
+        c.lineTo(pts[i + 1][0], pts[i + 1][1]);
+        c.stroke();
+      }
+    };
+    fatBand(fat, 8.5, 'rgba(110,55,35,0.2)', 1);
+    fatBand(fat, 7, 'rgba(238,210,192,0.95)', 1);
+    fatBand(fat, 5, '#f6e7da', 1);
+    fatBand(fat, 1.6, 'rgba(255,250,244,0.7)', 0.6);
+    // small intramuscular fat veins
+    c.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
       const p = fat[Math.floor(rand() * fat.length)];
-      c.fillStyle = 'rgba(165,100,78,0.55)';
-      ellipse(c, p[0] + (rand() - 0.5) * 2, p[1] + (rand() - 0.5) * 2, 1.5 + rand() * 2, 1 + rand());
-      c.fill();
+      const a = rand() * TAU;
+      const L = 3 + rand() * 6;
+      c.lineWidth = 1 + rand() * 1.2;
+      c.strokeStyle = 'rgba(245,225,210,0.75)';
+      c.beginPath();
+      c.moveTo(p[0], p[1]);
+      c.quadraticCurveTo(
+        p[0] + Math.cos(a) * L * 0.5 + (rand() - 0.5) * 3,
+        p[1] + Math.sin(a) * L * 0.5 + (rand() - 0.5) * 3,
+        p[0] + Math.cos(a) * L,
+        p[1] + Math.sin(a) * L
+      );
+      c.stroke();
     }
-    // fat cap: thick creamy layer along one part of the rim
+    // fat cap: thick creamy layer along part of the rim (crescent)
     const capA = ph + 0.3;
     c.save();
     c.rotate(capA);
-    c.fillStyle = 'rgba(240,220,202,0.92)';
+    c.lineCap = 'round';
+    c.lineWidth = rmin * 0.22;
+    c.strokeStyle = 'rgba(240,220,202,0.92)';
     c.beginPath();
-    c.ellipse(rmin * 0.72, 0, rmin * 0.26, rmin * 0.5, 0, 0, TAU);
-    c.fill();
-    c.fillStyle = 'rgba(255,246,236,0.5)';
+    c.arc(0, 0, rmin * 0.82, -0.9, 0.9);
+    c.stroke();
+    c.lineWidth = rmin * 0.1;
+    c.strokeStyle = 'rgba(255,246,236,0.55)';
     c.beginPath();
-    c.ellipse(rmin * 0.76, -rmin * 0.08, rmin * 0.12, rmin * 0.3, 0, 0, TAU);
-    c.fill();
-    c.strokeStyle = 'rgba(190,140,120,0.35)';
-    c.lineWidth = 0.8;
+    c.arc(0, 0, rmin * 0.84, -0.7, 0.7);
+    c.stroke();
+    c.lineWidth = 1;
+    c.strokeStyle = 'rgba(190,140,120,0.4)';
     c.beginPath();
-    c.ellipse(rmin * 0.72, 0, rmin * 0.26, rmin * 0.5, 0, 0, TAU);
+    c.arc(0, 0, rmin * 0.71, -0.95, 0.95);
     c.stroke();
     c.restore();
     // seared caramel rim with char flecks (thin, mottled)
@@ -1314,7 +1341,13 @@ const PIECES: Record<string, PieceDrawer> = {
       c.fillRect(x - r * 2, y - r * 2, r * 4, r * 4);
       // pores
       for (let k = 0; k < 4; k++) {
-        dot(c, x + (rand() - 0.5) * r * 1.4, y + (rand() - 0.5) * r * 1.4, 0.4 + rand() * 0.6, 'rgba(120,70,20,0.5)');
+        dot(
+          c,
+          x + (rand() - 0.5) * r * 1.4,
+          y + (rand() - 0.5) * r * 1.4,
+          0.4 + rand() * 0.6,
+          'rgba(120,70,20,0.5)'
+        );
       }
       c.restore();
     };
@@ -1334,7 +1367,13 @@ const PIECES: Record<string, PieceDrawer> = {
     for (let i = 0; i < 14; i++) {
       const t = rand();
       const p = bez(t, P0, P1, P2, P3);
-      dot(c, p[0] + (rand() - 0.5) * 30, p[1] + (rand() - 0.5) * 26, 0.6 + rand(), 'rgba(200,140,60,0.75)');
+      dot(
+        c,
+        p[0] + (rand() - 0.5) * 30,
+        p[1] + (rand() - 0.5) * 26,
+        0.6 + rand(),
+        'rgba(200,140,60,0.75)'
+      );
     }
     // overall light
     spec(c, 8, -14, 14, 6, 0.3, -0.2);
@@ -1945,7 +1984,9 @@ function renderNoodles(
       maxC = 0;
     }
     const ca = rand() * TAU;
-    const cd = Math.sqrt(rand()) * maxC;
+    // irregular nest outline: the usable radius varies with angle
+    const edgeK = 1 + 0.07 * Math.sin(ca * 3 + seed) + 0.05 * Math.sin(ca * 5 + 1.3);
+    const cd = Math.sqrt(rand()) * Math.max(0, maxC - r * (1 - edgeK));
     const cx = Math.cos(ca) * cd;
     const cy = Math.sin(ca) * cd;
     const side = rand() < 0.8 ? spin : -spin;
@@ -2562,10 +2603,10 @@ function bowlBaseSprite(styleId: string, S: number): HTMLCanvasElement {
       // concave shading: deeper centre darker, cast shadow under the top-left rim
       circle(c, 0, 0, inner);
       c.fillStyle = radial(c, inner * 0.12, inner * 0.14, 0, inner * 1.05, [
-        [0, 'rgba(60,35,20,0.10)'],
+        [0, 'rgba(60,35,20,0.12)'],
         [0.55, 'rgba(60,35,20,0.03)'],
-        [0.85, 'rgba(60,35,20,0.08)'],
-        [1, 'rgba(60,35,20,0.26)'],
+        [0.82, 'rgba(60,35,20,0.1)'],
+        [1, 'rgba(60,35,20,0.32)'],
       ]);
       c.fill();
       // reflected light on the bottom-right wall
