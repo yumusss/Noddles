@@ -6,7 +6,15 @@ import SceneCanvas from './SceneCanvas';
 import { salonScene } from './scenes';
 import { sfx } from '../game/audio';
 
-export default function DecorShop({ save, onChange, onBack }: { save: Save; onChange: (cash: number, decor: DecorState, owned: string[]) => void; onBack: () => void }) {
+export default function DecorShop({
+  save,
+  onChange,
+  onBack,
+}: {
+  save: Save;
+  onChange: (cash: number, decor: DecorState, owned: string[]) => void;
+  onBack: () => void;
+}) {
   const [slot, setSlot] = useState<Slot>('duvar');
   const scene = useMemo(() => salonScene(save.decor, 'ogle', false), [save.decor]);
   const items = DECOR.filter((d) => d.slot === slot);
@@ -27,7 +35,10 @@ export default function DecorShop({ save, onChange, onBack }: { save: Save; onCh
       <div className="decor-panel">
         <div className="slot-tabs">
           {SLOTS.map((s) => (
-            <button key={s.id} className={`tab ${slot === s.id ? 'on' : ''}`} onClick={() => setSlot(s.id)}>
+            <button
+              key={s.id}
+              className={`tab ${slot === s.id ? 'on' : ''}`}
+              onClick={() => setSlot(s.id)}>
               {s.name}
             </button>
           ))}
@@ -48,7 +59,10 @@ export default function DecorShop({ save, onChange, onBack }: { save: Save; onCh
                     onChange(save.cash, { ...save.decor, [slot]: it.id }, save.owned);
                   } else if (can) {
                     sfx('coins');
-                    onChange(save.cash - it.price, { ...save.decor, [slot]: it.id }, [...save.owned, it.id]);
+                    onChange(save.cash - it.price, { ...save.decor, [slot]: it.id }, [
+                      ...save.owned,
+                      it.id,
+                    ]);
                   } else sfx('fail');
                 }}>
                 <strong>{it.name}</strong>

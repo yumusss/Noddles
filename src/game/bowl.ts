@@ -70,4 +70,5 @@ export function freeSpot(b: BowlState, rand: () => number, radius = 24): { x: nu
   return best;
 }
 
-export const inBowl = (x: number, y: number, pad = 0) => Math.hypot(x - BOWL_C, y - BOWL_C) <= BOWL_R + pad;
+export const inBowl = (x: number, y: number, pad = 0) =>
+  Math.hypot(x - BOWL_C, y - BOWL_C) <= BOWL_R + pad;

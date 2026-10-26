@@ -93,7 +93,13 @@ function landscape(W: number, H: number): PrepLayout {
   const trH = 74;
   const trX = 40;
   const trY = wallH + 16;
-  for (let i = 0; i < 4; i++) trays.push({ x: trX + (i % 2) * (trW + 14), y: trY + Math.floor(i / 2) * (trH + 12), w: trW, h: trH });
+  for (let i = 0; i < 4; i++)
+    trays.push({
+      x: trX + (i % 2) * (trW + 14),
+      y: trY + Math.floor(i / 2) * (trH + 12),
+      w: trW,
+      h: trH,
+    });
   const thickChips = { x: trX, y: trY + 2 * (trH + 12) + 2, w: 2 * trW + 14, h: 44 };
   // pots: 2 columns × 5 at the right
   const pots: Rect[] = [];
@@ -101,12 +107,25 @@ function landscape(W: number, H: number): PrepLayout {
   const pgap = 10;
   const px0 = W - 40 - 2 * pot - pgap;
   const py0 = wallH + 10;
-  for (let i = 0; i < 10; i++) pots.push({ x: px0 + (i % 2) * (pot + pgap), y: py0 + Math.floor(i / 2) * (pot + pgap), w: pot, h: pot });
+  for (let i = 0; i < 10; i++)
+    pots.push({
+      x: px0 + (i % 2) * (pot + pgap),
+      y: py0 + Math.floor(i / 2) * (pot + pgap),
+      w: pot,
+      h: pot,
+    });
   // gauge between trays and the left tub column
   const gauge = { x: lx - 20 - 64, y: bowlY - 135, w: 64, h: 270 };
   // trash between right tub column and pots
   const trash = { x: rx + tub + 26, y: bowlY + 40, w: 72, h: 84 };
-  const props: Rect[] = [{ x: 36, y: thickChips.y + thickChips.h + 18, w: lx - 100 - 36, h: H - (thickChips.y + thickChips.h + 18) - 16 }];
+  const props: Rect[] = [
+    {
+      x: 36,
+      y: thickChips.y + thickChips.h + 18,
+      w: lx - 100 - 36,
+      h: H - (thickChips.y + thickChips.h + 18) - 16,
+    },
+  ];
   return { bowl, shelf, trays, thickChips, pots, tubs, gauge, trash, wallH, props };
 }
 
@@ -153,7 +172,13 @@ function portrait(W: number, H: number): PrepLayout {
   const px0 = cx - potRow / 2;
   const py0 = r3 + tub + 20;
   const pots: Rect[] = [];
-  for (let i = 0; i < 10; i++) pots.push({ x: px0 + (i % 5) * (pot + pgap), y: py0 + Math.floor(i / 5) * (pot + pgap), w: pot, h: pot });
+  for (let i = 0; i < 10; i++)
+    pots.push({
+      x: px0 + (i % 5) * (pot + pgap),
+      y: py0 + Math.floor(i / 5) * (pot + pgap),
+      w: pot,
+      h: pot,
+    });
   const gauge = { x: 34, y: bowl.y - 135, w: 64, h: 270 };
   const trash = { x: W - 34 - 66, y: bowl.y + 36, w: 66, h: 78 };
   const bottom = py0 + 2 * pot + pgap + 12;
@@ -163,7 +188,14 @@ function portrait(W: number, H: number): PrepLayout {
 
 // ---------------------------------------------------------------- background
 
-export function drawPrepBack(c: Ctx, W: number, H: number, tod: Tod, t: number, L: PrepLayout): void {
+export function drawPrepBack(
+  c: Ctx,
+  W: number,
+  H: number,
+  tod: Tod,
+  t: number,
+  L: PrepLayout
+): void {
   void t;
   const s = sprite(`prep:back:${W}x${H}:${tod}`, W, H, (g) => paintBack(g, W, H, tod, L), 2);
   c.save();
@@ -229,7 +261,14 @@ function paintBack(c: Ctx, W: number, H: number, tod: Tod, L: PrepLayout) {
   speckle(c, 0, L.wallH, W, H - L.wallH, 9, 900, 'rgba(60,35,20,0.05)');
   speckle(c, 0, L.wallH, W, H - L.wallH, 10, 500, 'rgba(255,235,210,0.08)');
   // vignette on the counter
-  const vg = c.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.3, W / 2, H * 0.55, Math.max(W, H) * 0.75);
+  const vg = c.createRadialGradient(
+    W / 2,
+    H * 0.55,
+    Math.min(W, H) * 0.3,
+    W / 2,
+    H * 0.55,
+    Math.max(W, H) * 0.75
+  );
   vg.addColorStop(0, 'rgba(60,35,20,0)');
   vg.addColorStop(1, 'rgba(60,35,20,0.22)');
   c.fillStyle = vg;
@@ -245,7 +284,12 @@ function paintBack(c: Ctx, W: number, H: number, tod: Tod, L: PrepLayout) {
     const off = Math.round(ty / tile) % 2 === 0 ? 0 : tile / 2;
     for (let tx = -tile + off; tx < W + tile; tx += tile) {
       const v = tr();
-      const col = v < 0.12 ? mix(PAL.cream, PAL.sage, 0.3) : v < 0.2 ? mix(PAL.cream, PAL.blush, 0.25) : mix(PAL.cream, PAL.paper, v);
+      const col =
+        v < 0.12
+          ? mix(PAL.cream, PAL.sage, 0.3)
+          : v < 0.2
+            ? mix(PAL.cream, PAL.blush, 0.25)
+            : mix(PAL.cream, PAL.paper, v);
       const tg = c.createLinearGradient(tx, ty, tx, ty + tile);
       tg.addColorStop(0, '#fffdf8');
       tg.addColorStop(1, col);
@@ -361,7 +405,14 @@ function paintBack(c: Ctx, W: number, H: number, tod: Tod, L: PrepLayout) {
     c.fillRect(0, 0, W, H);
   }
   if (tl.lamp > 0) {
-    const lg = c.createRadialGradient(W / 2, L.bowl.y - 80, 40, W / 2, L.bowl.y - 80, Math.max(W, H) * 0.65);
+    const lg = c.createRadialGradient(
+      W / 2,
+      L.bowl.y - 80,
+      40,
+      W / 2,
+      L.bowl.y - 80,
+      Math.max(W, H) * 0.65
+    );
     lg.addColorStop(0, `rgba(255,214,150,${0.32 * tl.lamp})`);
     lg.addColorStop(0.5, `rgba(255,200,130,${0.12 * tl.lamp})`);
     lg.addColorStop(1, 'rgba(255,200,130,0)');
@@ -371,7 +422,15 @@ function paintBack(c: Ctx, W: number, H: number, tod: Tod, L: PrepLayout) {
 }
 
 /** A lighter rounded "placemat" with inner shadow so an empty slot reads as a slot. */
-function coaster(c: Ctx, x: number, y: number, w: number, h: number, rad: number, kind: 'square' | 'round') {
+function coaster(
+  c: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rad: number,
+  kind: 'square' | 'round'
+) {
   const path = () => {
     if (kind === 'round') circle(c, x + w / 2, y + h / 2, w / 2 - 2);
     else roundRect(c, x, y, w, h, rad);
@@ -518,7 +577,14 @@ function board(c: Ctx, x: number, y: number, w: number, h: number, rot: number) 
     const yy = -h / 2 + 10 + r() * (h - 20);
     c.beginPath();
     c.moveTo(-w / 2 + 8, yy);
-    c.bezierCurveTo(-w / 6, yy + (r() - 0.5) * 6, w / 6, yy + (r() - 0.5) * 6, w / 2 - 28, yy + (r() - 0.5) * 4);
+    c.bezierCurveTo(
+      -w / 6,
+      yy + (r() - 0.5) * 6,
+      w / 6,
+      yy + (r() - 0.5) * 6,
+      w / 2 - 28,
+      yy + (r() - 0.5) * 4
+    );
     c.stroke();
   }
   c.strokeStyle = 'rgba(60,35,20,0.25)';
@@ -719,7 +785,16 @@ export function drawSlotLocked(c: Ctx, x: number, y: number, w: number, h: numbe
 
 // ---------------------------------------------------------------- gauge
 
-export function drawGauge(c: Ctx, x: number, y: number, w: number, h: number, fill: number, color: string, target: [number, number]): void {
+export function drawGauge(
+  c: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: number,
+  color: string,
+  target: [number, number]
+): void {
   c.save();
   const tubeW = Math.min(28, w * 0.45);
   const tx = x + 6;
@@ -889,7 +964,10 @@ export function drawCookRing(c: Ctx, x: number, y: number, r: number, progress: 
       g.lineWidth = major ? 1.6 : 1;
       g.beginPath();
       g.moveTo(cx + Math.cos(a) * (ro + 2), cy + Math.sin(a) * (ro + 2));
-      g.lineTo(cx + Math.cos(a) * (ro + (major ? 7 : 4)), cy + Math.sin(a) * (ro + (major ? 7 : 4)));
+      g.lineTo(
+        cx + Math.cos(a) * (ro + (major ? 7 : 4)),
+        cy + Math.sin(a) * (ro + (major ? 7 : 4))
+      );
       g.stroke();
     }
     // tiny icons: a droplet at start (raw), a star at ideal middle

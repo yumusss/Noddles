@@ -1,5 +1,11 @@
 // Ready-made scene drawers for menus and story screens.
-import { drawSalonBack, drawSalonFront, drawSalonLight, salonLayout, type Diner } from '../art/salon';
+import {
+  drawSalonBack,
+  drawSalonFront,
+  drawSalonLight,
+  salonLayout,
+  type Diner,
+} from '../art/salon';
 import { avatarImage, randomLook } from '../art/avatar';
 import { drawCat } from '../art/cat';
 import type { Tod } from '../art/common';
@@ -17,12 +23,12 @@ export function salonScene(decor: DecorState, tod: Tod, rain = false, withCat = 
     const L = salonLayout(W, H, decor);
     for (const d of diners) {
       if (!d.img) d.img = avatarImage(randomLook(d.seed), 'happy', d.eating);
-      d.bob = t * 2 + d.seed;
+      d.bob = Math.sin(t * 2 + d.seed) * 3;
     }
     const ds = diners.filter((d) => d.seat < L.seats.length);
     const o = { rain, diners: ds, tipCoins: 6, lampsOn: tod === 'aksam' || tod === 'gunbatimi' };
     drawSalonBack(c, W, H, decor, tod, t, o);
-    if (withCat) drawCat(c, L.catSpots[0].x, L.catSpots[0].y, 64, 'loaf', t, false);
+    if (withCat) drawCat(c, L.catSpots[1].x, L.catSpots[1].y, 64, 'loaf', t, false);
     drawSalonFront(c, W, H, decor, tod, t, o);
     drawSalonLight(c, W, H, decor, tod);
   };

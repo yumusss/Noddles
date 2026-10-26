@@ -14,11 +14,17 @@ export default function Ending({ save, onMap }: { save: Save; onMap: () => void 
       <div className="ending-card">
         <span className="chip gold">Meydan kurtarıldı!</span>
         <h1>Noddles yaşıyor</h1>
-        <p>Fener Sokağı’nın son noodle dükkânı, mahallenin kalbi oldu. Mochi tezgâhın üstünde mırlıyor, Hana Nine pencerede gülümsüyor.</p>
+        <p>
+          Fener Sokağı’nın son noodle dükkânı, mahallenin kalbi oldu. Mochi tezgâhın üstünde
+          mırlıyor, Hana Nine pencerede gülümsüyor.
+        </p>
         <p className="ending-stats">
           ★ {total}/30 · Kasada {fmt(save.cash)}
         </p>
-        <p className="muted">Üç yıldız toplamak için günleri tekrar oynayabilir, kazandığın parayla dükkânı dekore edebilirsin.</p>
+        <p className="muted">
+          Üç yıldız toplamak için günleri tekrar oynayabilir, kazandığın parayla dükkânı dekore
+          edebilirsin.
+        </p>
         <button className="btn big primary" onClick={onMap}>
           Haritaya dön
         </button>

@@ -1,5 +1,15 @@
 // Customers, their spoken orders, and how a served bowl is judged.
-import { BOWLS, INGREDIENTS, LEVELS, MEAT, ONLINE_NAMES, THICK_LABEL, bowlStyle, unlockedUpTo, type Thick } from './data';
+import {
+  BOWLS,
+  INGREDIENTS,
+  LEVELS,
+  MEAT,
+  ONLINE_NAMES,
+  THICK_LABEL,
+  bowlStyle,
+  unlockedUpTo,
+  type Thick,
+} from './data';
 import { BOWL_C, cookOf, type BowlState, type CookState, COOK_LABEL } from './bowl';
 import { isFeminine, randomLook, type Look } from '../art/avatar';
 
@@ -42,11 +52,49 @@ export interface Customer {
   reactions?: { great: string; ok: string; bad: string };
 }
 
-const FEMALE = ['Ayşe', 'Elif', 'Zeynep', 'Ece', 'Selin', 'Defne', 'Melis', 'Nil', 'İpek', 'Lale', 'Asya', 'Nehir', 'Ada', 'Duru', 'Yuki', 'Mia', 'Sara', 'Deniz'];
-const MALE = ['Mehmet', 'Can', 'Burak', 'Kaan', 'Emre', 'Ozan', 'Yusuf', 'Arda', 'Kerem', 'Tolga', 'Barış', 'Cem', 'Mert', 'Efe', 'Kenji', 'Leo', 'Omar', 'Deniz'];
+const FEMALE = [
+  'Ayşe',
+  'Elif',
+  'Zeynep',
+  'Ece',
+  'Selin',
+  'Defne',
+  'Melis',
+  'Nil',
+  'İpek',
+  'Lale',
+  'Asya',
+  'Nehir',
+  'Ada',
+  'Duru',
+  'Yuki',
+  'Mia',
+  'Sara',
+  'Deniz',
+];
+const MALE = [
+  'Mehmet',
+  'Can',
+  'Burak',
+  'Kaan',
+  'Emre',
+  'Ozan',
+  'Yusuf',
+  'Arda',
+  'Kerem',
+  'Tolga',
+  'Barış',
+  'Cem',
+  'Mert',
+  'Efe',
+  'Kenji',
+  'Leo',
+  'Omar',
+  'Deniz',
+];
 
-const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
-const shuffle = <T,>(a: T[]) => [...a].sort(() => Math.random() - 0.5);
+const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)];
+const shuffle = <T>(a: T[]) => [...a].sort(() => Math.random() - 0.5);
 
 const UNIT: Record<string, string> = {
   chashu: 'dilim chashu',
@@ -175,7 +223,9 @@ export function randomOrder(levelId: number): Order {
   }
   const count = Math.min(
     tops.length,
-    cx === 1 ? 1 + Math.floor(Math.random() * 2) : 2 + Math.floor(Math.random() * (cx >= 3 ? 2 : 1.6))
+    cx === 1
+      ? 1 + Math.floor(Math.random() * 2)
+      : 2 + Math.floor(Math.random() * (cx >= 3 ? 2 : 1.6))
   );
   const chosen: string[] = [];
   const freshTops = tops.filter((t) => fresh.includes(t));
@@ -199,7 +249,8 @@ export function randomOrder(levelId: number): Order {
     const no = tops.filter((t) => !chosen.includes(t));
     if (no.length) o.rules.push({ t: 'no', id: pick(no) });
   }
-  if (cx >= 3 && un.includes('acili') && Math.random() < 0.15 && o.broth !== 'acili') o.rules.push({ t: 'spicy' });
+  if (cx >= 3 && un.includes('acili') && Math.random() < 0.15 && o.broth !== 'acili')
+    o.rules.push({ t: 'spicy' });
   if (cx >= 2 && Math.random() < 0.12) o.rules.push({ t: 'free' });
   if (!o.reqs.length && !o.rules.length) o.reqs.push({ id: pick(tops), mode: 'var' });
   return o;
@@ -218,7 +269,11 @@ const GREETS = [
   'Annem burayı anlata anlata bitiremedi.',
 ];
 const RAIN_GREETS = ['Yağmurda en iyisi sıcak bir kase!', 'Sırılsıklam oldum, ısınmam lazım.'];
-const PHONE_GREETS = ['Alo, Noddles mı?', 'Alo! Paket servis var mı?', 'Merhaba, sipariş vermek istiyorum.'];
+const PHONE_GREETS = [
+  'Alo, Noddles mı?',
+  'Alo! Paket servis var mı?',
+  'Merhaba, sipariş vermek istiyorum.',
+];
 
 interface SpecialDef {
   at: number;
@@ -239,9 +294,25 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       name: 'Silindir Şapkalı Bey',
       greet: 'Hmph. Burası mı meşhur dükkân?',
       text: 'Acılı tantan suyuyla bir ince ramen. Tam 3 dilim chashu, bol acı yağ ve yeşil soğan. Bakalım bu “efsane” neymiş.',
-      order: { thick: 'ince', noodle: 'ramen', broth: 'acili', bowl: null, reqs: [{ id: 'chashu', mode: 'exact', n: 3 }, { id: 'aciyag', mode: 'bol' }, { id: 'yesil', mode: 'var' }], rules: [], cook: 'perfect' },
+      order: {
+        thick: 'ince',
+        noodle: 'ramen',
+        broth: 'acili',
+        bowl: null,
+        reqs: [
+          { id: 'chashu', mode: 'exact', n: 3 },
+          { id: 'aciyag', mode: 'bol' },
+          { id: 'yesil', mode: 'var' },
+        ],
+        rules: [],
+        cook: 'perfect',
+      },
       bonus: 60,
-      reactions: { great: '…Fena değil. Hiç de fena değil. (Şapkasını indirip yüzünü saklar.)', ok: 'Hmph. MegaNoodle bundan iyisini yapar.', bad: 'İşte! Ben demiştim, bu dükkân bitmiş!' },
+      reactions: {
+        great: '…Fena değil. Hiç de fena değil. (Şapkasını indirip yüzünü saklar.)',
+        ok: 'Hmph. MegaNoodle bundan iyisini yapar.',
+        bad: 'İşte! Ben demiştim, bu dükkân bitmiş!',
+      },
     },
   ],
   7: [
@@ -251,9 +322,25 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       name: 'Madam Lezzetova',
       greet: 'Not defterim hazır, şekerim.',
       text: 'Miso suyuyla bir ince soba. Tam 4 parça tofu, 3 shiitake ve biraz yeşil soğan. Erişte diri kalsın. Kusursuz olsun.',
-      order: { thick: 'ince', noodle: 'soba', broth: 'miso', bowl: null, reqs: [{ id: 'tofu', mode: 'exact', n: 4 }, { id: 'mantar', mode: 'exact', n: 3 }, { id: 'yesil', mode: 'biraz' }], rules: [], cook: 'dente' },
+      order: {
+        thick: 'ince',
+        noodle: 'soba',
+        broth: 'miso',
+        bowl: null,
+        reqs: [
+          { id: 'tofu', mode: 'exact', n: 4 },
+          { id: 'mantar', mode: 'exact', n: 3 },
+          { id: 'yesil', mode: 'biraz' },
+        ],
+        rules: [],
+        cook: 'dente',
+      },
       bonus: 100,
-      reactions: { great: 'Dürüst bir kase. Ruhu olan bir mutfak. Beş yıldız!', ok: 'İyi… ama unutulmaz değil. Üç yıldız.', bad: 'Hayal kırıklığı. Bunu yazmak zorundayım.' },
+      reactions: {
+        great: 'Dürüst bir kase. Ruhu olan bir mutfak. Beş yıldız!',
+        ok: 'İyi… ama unutulmaz değil. Üç yıldız.',
+        bad: 'Hayal kırıklığı. Bunu yazmak zorundayım.',
+      },
     },
   ],
   9: [
@@ -263,9 +350,26 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       name: 'Hana Nine',
       greet: 'Bu sefer müşteri benim evladım.',
       text: 'Kemik suyuyla bir orta kalınlıkta ramen. 2 dilim chashu, 2 yumurta, bambu filizi ve bol yeşil soğan. Tam kıvamında. Sınav gibi düşün!',
-      order: { thick: 'orta', noodle: 'ramen', broth: 'tonkotsu', bowl: null, reqs: [{ id: 'chashu', mode: 'exact', n: 2 }, { id: 'yumurta', mode: 'exact', n: 2 }, { id: 'bambu', mode: 'var' }, { id: 'yesil', mode: 'bol' }], rules: [], cook: 'perfect' },
+      order: {
+        thick: 'orta',
+        noodle: 'ramen',
+        broth: 'tonkotsu',
+        bowl: null,
+        reqs: [
+          { id: 'chashu', mode: 'exact', n: 2 },
+          { id: 'yumurta', mode: 'exact', n: 2 },
+          { id: 'bambu', mode: 'var' },
+          { id: 'yesil', mode: 'bol' },
+        ],
+        rules: [],
+        cook: 'perfect',
+      },
       bonus: 100,
-      reactions: { great: 'İşte bu… benim kasem. Hayır, artık senin kasen.', ok: 'Güzel, ama bir şey eksik. Tekrar dene, sen yaparsın.', bad: 'Evladım… Defteri bir daha okumalısın.' },
+      reactions: {
+        great: 'İşte bu… benim kasem. Hayır, artık senin kasen.',
+        ok: 'Güzel, ama bir şey eksik. Tekrar dene, sen yaparsın.',
+        bad: 'Evladım… Defteri bir daha okumalısın.',
+      },
     },
   ],
   10: [
@@ -275,9 +379,25 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       name: 'Madam Lezzetova',
       greet: 'Jüri başkanı olarak buradayım.',
       text: 'Kemik suyuyla bir kalın udon. Tam 2 tempura karides, 3 dilim naruto ve 2 yaprak nori. Şaşırt beni.',
-      order: { thick: 'kalin', noodle: 'udon', broth: 'tonkotsu', bowl: null, reqs: [{ id: 'karides', mode: 'exact', n: 2 }, { id: 'naruto', mode: 'exact', n: 3 }, { id: 'nori', mode: 'exact', n: 2 }], rules: [], cook: 'perfect' },
+      order: {
+        thick: 'kalin',
+        noodle: 'udon',
+        broth: 'tonkotsu',
+        bowl: null,
+        reqs: [
+          { id: 'karides', mode: 'exact', n: 2 },
+          { id: 'naruto', mode: 'exact', n: 3 },
+          { id: 'nori', mode: 'exact', n: 2 },
+        ],
+        rules: [],
+        cook: 'perfect',
+      },
       bonus: 100,
-      reactions: { great: 'Jüri notu: on üzerinden on!', ok: 'Jüri notu: yedi. Fena değil.', bad: 'Jüri notu: üç. Üzgünüm.' },
+      reactions: {
+        great: 'Jüri notu: on üzerinden on!',
+        ok: 'Jüri notu: yedi. Fena değil.',
+        bad: 'Jüri notu: üç. Üzgünüm.',
+      },
     },
     {
       at: 8,
@@ -285,9 +405,26 @@ const SPECIALS: Record<number, SpecialDef[]> = {
       name: 'Baron Kraker',
       greet: '…Merhaba. Bu sefer kılık yok.',
       text: 'Soya suyuyla bir ince pirinç eriştesi. 1 yumurta, bol susam, biraz yeşil soğan ve 2 shiitake. Annemin yaptığı gibi. Sade. Lütfen.',
-      order: { thick: 'ince', noodle: 'pirinc', broth: 'shoyu', bowl: null, reqs: [{ id: 'yumurta', mode: 'exact', n: 1 }, { id: 'susam', mode: 'bol' }, { id: 'yesil', mode: 'biraz' }, { id: 'mantar', mode: 'exact', n: 2 }], rules: [], cook: 'perfect' },
+      order: {
+        thick: 'ince',
+        noodle: 'pirinc',
+        broth: 'shoyu',
+        bowl: null,
+        reqs: [
+          { id: 'yumurta', mode: 'exact', n: 1 },
+          { id: 'susam', mode: 'bol' },
+          { id: 'yesil', mode: 'biraz' },
+          { id: 'mantar', mode: 'exact', n: 2 },
+        ],
+        rules: [],
+        cook: 'perfect',
+      },
       bonus: 150,
-      reactions: { great: 'Annem… tam böyle yapardı. (Gözlerini siler.)', ok: 'Güzel. Ama anneminki daha sıcaktı.', bad: 'Sanırım bazı tatlar geri gelmiyor.' },
+      reactions: {
+        great: 'Annem… tam böyle yapardı. (Gözlerini siler.)',
+        ok: 'Güzel. Ama anneminki daha sıcaktı.',
+        bad: 'Sanırım bazı tatlar geri gelmiyor.',
+      },
     },
   ],
 };
@@ -304,7 +441,18 @@ export function dayCustomers(levelId: number): Customer[] {
   for (let i = 0; i < L.customers; i++) {
     const sp = specials.find((s) => s.at === i);
     if (sp) {
-      out.push({ id: i, name: sp.name, look: { seed: 7, special: sp.look }, phone: false, special: sp.look, greet: sp.greet, text: sp.text, order: sp.order, bonus: sp.bonus, reactions: sp.reactions });
+      out.push({
+        id: i,
+        name: sp.name,
+        look: { seed: 7, special: sp.look },
+        phone: false,
+        special: sp.look,
+        greet: sp.greet,
+        text: sp.text,
+        order: sp.order,
+        bonus: sp.bonus,
+        reactions: sp.reactions,
+      });
       continue;
     }
     const order = randomOrder(levelId);
@@ -315,7 +463,11 @@ export function dayCustomers(levelId: number): Customer[] {
       name: phone ? pick(ONLINE_NAMES) : pick(isFeminine(look) ? FEMALE : MALE),
       look,
       phone,
-      greet: phone ? pick(PHONE_GREETS) : L.rain && Math.random() < 0.5 ? pick(RAIN_GREETS) : pick(GREETS),
+      greet: phone
+        ? pick(PHONE_GREETS)
+        : L.rain && Math.random() < 0.5
+          ? pick(RAIN_GREETS)
+          : pick(GREETS),
       text: orderText(order),
       order,
       bonus: 0,
@@ -344,7 +496,8 @@ export function judge(o: Order, b: BowlState, waitSec: number): Verdict {
   let score = 0;
   // noodle 20
   if (!b.noodle) notes.push('Erişte yok!');
-  else if (o.noodle && b.noodle !== o.noodle) notes.push(`${INGREDIENTS[o.noodle].name} istemiştim`);
+  else if (o.noodle && b.noodle !== o.noodle)
+    notes.push(`${INGREDIENTS[o.noodle].name} istemiştim`);
   else score += 20;
   if (b.noodle && o.thick && b.thick !== o.thick) {
     score -= 8;
@@ -421,7 +574,8 @@ export function judge(o: Order, b: BowlState, waitSec: number): Verdict {
       notes.push('Et yemiyorum demiştim!');
     }
     if (r.t === 'spicy') {
-      const spicy = b.broth === 'acili' || cnt.has('aciyag') || cnt.has('biber') || cnt.has('kimchi');
+      const spicy =
+        b.broth === 'acili' || cnt.has('aciyag') || cnt.has('biber') || cnt.has('kimchi');
       if (!spicy) {
         score -= 20;
         notes.push('Hiç acı değil!');
@@ -449,7 +603,11 @@ export function judge(o: Order, b: BowlState, waitSec: number): Verdict {
   } else if (d === 1) {
     score += 10;
     notes.push(
-      want === 'dente' ? 'Erişte biraz fazla pişmiş' : want === 'soft' ? 'Biraz daha yumuşak olmalıydı' : `Erişte ${COOK_LABEL[cs].toLocaleLowerCase('tr')} olmuş`
+      want === 'dente'
+        ? 'Erişte biraz fazla pişmiş'
+        : want === 'soft'
+          ? 'Biraz daha yumuşak olmalıydı'
+          : `Erişte ${COOK_LABEL[cs].toLocaleLowerCase('tr')} olmuş`
     );
   }
   // distribution
@@ -473,9 +631,16 @@ export function judge(o: Order, b: BowlState, waitSec: number): Verdict {
 }
 
 export function reactionLine(c: Customer, score: number): string {
-  if (c.reactions) return score >= 85 ? c.reactions.great : score >= 55 ? c.reactions.ok : c.reactions.bad;
-  if (score >= 95) return pick(['Bu hayatımda yediğim en iyi noodle!', 'Aşık oldum! Her gün geleceğim!', 'Mükemmel! Ellerine sağlık şef!']);
-  if (score >= 80) return pick(['Çok lezzetli, teşekkürler!', 'Harika olmuş!', 'Tam aradığım tat!']);
+  if (c.reactions)
+    return score >= 85 ? c.reactions.great : score >= 55 ? c.reactions.ok : c.reactions.bad;
+  if (score >= 95)
+    return pick([
+      'Bu hayatımda yediğim en iyi noodle!',
+      'Aşık oldum! Her gün geleceğim!',
+      'Mükemmel! Ellerine sağlık şef!',
+    ]);
+  if (score >= 80)
+    return pick(['Çok lezzetli, teşekkürler!', 'Harika olmuş!', 'Tam aradığım tat!']);
   if (score >= 55) return pick(['Fena değil.', 'İdare eder.', 'Güzel ama…']);
   if (score >= 30) return pick(['Hmm… ben bunu istememiştim.', 'Bu biraz farklı olmuş.']);
   return pick(['Bu ne böyle?!', 'Bir daha gelmem!', 'Ciddi misin şef?']);

@@ -3,7 +3,12 @@ import { drawIngredientIcon, drawBowlIcon } from '../art/food';
 import SceneCanvas from './SceneCanvas';
 import { sfx } from '../game/audio';
 
-const CAT_NAME: Record<string, string> = { noodle: 'Erişte', broth: 'Çorba', sauce: 'Sos', topping: 'Malzeme' };
+const CAT_NAME: Record<string, string> = {
+  noodle: 'Erişte',
+  broth: 'Çorba',
+  sauce: 'Sos',
+  topping: 'Malzeme',
+};
 
 /** "Recipe book page": what opens this day, the star targets and a tip. */
 export default function Unlock({ level, onDone }: { level: Level; onDone: () => void }) {

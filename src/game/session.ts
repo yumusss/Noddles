@@ -1,22 +1,89 @@
 // One working day: customers, the bowl, the three stations, input and rendering.
 import { Engine, type View } from '../core/engine';
 import { PAL, TOD_LIGHT, clamp, lerp, rgba, type Ctx } from '../art/common';
-import { drawBowlTop, drawTub, drawNoodleTray, drawPot, drawBowlIcon, PIECE_SIZE, PIECE_VARIANTS, drawPiece } from '../art/food';
-import { prepLayout, drawPrepBack, drawSlotLocked, drawGauge, drawCookRing, drawPointerHint, type PrepLayout } from '../art/prep';
+import {
+  drawBowlTop,
+  drawTub,
+  drawNoodleTray,
+  drawPot,
+  drawBowlIcon,
+  PIECE_SIZE,
+  PIECE_VARIANTS,
+  drawPiece,
+} from '../art/food';
+import {
+  prepLayout,
+  drawPrepBack,
+  drawSlotLocked,
+  drawGauge,
+  drawCookRing,
+  drawPointerHint,
+  type PrepLayout,
+} from '../art/prep';
 import { kamadoLayout, drawKamadoBack, drawKamadoFront, type KamadoLayout } from '../art/kamado';
-import { salonLayout, drawSalonBack, drawSalonFront, drawSalonLight, type SalonLayout, type Diner } from '../art/salon';
+import {
+  salonLayout,
+  drawSalonBack,
+  drawSalonFront,
+  drawSalonLight,
+  type SalonLayout,
+  type Diner,
+} from '../art/salon';
 import { drawAvatar, avatarImage, randomLook, preloadAvatar, type Mood } from '../art/avatar';
 import { drawCat, type CatPose } from '../art/cat';
 import { drawScooter } from '../art/courier';
 import { ParticleSystem } from '../art/fx';
-import { BOWLS, INGREDIENTS, LEVELS, THICK_LABEL, unlockedUpTo, type Level, type Thick } from './data';
-import { BOWL_C, BOWL_R, BOWL_SPACE, cookOf, freeSpot, inBowl, newBowl, type BowlState, type CookState, COOK_LABEL } from './bowl';
+import {
+  BOWLS,
+  INGREDIENTS,
+  LEVELS,
+  THICK_LABEL,
+  unlockedUpTo,
+  type Level,
+  type Thick,
+} from './data';
+import {
+  BOWL_C,
+  BOWL_R,
+  BOWL_SPACE,
+  cookOf,
+  freeSpot,
+  inBowl,
+  newBowl,
+  type BowlState,
+  type CookState,
+  COOK_LABEL,
+} from './bowl';
 import { dayCustomers, judge, orderLines, reactionLine, starsFor, type Customer } from './orders';
-import { DENOMS, cashGiven, cost, emptyLedger, net, paid, price, sum, tip, type DayLedger, type Denom } from './money';
+import {
+  DENOMS,
+  cashGiven,
+  cost,
+  emptyLedger,
+  net,
+  paid,
+  price,
+  sum,
+  tip,
+  type DayLedger,
+  type Denom,
+} from './money';
 import { tipBonus, type DecorState } from './decor';
 import { sfx, buzz } from './audio';
 
-export type Phase = 'enter' | 'greet' | 'order' | 'ring' | 'cooking' | 'served' | 'eating' | 'react' | 'pay' | 'delivering' | 'leave' | 'dayEnd';
+export type Phase =
+  | 'enter'
+  | 'greet'
+  | 'order'
+  | 'ring'
+  | 'cooking'
+  | 'served'
+  | 'eating'
+  | 'react'
+  | 'pay'
+  | 'delivering'
+  | 'leave'
+  | 'dayEnd';
 
 export interface Bubble {
   name: string;
@@ -70,7 +137,15 @@ export interface UiSnapshot {
 }
 
 type Drag =
-  | { kind: 'pan'; lastX: number; lastT: number; vel: number; startX: number; startY: number; moved: boolean }
+  | {
+      kind: 'pan';
+      lastX: number;
+      lastT: number;
+      vel: number;
+      startX: number;
+      startY: number;
+      moved: boolean;
+    }
   | { kind: 'bowl'; ox: number; oy: number }
   | { kind: 'tub'; id: string; sx: number; sy: number; moved: boolean; x: number; y: number }
   | { kind: 'hold'; id: string }
@@ -90,6 +165,7 @@ interface Fly {
 
 interface CatState {
   pose: CatPose;
+  spot: number;
   x: number;
   y: number;
   tx: number;
@@ -131,14 +207,15 @@ export class DaySession {
   private pointer = { x: 0, y: 0, sx: 0, sy: 0, down: false };
   private flies: Fly[] = [];
   private fx = new ParticleSystem();
-  private cat: CatState = { pose: 'sit', x: 0, y: 0, tx: 0, flip: false, timer: 2 };
-  private diners: (Diner & { leaveT: number; seed: number })[] = [];
+  private cat: CatState = { pose: 'sit', spot: 1, x: 0, y: 0, tx: 0, flip: false, timer: 2 };
+  diners: (Diner & { leaveT: number; seed: number })[] = [];
   private seedCounter = 1;
   private scooter: { x: number; t: number } | null = null;
   private tipCoins: number;
   private heat = 0.15;
   private tutorialDone = new Set<string>();
   private unlocked: Set<string>;
+  private nextUnlock: Set<string>;
   private lastCook: CookState = 'raw';
   private listeners = new Set<() => void>();
   private snap: UiSnapshot | null = null;
@@ -150,7 +227,13 @@ export class DaySession {
   private dayOver = false;
   onDayEnd: ((r: DayResult) => void) | null = null;
 
-  constructor(canvas: HTMLCanvasElement, levelId: number, decor: DecorState, cash: number, tipCoins: number) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    levelId: number,
+    decor: DecorState,
+    cash: number,
+    tipCoins: number
+  ) {
     this.engine = new Engine(canvas);
     this.level = LEVELS[levelId - 1];
     this.customers = dayCustomers(levelId);
@@ -159,6 +242,7 @@ export class DaySession {
     this.cashBefore = cash;
     this.tipCoins = tipCoins;
     this.unlocked = new Set(unlockedUpTo(levelId));
+    this.nextUnlock = new Set(LEVELS[levelId]?.unlock ?? []);
     this.layout(this.engine.view);
     this.engine.onResize = (v) => this.layout(v);
     this.engine.onFrame = (c, v, t, dt) => this.frame(c, v, t, dt);
@@ -167,8 +251,8 @@ export class DaySession {
     // pre-seat a couple of diners
     const seats = this.salL.seats.length;
     for (let i = 0; i < Math.min(2, seats); i++) this.seatDiner(60 + Math.random() * 60);
-    this.cat.x = this.salL.catSpots[0].x;
-    this.cat.y = this.salL.catSpots[0].y;
+    this.cat.x = this.salL.catSpots[1].x;
+    this.cat.y = this.salL.catSpots[1].y;
     this.cat.tx = this.cat.x;
     for (const cu of this.customers) preloadAvatar(cu.look, ['neutral', 'happy']);
     this.bindInput(canvas);
@@ -202,7 +286,14 @@ export class DaySession {
       cash: this.cash ? { ...this.cash, giving: [...this.cash.giving] } : null,
       earned: this.earned,
       cook: this.bowl.noodle ? cookOf(this.bowl) : null,
-      cookWhere: this.bowlAt === 'stove' ? 'stove' : this.bowlAt === 'hand' ? 'hand' : this.bowlAt === 'prep' ? 'prep' : null,
+      cookWhere:
+        this.bowlAt === 'stove'
+          ? 'stove'
+          : this.bowlAt === 'hand'
+            ? 'hand'
+            : this.bowlAt === 'prep'
+              ? 'prep'
+              : null,
       score: this.lastScore,
       toast: this.toast,
       hint: this.currentHint(),
@@ -229,7 +320,8 @@ export class DaySession {
     this.kamL = kamadoLayout(v.W, v.H);
     this.salL = salonLayout(v.W, v.H, this.decor);
     if (this.bowlAt === 'prep') this.bowlPos = { x: v.W + this.prepL.bowl.x, y: this.prepL.bowl.y };
-    if (this.bowlAt === 'stove') this.bowlPos = { x: 2 * v.W + this.kamL.bowl.x, y: this.kamL.bowl.y };
+    if (this.bowlAt === 'stove')
+      this.bowlPos = { x: 2 * v.W + this.kamL.bowl.x, y: this.kamL.bowl.y };
     this.notify();
   }
 
@@ -344,7 +436,11 @@ export class DaySession {
       this.ledger.tips += tp;
       this.earned += pay + tp;
       this.tipCoins += tp > 0 ? 1 : 0;
-      this.pendingReaction = { text: `Uygulama: "${reactionLine(cu, v.score)}" ★${(v.score / 20).toFixed(1)}`, tone: v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad', notes: v.notes };
+      this.pendingReaction = {
+        text: `Uygulama: "${reactionLine(cu, v.score)}" ★${(v.score / 20).toFixed(1)}`,
+        tone: v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad',
+        notes: v.notes,
+      };
       this.pendingPay = { pay, tp };
     } else {
       this.bowlAt = 'counter';
@@ -353,7 +449,11 @@ export class DaySession {
       this.customerMood = 'happy';
       this.customerEating = true;
       sfx('place');
-      this.pendingReaction = { text: reactionLine(cu, v.score), tone: v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad', notes: v.notes.concat(v.praise) };
+      this.pendingReaction = {
+        text: reactionLine(cu, v.score),
+        tone: v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad',
+        notes: v.notes.concat(v.praise),
+      };
       this.pendingPay = { pay, tp };
     }
     this.bubble = null;
@@ -408,11 +508,19 @@ export class DaySession {
       const j = this.salL.tipJar;
       this.fx.emit('coin', j.x + j.w / 2, j.y - 10, Math.min(6, tp), 20);
       sfx('ding');
-      this.setBubble(cu.name, tp >= 10 ? `Bahşiş kavanozuna ${tp} ₺ bıraktım. Harikaydı!` : `Bahşiş: ${tp} ₺. Teşekkürler şef!`, false, 'good');
+      this.setBubble(
+        cu.name,
+        tp >= 10
+          ? `Bahşiş kavanozuna ${tp} ₺ bıraktım. Harikaydı!`
+          : `Bahşiş: ${tp} ₺. Teşekkürler şef!`,
+        false,
+        'good'
+      );
     }
     this.ledger.tips += tp;
     this.earned += tp;
     this.customerMood = tp > 0 ? 'love' : this.customerMood;
+    this.cash = null;
     this.phase = 'leave';
     this.phaseT = -1.6;
     this.notify();
@@ -483,7 +591,8 @@ export class DaySession {
         const id = TOPPINGS[i];
         if (!id || !this.hit(L.tubs[i], lx, y, 6)) continue;
         if (!this.unlocked.has(id)) {
-          this.drag = { kind: 'tap', target: 'locked', sx, sy };
+          if (this.nextUnlock.has(id)) this.drag = { kind: 'tap', target: 'locked', sx, sy };
+          else continue;
           return;
         }
         this.drag = { kind: 'tub', id, sx, sy, moved: false, x, y };
@@ -492,10 +601,7 @@ export class DaySession {
       for (let i = 0; i < L.pots.length; i++) {
         const id = LIQUIDS[i];
         if (!id || !this.hit(L.pots[i], lx, y, 6)) continue;
-        if (!this.unlocked.has(id)) {
-          this.drag = { kind: 'tap', target: 'locked', sx, sy };
-          return;
-        }
+        if (!this.unlocked.has(id)) continue;
         this.drag = { kind: 'hold', id };
         if (this.bowl.broth !== id) {
           if (this.bowl.broth && this.bowl.fill > 0.05) this.ledger.waste += 2;
@@ -519,7 +625,12 @@ export class DaySession {
       }
       if (this.hit(L.thickChips, lx, y, 4)) {
         const k = Math.floor(((lx - L.thickChips.x) / L.thickChips.w) * 3);
-        this.drag = { kind: 'tap', target: 'thick:' + (['ince', 'orta', 'kalin'] as Thick[])[clamp(k, 0, 2)], sx, sy };
+        this.drag = {
+          kind: 'tap',
+          target: 'thick:' + (['ince', 'orta', 'kalin'] as Thick[])[clamp(k, 0, 2)],
+          sx,
+          sy,
+        };
         return;
       }
       if (this.hit(L.trash, lx, y, 6)) {
@@ -542,7 +653,15 @@ export class DaySession {
         return;
       }
     }
-    this.drag = { kind: 'pan', lastX: sx, lastT: performance.now(), vel: 0, startX: sx, startY: sy, moved: false };
+    this.drag = {
+      kind: 'pan',
+      lastX: sx,
+      lastT: performance.now(),
+      vel: 0,
+      startX: sx,
+      startY: sy,
+      moved: false,
+    };
     this.engine.camTarget = null;
     this.engine.camVel = 0;
   }
@@ -571,7 +690,15 @@ export class DaySession {
       d.y = y;
     } else if (d.kind === 'tap') {
       if (Math.hypot(sx - d.sx, sy - d.sy) > 14) {
-        this.drag = { kind: 'pan', lastX: sx, lastT: performance.now(), vel: 0, startX: d.sx, startY: d.sy, moved: true };
+        this.drag = {
+          kind: 'pan',
+          lastX: sx,
+          lastT: performance.now(),
+          vel: 0,
+          startX: d.sx,
+          startY: d.sy,
+          moved: true,
+        };
         this.engine.camTarget = null;
       }
     }
@@ -619,12 +746,14 @@ export class DaySession {
 
   private tap(target: string) {
     const v = this.engine.view;
-    if (target === 'locked') return this.showToast('Bu malzeme henüz defterde yok. İlerleyen günlerde açılacak!');
+    if (target === 'locked')
+      return this.showToast('Bu malzeme henüz defterde yok. İlerleyen günlerde açılacak!');
     if (target.startsWith('tray:')) {
       const id = target.slice(5);
       if (!this.unlocked.has(id)) return this.showToast('Bu erişte henüz menüde değil.');
       if (this.bowlAt !== 'prep') return this.showToast('Önce kaseyi tezgâha koy.');
-      if (this.bowl.progress > 0) return this.showToast('Pişen erişte değiştirilemez. Kaseyi çöpe at.');
+      if (this.bowl.progress > 0)
+        return this.showToast('Pişen erişte değiştirilemez. Kaseyi çöpe at.');
       this.bowl.noodle = id;
       this.bowl.progress = 0;
       this.tutorialDone.add('noodle');
@@ -643,7 +772,8 @@ export class DaySession {
     if (target.startsWith('shelf:')) {
       const id = target.slice(6);
       const b = BOWLS.find((x) => x.id === id)!;
-      if (b.unlock > this.level.id) return this.showToast(`${b.name} kase ${b.unlock}. günde raftan iner.`);
+      if (b.unlock > this.level.id)
+        return this.showToast(`${b.name} kase ${b.unlock}. günde raftan iner.`);
       if (this.bowlAt !== 'prep') return this.showToast('Önce kaseyi tezgâha koy.');
       this.bowl.style = id;
       sfx('pop');
@@ -706,7 +836,14 @@ export class DaySession {
   }
 
   private landFly(f: Fly) {
-    this.bowl.pieces.push({ id: f.id, x: f.bx, y: f.by, rot: Math.random() * Math.PI * 2, v: f.v, s: 0.9 + Math.random() * 0.2 });
+    this.bowl.pieces.push({
+      id: f.id,
+      x: f.bx,
+      y: f.by,
+      rot: Math.random() * Math.PI * 2,
+      v: f.v,
+      s: 0.9 + Math.random() * 0.2,
+    });
     sfx('place');
     this.notify();
   }
@@ -717,7 +854,10 @@ export class DaySession {
     const st = Math.floor(x / v.W);
     const lx = x - st * v.W;
     // stove
-    if (st === 2 && Math.hypot(lx - this.kamL.ring.x, y - this.kamL.ring.y) < this.kamL.ring.r + 40) {
+    if (
+      st === 2 &&
+      Math.hypot(lx - this.kamL.ring.x, y - this.kamL.ring.y) < this.kamL.ring.r + 40
+    ) {
       this.bowlAt = 'stove';
       this.bowlPos = { x: 2 * v.W + this.kamL.bowl.x, y: this.kamL.bowl.y };
       sfx('place');
@@ -731,17 +871,23 @@ export class DaySession {
       const S = this.salL;
       if (cu.phone) {
         if (this.hit(S.deliveryBox, lx, y, 70)) {
-          this.bowlPos = { x: S.deliveryBox.x + S.deliveryBox.w / 2, y: S.deliveryBox.y + S.deliveryBox.h / 2 };
+          this.bowlPos = {
+            x: S.deliveryBox.x + S.deliveryBox.w / 2,
+            y: S.deliveryBox.y + S.deliveryBox.h / 2,
+          };
           this.serve(true);
           return;
         }
         this.showToast('Paket siparişi kapıdaki kutuya bırak.');
       } else if (Math.abs(lx - S.customer.x) < v.W * 0.3 && y < S.counterTop + 140) {
-        this.bowlPos = { x: S.customer.x + 10, y: S.counterTop + 36 };
+        this.bowlPos = { x: S.customer.x + S.customer.size * 0.42, y: S.counterTop + 30 };
         this.serve(false);
         return;
       }
-    } else if (st === 0 && this.bowl.noodle) this.showToast(this.phase === 'ring' ? 'Önce telefona bak!' : 'Müşteri henüz sipariş vermedi.');
+    } else if (st === 0 && this.bowl.noodle)
+      this.showToast(
+        this.phase === 'ring' ? 'Önce telefona bak!' : 'Müşteri henüz sipariş vermedi.'
+      );
     // back to prep
     this.bowlAt = 'prep';
     this.bowlPos = { x: v.W + this.prepL.bowl.x, y: this.prepL.bowl.y };
@@ -768,12 +914,27 @@ export class DaySession {
       c.flip = dir < 0;
       if (Math.abs(c.tx - c.x) < 4) {
         c.x = c.tx;
-        c.pose = (['sit', 'loaf', 'sleep', 'sit', 'stretch'] as CatPose[])[Math.floor(Math.random() * 5)];
+        c.pose = (['sit', 'loaf', 'sleep', 'sit', 'stretch'] as CatPose[])[
+          Math.floor(Math.random() * 5)
+        ];
         c.timer = 4 + Math.random() * 7;
       }
     } else if (c.timer <= 0) {
       const spots = this.salL.catSpots;
-      const s = spots[Math.floor(Math.random() * spots.length)];
+      const i = Math.floor(Math.random() * spots.length);
+      const s = spots[i];
+      if (i !== c.spot && (i === 0 || c.spot === 0)) {
+        // hop between counter and floor: teleport-ish with a little jump
+        c.x = s.x;
+        c.y = s.y;
+        c.tx = s.x;
+        c.spot = i;
+        c.pose = 'sit';
+        c.timer = 5 + Math.random() * 6;
+        sfx('cat');
+        return;
+      }
+      c.spot = i;
       c.tx = s.x;
       c.y = s.y;
       c.pose = 'walk';
@@ -785,7 +946,13 @@ export class DaySession {
     if (this.level.id > 2) return null;
     const v = this.engine.view;
     const cu = this.customer;
-    if (this.phase === 'ring') return { station: 0, x: this.salL.phone.x + this.salL.phone.w / 2, y: this.salL.phone.y, text: 'Telefon çalıyor! Dokun.' };
+    if (this.phase === 'ring')
+      return {
+        station: 0,
+        x: this.salL.phone.x + this.salL.phone.w / 2,
+        y: this.salL.phone.y,
+        text: 'Telefon çalıyor! Dokun.',
+      };
     if (this.phase !== 'cooking' || !cu) return null;
     const o = cu.order;
     const L = this.prepL;
@@ -793,15 +960,33 @@ export class DaySession {
       if (!this.bowl.noodle) {
         const i = NOODLES.indexOf(o.noodle ?? 'ramen');
         const t = L.trays[Math.max(0, i)];
-        return { station: 1, x: v.W + t.x + t.w / 2, y: t.y + t.h / 2, text: `Erişteyi koy: ${o.thick ? THICK_LABEL[o.thick] + ' ' : ''}${INGREDIENTS[o.noodle ?? 'ramen'].name}` };
+        return {
+          station: 1,
+          x: v.W + t.x + t.w / 2,
+          y: t.y + t.h / 2,
+          text: `Erişteyi koy: ${o.thick ? THICK_LABEL[o.thick] + ' ' : ''}${INGREDIENTS[o.noodle ?? 'ramen'].name}`,
+        };
       }
       if (o.thick && this.bowl.thick !== o.thick && this.level.id === 1) {
-        return { station: 1, x: v.W + L.thickChips.x + L.thickChips.w / 2, y: L.thickChips.y + L.thickChips.h / 2, text: `Kalınlık: ${THICK_LABEL[o.thick]}` };
+        return {
+          station: 1,
+          x: v.W + L.thickChips.x + L.thickChips.w / 2,
+          y: L.thickChips.y + L.thickChips.h / 2,
+          text: `Kalınlık: ${THICK_LABEL[o.thick]}`,
+        };
       }
       if (!this.bowl.broth || this.bowl.fill < 0.72) {
         const i = LIQUIDS.indexOf(o.broth ?? 'shoyu');
         const p = L.pots[Math.max(0, i)];
-        return { station: 1, x: v.W + p.x + p.w / 2, y: p.y + p.h / 2, text: this.bowl.fill > 0 ? 'Basılı tut, göstergeyi “tam”a getir' : `Basılı tut ve doldur: ${INGREDIENTS[o.broth ?? 'shoyu'].name}` };
+        return {
+          station: 1,
+          x: v.W + p.x + p.w / 2,
+          y: p.y + p.h / 2,
+          text:
+            this.bowl.fill > 0
+              ? 'Basılı tut, göstergeyi “tam”a getir'
+              : `Basılı tut ve doldur: ${INGREDIENTS[o.broth ?? 'shoyu'].name}`,
+        };
       }
       const cnt = new Map<string, number>();
       for (const p of this.bowl.pieces) cnt.set(p.id, (cnt.get(p.id) ?? 0) + 1);
@@ -811,21 +996,55 @@ export class DaySession {
         if (have < need) {
           const i = TOPPINGS.indexOf(r.id);
           const tb = L.tubs[i];
-          return { station: 1, x: v.W + tb.x + tb.w / 2, y: tb.y + tb.h / 2, text: r.mode === 'exact' ? `${INGREDIENTS[r.id].name}: ${have}/${need} (dokun)` : `${r.mode === 'bol' ? 'Bol ' : ''}${INGREDIENTS[r.id].name} ekle (dokun)` };
+          return {
+            station: 1,
+            x: v.W + tb.x + tb.w / 2,
+            y: tb.y + tb.h / 2,
+            text:
+              r.mode === 'exact'
+                ? `${INGREDIENTS[r.id].name}: ${have}/${need} (dokun)`
+                : `${r.mode === 'bol' ? 'Bol ' : ''}${INGREDIENTS[r.id].name} ekle (dokun)`,
+          };
         }
       }
-      return { station: 1, x: this.bowlPos.x, y: this.bowlPos.y, text: 'Kaseyi tut, sağa kaydırıp ocağa taşı' };
+      return {
+        station: 1,
+        x: this.bowlPos.x,
+        y: this.bowlPos.y,
+        text: 'Kaseyi tut, sağa kaydırıp ocağa taşı',
+      };
     }
     if (this.bowlAt === 'stove') {
       const cs = cookOf(this.bowl);
       const want = o.cook;
-      if (cs === want || (cs === 'soft' && want !== 'soft') || cs === 'burnt') return { station: 2, x: this.bowlPos.x, y: this.bowlPos.y, text: cs === want ? 'Tam zamanı! Kaseyi al, sola kaydır, müşteriye götür' : 'Hemen al!' };
-      return { station: 2, x: 2 * v.W + this.kamL.timer.x, y: this.kamL.timer.y, text: `Bekle… “${COOK_LABEL[want]}” olunca al` };
+      if (cs === want || (cs === 'soft' && want !== 'soft') || cs === 'burnt')
+        return {
+          station: 2,
+          x: this.bowlPos.x,
+          y: this.bowlPos.y,
+          text: cs === want ? 'Tam zamanı! Kaseyi al, sola kaydır, müşteriye götür' : 'Hemen al!',
+        };
+      return {
+        station: 2,
+        x: 2 * v.W + this.kamL.timer.x,
+        y: this.kamL.timer.y,
+        text: `Bekle… “${COOK_LABEL[want]}” olunca al`,
+      };
     }
     if (this.bowlAt === 'hand' && this.bowl.noodle && cookOf(this.bowl) !== 'raw') {
       return cu.phone
-        ? { station: 0, x: this.salL.deliveryBox.x + this.salL.deliveryBox.w / 2, y: this.salL.deliveryBox.y, text: 'Paket kutusuna bırak' }
-        : { station: 0, x: this.salL.customer.x, y: this.salL.counterTop + 30, text: 'Tezgâha, müşterinin önüne bırak' };
+        ? {
+            station: 0,
+            x: this.salL.deliveryBox.x + this.salL.deliveryBox.w / 2,
+            y: this.salL.deliveryBox.y,
+            text: 'Paket kutusuna bırak',
+          }
+        : {
+            station: 0,
+            x: this.salL.customer.x,
+            y: this.salL.counterTop + 30,
+            text: 'Tezgâha, müşterinin önüne bırak',
+          };
     }
     return null;
   }
@@ -865,7 +1084,8 @@ export class DaySession {
       c.restore();
     }
     // bowl in hand on top of everything
-    if (this.bowlAt === 'hand') this.drawTheBowl(c, t, this.prepL.bowl.size * (1 + 0.08 * this.bowlLift), 0.5);
+    if (this.bowlAt === 'hand')
+      this.drawTheBowl(c, t, this.prepL.bowl.size * (1 + 0.08 * this.bowlLift), 0.5);
     this.fx.draw(c);
     c.restore();
   }
@@ -931,7 +1151,14 @@ export class DaySession {
         if (cs === 'perfect') buzz(12);
         this.notify();
       }
-      if (Math.random() < dt * 6) this.fx.emit('steam', this.bowlPos.x + (Math.random() - 0.5) * 80, this.bowlPos.y - 40, 1, 10);
+      if (Math.random() < dt * 6)
+        this.fx.emit(
+          'steam',
+          this.bowlPos.x + (Math.random() - 0.5) * 80,
+          this.bowlPos.y - 40,
+          1,
+          10
+        );
     }
     this.heat = lerp(this.heat, this.bowlAt === 'stove' ? 1 : 0.18, Math.min(1, dt * 2));
     // waiting time
@@ -958,7 +1185,12 @@ export class DaySession {
         }
         break;
       case 'greet':
-        if (this.bubble && this.bubble.shown >= this.bubble.text.length && this.phaseT > 1.4 && cu) {
+        if (
+          this.bubble &&
+          this.bubble.shown >= this.bubble.text.length &&
+          this.phaseT > 1.4 &&
+          cu
+        ) {
           this.phase = 'order';
           this.phaseT = 0;
           this.setBubble(cu.name, cu.text);
@@ -985,18 +1217,36 @@ export class DaySession {
           this.phaseT = 0;
           this.customerEating = false;
           const sc = this.lastScore ?? 0;
-          this.customerMood = sc >= 85 ? 'love' : sc >= 55 ? 'happy' : sc >= 30 ? 'worried' : 'angry';
+          this.customerMood =
+            sc >= 85 ? 'love' : sc >= 55 ? 'happy' : sc >= 30 ? 'worried' : 'angry';
           const notes = this.pendingReaction.notes.slice(0, 2).join(' · ');
-          this.setBubble(cu.name, this.pendingReaction.text + (notes ? `  (${notes})` : ''), false, this.pendingReaction.tone);
+          this.setBubble(
+            cu.name,
+            this.pendingReaction.text + (notes ? `  (${notes})` : ''),
+            false,
+            this.pendingReaction.tone
+          );
           if (sc >= 85) {
             sfx('perfect');
-            this.fx.emit('heart', this.salL.customer.x, this.salL.customer.y - this.salL.customer.size, 5, 30);
+            this.fx.emit(
+              'heart',
+              this.salL.customer.x,
+              this.salL.customer.y - this.salL.customer.size,
+              5,
+              30
+            );
           } else if (sc < 30) sfx('angry');
           else sfx('ding');
         }
         break;
       case 'react':
-        if (this.bubble && this.bubble.shown >= this.bubble.text.length && this.phaseT > 2.2 && cu && this.pendingPay) {
+        if (
+          this.bubble &&
+          this.bubble.shown >= this.bubble.text.length &&
+          this.phaseT > 2.2 &&
+          cu &&
+          this.pendingPay
+        ) {
           this.phase = 'pay';
           this.phaseT = 0;
           const { pay, tp } = this.pendingPay;
@@ -1013,7 +1263,12 @@ export class DaySession {
           this.scooter.x += dt * 420;
         }
         if (this.phaseT > 1.4 && this.pendingReaction && this.bubble === null) {
-          this.setBubble('Rüzgar', 'Paket yolda! ' + this.pendingReaction.text, true, this.pendingReaction.tone);
+          this.setBubble(
+            'Rüzgar',
+            'Paket yolda! ' + this.pendingReaction.text,
+            true,
+            this.pendingReaction.tone
+          );
         }
         if (this.phaseT > 4.2) {
           this.scooter = null;
@@ -1025,7 +1280,8 @@ export class DaySession {
       case 'leave':
         if (this.phaseT > 0 && this.idx >= 0 && this.phaseT < dt * 2) {
           // moment of leaving
-          if (cu && !cu.phone && this.lastScore !== null && this.lastScore >= 55) this.seatDiner(40 + Math.random() * 60);
+          if (cu && !cu.phone && this.lastScore !== null && this.lastScore >= 55)
+            this.seatDiner(40 + Math.random() * 60);
           this.servedBowl = null;
           this.bowlAt = 'prep';
           this.resetBowl();
@@ -1038,7 +1294,7 @@ export class DaySession {
     for (const d of this.diners) {
       d.leaveT -= dt;
       if (!d.img) d.img = avatarImage(randomLook(d.seed), 'happy', true);
-      d.bob = t * 2 + d.seed;
+      d.bob = Math.sin(t * 2 + d.seed) * 3;
     }
     this.diners = this.diners.filter((d) => d.leaveT > 0);
     if (Math.random() < dt / 45) this.seatDiner(50 + Math.random() * 50);
@@ -1058,7 +1314,9 @@ export class DaySession {
       c.fill();
       c.restore();
     }
-    drawBowlTop(c, this.bowl, size, t, { steam: this.bowlAt === 'stove' ? 1 : cookOf(this.bowl) !== 'raw' ? 0.5 : 0 });
+    drawBowlTop(c, this.bowl, size, t, {
+      steam: this.bowlAt === 'stove' ? 1 : cookOf(this.bowl) !== 'raw' ? 0.5 : 0,
+    });
     c.restore();
   }
 
@@ -1077,32 +1335,70 @@ export class DaySession {
     };
     drawSalonBack(c, v.W, v.H, this.decor, tod, t, opts);
     // customer
-    if (cu && !cu.phone && this.idx >= 0 && this.phase !== 'leave' && this.phase !== 'dayEnd' && this.customerY > 0) {
+    if (
+      cu &&
+      !cu.phone &&
+      this.idx >= 0 &&
+      this.phase !== 'leave' &&
+      this.phase !== 'dayEnd' &&
+      this.customerY > 0
+    ) {
       const size = S.customer.size * (cu.look.kid ? 0.82 : 1);
       const y = S.customer.y + (1 - this.customerY) * 90;
       c.save();
       c.globalAlpha = this.customerY;
-      drawAvatar(c, cu.look, this.customerMood, S.customer.x, y, size, { eating: this.customerEating, bob: Math.sin(t * 2) * 2 });
+      drawAvatar(c, cu.look, this.customerMood, S.customer.x, y, size, {
+        eating: this.customerEating,
+        bob: Math.sin(t * 2) * 2,
+      });
       c.restore();
     } else if (cu && !cu.phone && this.phase === 'leave' && this.customerY > 0) {
       c.save();
       c.globalAlpha = this.customerY;
-      drawAvatar(c, cu.look, this.customerMood, S.customer.x + (1 - this.customerY) * 120, S.customer.y, S.customer.size, {});
+      drawAvatar(
+        c,
+        cu.look,
+        this.customerMood,
+        S.customer.x + (1 - this.customerY) * 120,
+        S.customer.y,
+        S.customer.size,
+        {}
+      );
       c.restore();
     }
-    // cat
-    drawCat(c, this.cat.x, this.cat.y, 64, this.cat.pose, t, this.cat.flip);
+    if (this.cat.spot !== 0)
+      drawCat(c, this.cat.x, this.cat.y, 64, this.cat.pose, t, this.cat.flip);
     drawSalonFront(c, v.W, v.H, this.decor, tod, t, opts);
+    if (this.cat.spot === 0)
+      drawCat(c, this.cat.x, this.cat.y, 56, this.cat.pose, t, this.cat.flip);
     // served bowl on the counter
-    if (this.servedBowl && (this.bowlAt === 'counter' || this.bowlAt === 'box') && this.phase !== 'delivering') {
+    if (
+      this.servedBowl &&
+      (this.bowlAt === 'counter' || this.bowlAt === 'box') &&
+      this.phase !== 'delivering'
+    ) {
       c.save();
       c.translate(this.bowlPos.x, this.bowlPos.y);
-      const eaten = this.phase !== 'served' && this.phase !== 'react' ? 0 : this.phase === 'react' ? 1 : Math.min(1, this.phaseT / 2.2);
-      drawBowlTop(c, eaten > 0.6 ? { ...this.servedBowl, pieces: [], fill: this.servedBowl.fill * 0.2 } : this.servedBowl, S.customer.size * 0.55, t, { steam: 0.6 });
+      const eaten =
+        this.phase !== 'served' && this.phase !== 'react'
+          ? 0
+          : this.phase === 'react'
+            ? 1
+            : Math.min(1, this.phaseT / 2.2);
+      drawBowlTop(
+        c,
+        eaten > 0.6
+          ? { ...this.servedBowl, pieces: [], fill: this.servedBowl.fill * 0.2 }
+          : this.servedBowl,
+        S.customer.size * 0.4,
+        t,
+        { steam: 0.6 }
+      );
       c.restore();
     }
     // scooter
-    if (this.scooter) drawScooter(c, this.scooter.x, S.counterTop + 40, 120, t, { rider: true, box: true });
+    if (this.scooter)
+      drawScooter(c, this.scooter.x, S.counterTop + 40, 120, t, { rider: true, box: true });
     drawSalonLight(c, v.W, v.H, this.decor, tod);
     // hint pointer
     const h = this.currentHint();
@@ -1135,10 +1431,7 @@ export class DaySession {
     L.trays.forEach((r, i) => {
       const id = NOODLES[i];
       if (!id) return;
-      if (!this.unlocked.has(id)) {
-        drawSlotLocked(c, r.x, r.y, r.w, r.h);
-        return;
-      }
+      if (!this.unlocked.has(id)) return;
       c.save();
       c.translate(r.x, r.y);
       drawNoodleTray(c, id, this.bowl.thick, r.w, r.h);
@@ -1171,10 +1464,7 @@ export class DaySession {
     L.pots.forEach((r, i) => {
       const id = LIQUIDS[i];
       if (!id) return;
-      if (!this.unlocked.has(id)) {
-        drawSlotLocked(c, r.x, r.y, r.w, r.h);
-        return;
-      }
+      if (!this.unlocked.has(id)) return;
       c.save();
       c.translate(r.x, r.y);
       drawPot(c, id, r.w, r.h, t);
@@ -1187,7 +1477,7 @@ export class DaySession {
       const id = TOPPINGS[i];
       if (!id) return;
       if (!this.unlocked.has(id)) {
-        drawSlotLocked(c, r.x, r.y, r.w, r.h);
+        if (this.nextUnlock.has(id)) drawSlotLocked(c, r.x, r.y, r.w, r.h);
         return;
       }
       c.save();
@@ -1200,7 +1490,16 @@ export class DaySession {
     // gauge
     if (this.bowl.broth || this.bowl.fill > 0) {
       const g = L.gauge;
-      drawGauge(c, g.x, g.y, g.w, g.h, this.bowl.fill, this.bowl.broth ? INGREDIENTS[this.bowl.broth].color : PAL.honey, [0.72, 1.0]);
+      drawGauge(
+        c,
+        g.x,
+        g.y,
+        g.w,
+        g.h,
+        this.bowl.fill,
+        this.bowl.broth ? INGREDIENTS[this.bowl.broth].color : PAL.honey,
+        [0.72, 1.0]
+      );
     }
     // bowl
     c.restore();
@@ -1260,8 +1559,12 @@ export class DaySession {
     if (this.bowlAt === 'stove') this.drawTheBowl(c, t, K.bowl.size);
     c.save();
     c.translate(2 * v.W, 0);
-    drawKamadoFront(c, v.W, v.H, this.level.time, t, { heat: this.heat, cooking: this.bowlAt === 'stove' && !!this.bowl.noodle });
-    if (this.bowlAt === 'stove' && this.bowl.noodle) drawCookRing(c, K.timer.x, K.timer.y, K.timer.r, this.bowl.progress);
+    drawKamadoFront(c, v.W, v.H, this.level.time, t, {
+      heat: this.heat,
+      cooking: this.bowlAt === 'stove' && !!this.bowl.noodle,
+    });
+    if (this.bowlAt === 'stove' && this.bowl.noodle)
+      drawCookRing(c, K.timer.x, K.timer.y, K.timer.r, this.bowl.progress);
     c.restore();
     const h = this.currentHint();
     if (h && h.station === 2) drawPointerHint(c, h.x, h.y, t);
@@ -1270,7 +1573,37 @@ export class DaySession {
 
 // slot orders (index → ingredient id); unlocked ones become usable
 export const NOODLES = ['ramen', 'udon', 'soba', 'pirinc'];
-export const LIQUIDS = ['shoyu', 'miso', 'tavuk', 'acili', 'kori', 'tonkotsu', 'teriyaki', 'fistik', 'tatliaci', 'yakisoba'];
-export const TOPPINGS = ['yesil', 'yumurta', 'chashu', 'pakchoi', 'nori', 'filiz', 'misir', 'mantar', 'aciyag', 'biber', 'tofu', 'kimchi', 'karides', 'naruto', 'lime', 'bambu', 'citir', 'susam'];
+export const LIQUIDS = [
+  'shoyu',
+  'miso',
+  'tavuk',
+  'acili',
+  'kori',
+  'tonkotsu',
+  'teriyaki',
+  'fistik',
+  'tatliaci',
+  'yakisoba',
+];
+export const TOPPINGS = [
+  'yesil',
+  'yumurta',
+  'chashu',
+  'pakchoi',
+  'nori',
+  'filiz',
+  'misir',
+  'mantar',
+  'aciyag',
+  'biber',
+  'tofu',
+  'kimchi',
+  'karides',
+  'naruto',
+  'lime',
+  'bambu',
+  'citir',
+  'susam',
+];
 
 export { DENOMS, BOWL_R };

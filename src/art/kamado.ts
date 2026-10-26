@@ -97,7 +97,14 @@ function paintNook(c: Ctx, W: number, H: number, tod: Tod, L: KamadoLayout) {
   speckle(c, 0, 0, W, floorY, 12, 1400, 'rgba(0,0,0,0.08)');
   speckle(c, 0, 0, W, floorY, 13, 500, 'rgba(255,230,200,0.05)');
   // darker at the top & corners
-  const vg = c.createRadialGradient(W / 2, floorY, Math.min(W, H) * 0.2, W / 2, floorY * 0.6, Math.max(W, H) * 0.85);
+  const vg = c.createRadialGradient(
+    W / 2,
+    floorY,
+    Math.min(W, H) * 0.2,
+    W / 2,
+    floorY * 0.6,
+    Math.max(W, H) * 0.85
+  );
   vg.addColorStop(0, 'rgba(20,10,8,0)');
   vg.addColorStop(1, 'rgba(20,10,8,0.6)');
   c.fillStyle = vg;
@@ -105,7 +112,9 @@ function paintNook(c: Ctx, W: number, H: number, tod: Tod, L: KamadoLayout) {
 
   // ---- window slit (time of day)
   const sky = TOD_LIGHT[tod].sky;
-  const win = land ? { x: W * 0.12, y: H * 0.12, w: 150, h: 230 } : { x: W * 0.08, y: H * 0.09, w: 120, h: 190 };
+  const win = land
+    ? { x: W * 0.12, y: H * 0.12, w: 150, h: 230 }
+    : { x: W * 0.08, y: H * 0.09, w: 120, h: 190 };
   // deep frame
   c.fillStyle = '#2b1d19';
   roundRect(c, win.x - 12, win.y - 12, win.w + 24, win.h + 24, 8);
@@ -120,8 +129,18 @@ function paintNook(c: Ctx, W: number, H: number, tod: Tod, L: KamadoLayout) {
   c.fillStyle = tod === 'aksam' ? 'rgba(30,30,60,0.6)' : 'rgba(111,143,102,0.45)';
   c.beginPath();
   c.moveTo(win.x, win.y + win.h);
-  c.quadraticCurveTo(win.x + win.w * 0.3, win.y + win.h * 0.72, win.x + win.w * 0.6, win.y + win.h * 0.8);
-  c.quadraticCurveTo(win.x + win.w * 0.85, win.y + win.h * 0.86, win.x + win.w, win.y + win.h * 0.78);
+  c.quadraticCurveTo(
+    win.x + win.w * 0.3,
+    win.y + win.h * 0.72,
+    win.x + win.w * 0.6,
+    win.y + win.h * 0.8
+  );
+  c.quadraticCurveTo(
+    win.x + win.w * 0.85,
+    win.y + win.h * 0.86,
+    win.x + win.w,
+    win.y + win.h * 0.78
+  );
   c.lineTo(win.x + win.w, win.y + win.h);
   c.closePath();
   c.fill();
@@ -136,7 +155,14 @@ function paintNook(c: Ctx, W: number, H: number, tod: Tod, L: KamadoLayout) {
       c.fill();
     }
   } else if (tod === 'gunbatimi') {
-    const sun = c.createRadialGradient(win.x + win.w * 0.4, win.y + win.h * 0.62, 2, win.x + win.w * 0.4, win.y + win.h * 0.62, 40);
+    const sun = c.createRadialGradient(
+      win.x + win.w * 0.4,
+      win.y + win.h * 0.62,
+      2,
+      win.x + win.w * 0.4,
+      win.y + win.h * 0.62,
+      40
+    );
     sun.addColorStop(0, 'rgba(255,240,200,0.95)');
     sun.addColorStop(1, 'rgba(255,200,120,0)');
     c.fillStyle = sun;
@@ -250,7 +276,13 @@ function paintNook(c: Ctx, W: number, H: number, tod: Tod, L: KamadoLayout) {
     c.lineTo(sx, railY + 30);
     c.stroke();
     softShadow(c, sx, railY + 30 + sr + 8, sr, sr * 0.3, 0.35);
-    c.fillStyle = vGrad(c, railY + 30, railY + 30 + sr * 2, shade(PAL.latte, 0.1), shade(PAL.latte, -0.25));
+    c.fillStyle = vGrad(
+      c,
+      railY + 30,
+      railY + 30 + sr * 2,
+      shade(PAL.latte, 0.1),
+      shade(PAL.latte, -0.25)
+    );
     circle(c, sx, railY + 30 + sr, sr);
     c.fill();
     c.strokeStyle = 'rgba(60,35,20,0.4)';
@@ -369,11 +401,25 @@ function drawClayBody(c: Ctx, L: KamadoLayout, land: boolean) {
   const path = () => {
     c.beginPath();
     c.moveTo(cx - wTop / 2, top + 10);
-    c.bezierCurveTo(cx - B.w * 0.55, top + B.h * 0.1, cx - B.w * 0.5, bottom - B.h * 0.25, cx - B.w * 0.42, bottom - 16);
+    c.bezierCurveTo(
+      cx - B.w * 0.55,
+      top + B.h * 0.1,
+      cx - B.w * 0.5,
+      bottom - B.h * 0.25,
+      cx - B.w * 0.42,
+      bottom - 16
+    );
     c.quadraticCurveTo(cx - B.w * 0.4, bottom, cx - B.w * 0.36, bottom);
     c.lineTo(cx + B.w * 0.36, bottom);
     c.quadraticCurveTo(cx + B.w * 0.4, bottom, cx + B.w * 0.42, bottom - 16);
-    c.bezierCurveTo(cx + B.w * 0.5, bottom - B.h * 0.25, cx + B.w * 0.55, top + B.h * 0.1, cx + wTop / 2, top + 10);
+    c.bezierCurveTo(
+      cx + B.w * 0.5,
+      bottom - B.h * 0.25,
+      cx + B.w * 0.55,
+      top + B.h * 0.1,
+      cx + wTop / 2,
+      top + 10
+    );
     c.closePath();
   };
   path();
@@ -405,7 +451,14 @@ function drawClayBody(c: Ctx, L: KamadoLayout, land: boolean) {
   }
   // soot near the mouth
   const mouth = mouthRect(L, land);
-  const soot = c.createRadialGradient(mouth.x + mouth.w / 2, mouth.y + mouth.h * 0.4, mouth.w * 0.3, mouth.x + mouth.w / 2, mouth.y + mouth.h * 0.4, mouth.w * 1.1);
+  const soot = c.createRadialGradient(
+    mouth.x + mouth.w / 2,
+    mouth.y + mouth.h * 0.4,
+    mouth.w * 0.3,
+    mouth.x + mouth.w / 2,
+    mouth.y + mouth.h * 0.4,
+    mouth.w * 1.1
+  );
   soot.addColorStop(0, 'rgba(30,15,10,0.55)');
   soot.addColorStop(1, 'rgba(30,15,10,0)');
   c.fillStyle = soot;
@@ -504,7 +557,12 @@ function mouthRect(L: KamadoLayout, land: boolean) {
 // ---------------------------------------------------------------- fire
 
 const EMBER_SEED = rng(777);
-const EMBERS = Array.from({ length: 14 }, () => ({ x: EMBER_SEED(), y: EMBER_SEED(), r: 2 + EMBER_SEED() * 4, ph: EMBER_SEED() * TAU }));
+const EMBERS = Array.from({ length: 14 }, () => ({
+  x: EMBER_SEED(),
+  y: EMBER_SEED(),
+  r: 2 + EMBER_SEED() * 4,
+  ph: EMBER_SEED() * TAU,
+}));
 const FLAME_PH = Array.from({ length: 6 }, () => EMBER_SEED() * TAU);
 
 function flameShape(c: Ctx, x: number, baseY: number, w: number, h: number, t: number, ph: number) {
@@ -516,8 +574,22 @@ function flameShape(c: Ctx, x: number, baseY: number, w: number, h: number, t: n
   c.beginPath();
   c.moveTo(x - w / 2, baseY);
   // fat rounded belly, soft tip
-  c.bezierCurveTo(x - w * 0.75 - sw2 * 2, baseY - h * 0.45, x - w * 0.05 + sw, baseY - h * 0.8, tipX, tipY);
-  c.bezierCurveTo(x + w * 0.1 + sw, baseY - h * 0.8, x + w * 0.75 + sw2 * 2, baseY - h * 0.45, x + w / 2, baseY);
+  c.bezierCurveTo(
+    x - w * 0.75 - sw2 * 2,
+    baseY - h * 0.45,
+    x - w * 0.05 + sw,
+    baseY - h * 0.8,
+    tipX,
+    tipY
+  );
+  c.bezierCurveTo(
+    x + w * 0.1 + sw,
+    baseY - h * 0.8,
+    x + w * 0.75 + sw2 * 2,
+    baseY - h * 0.45,
+    x + w / 2,
+    baseY
+  );
   c.closePath();
 }
 
@@ -597,7 +669,10 @@ function drawFire(c: Ctx, L: KamadoLayout, land: boolean, t: number, heat: numbe
     for (let i = 0; i < n; i++) {
       const fx = cx + (i - (n - 1) / 2) * (m.w * 0.15) + Math.sin(t * 2 + i) * 4;
       const fw = m.w * (0.3 + 0.08 * Math.sin(t * 5 + FLAME_PH[i]));
-      const fh = hmax * (0.7 + 0.3 * Math.abs(Math.sin(t * 3.3 + FLAME_PH[i] * 1.7))) * (i === Math.floor(n / 2) ? 1.15 : 0.85);
+      const fh =
+        hmax *
+        (0.7 + 0.3 * Math.abs(Math.sin(t * 3.3 + FLAME_PH[i] * 1.7))) *
+        (i === Math.floor(n / 2) ? 1.15 : 0.85);
       for (const [c0, c1, c2, sc] of layers) {
         flameShape(c, fx, baseY + 2, fw * sc, fh * sc, t, FLAME_PH[i] + sc * 3);
         const g = c.createLinearGradient(0, baseY - fh * sc, 0, baseY);
@@ -618,7 +693,14 @@ const sparks = new ParticleSystem();
 let lastT = -1;
 let sparkAcc = 0;
 
-export function drawKamadoBack(c: Ctx, W: number, H: number, tod: Tod, t: number, o: { heat: number }): void {
+export function drawKamadoBack(
+  c: Ctx,
+  W: number,
+  H: number,
+  tod: Tod,
+  t: number,
+  o: { heat: number }
+): void {
   const L = kamadoLayout(W, H);
   const land = W >= H;
   const heat = clamp(o.heat, 0, 1);
@@ -647,7 +729,14 @@ export function drawKamadoBack(c: Ctx, W: number, H: number, tod: Tod, t: number
   c.fillStyle = mg;
   c.fillRect(m.x - m.w, m.y, m.w * 3, H - m.y);
   // glow leaking from the top ring onto the bowl's underside is drawn by the game; add a faint hot rim here
-  const rg = c.createRadialGradient(L.ring.x, L.ring.y, L.ring.r * 0.5, L.ring.x, L.ring.y, L.ring.r * 1.4);
+  const rg = c.createRadialGradient(
+    L.ring.x,
+    L.ring.y,
+    L.ring.r * 0.5,
+    L.ring.x,
+    L.ring.y,
+    L.ring.r * 1.4
+  );
   rg.addColorStop(0, `rgba(255,140,60,${0.1 + heat * 0.25})`);
   rg.addColorStop(1, 'rgba(255,140,60,0)');
   c.fillStyle = rg;
@@ -656,7 +745,14 @@ export function drawKamadoBack(c: Ctx, W: number, H: number, tod: Tod, t: number
   c.restore();
 }
 
-export function drawKamadoFront(c: Ctx, W: number, H: number, tod: Tod, t: number, o: { heat: number; cooking: boolean }): void {
+export function drawKamadoFront(
+  c: Ctx,
+  W: number,
+  H: number,
+  tod: Tod,
+  t: number,
+  o: { heat: number; cooking: boolean }
+): void {
   const L = kamadoLayout(W, H);
   const land = W >= H;
   const heat = clamp(o.heat, 0, 1);
@@ -705,7 +801,14 @@ export function drawKamadoFront(c: Ctx, W: number, H: number, tod: Tod, t: numbe
     c.fillRect(0, 0, W, H);
   }
   // vignette
-  const vg = c.createRadialGradient(W / 2, H * 0.55, Math.min(W, H) * 0.45, W / 2, H * 0.55, Math.max(W, H) * 0.8);
+  const vg = c.createRadialGradient(
+    W / 2,
+    H * 0.55,
+    Math.min(W, H) * 0.45,
+    W / 2,
+    H * 0.55,
+    Math.max(W, H) * 0.8
+  );
   vg.addColorStop(0, 'rgba(20,10,8,0)');
   vg.addColorStop(1, 'rgba(20,10,8,0.45)');
   c.fillStyle = vg;

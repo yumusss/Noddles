@@ -13,7 +13,8 @@ export default defineConfig({
       manifest: {
         name: 'Noddles — Noodle Dükkânı',
         short_name: 'Noddles',
-        description: 'Hikâyeli noodle dükkânı oyunu. Siparişleri al, kaseyi hazırla, mahalleyi kurtar.',
+        description:
+          'Hikâyeli noodle dükkânı oyunu. Siparişleri al, kaseyi hazırla, mahalleyi kurtar.',
         lang: 'tr',
         start_url: '/Noddles/',
         scope: '/Noddles/',
@@ -33,7 +34,10 @@ export default defineConfig({
           {
             urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
             handler: 'CacheFirst',
-            options: { cacheName: 'fonts', expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 } },
+            options: {
+              cacheName: 'fonts',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
           },
         ],
       },

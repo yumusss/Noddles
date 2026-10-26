@@ -138,7 +138,11 @@ export default function App() {
         />
       )}
       {screen.s === 'decor' && (
-        <DecorShop save={save} onChange={(cash, decor, owned) => setSave((s) => ({ ...s, cash, decor, owned }))} onBack={() => setScreen({ s: 'map' })} />
+        <DecorShop
+          save={save}
+          onChange={(cash, decor, owned) => setSave((s) => ({ ...s, cash, decor, owned }))}
+          onBack={() => setScreen({ s: 'map' })}
+        />
       )}
       {screen.s === 'intro' && (
         <Story
@@ -152,7 +156,12 @@ export default function App() {
           onDone={() => setScreen({ s: 'unlock', level: screen.level })}
         />
       )}
-      {screen.s === 'unlock' && <Unlock level={LEVELS[screen.level - 1]} onDone={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })} />}
+      {screen.s === 'unlock' && (
+        <Unlock
+          level={LEVELS[screen.level - 1]}
+          onDone={() => setScreen({ s: 'play', level: screen.level, key: Date.now() })}
+        />
+      )}
       {screen.s === 'play' && (
         <Play
           key={screen.key}

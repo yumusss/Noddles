@@ -27,7 +27,14 @@ const HERO: BowlState = {
 
 export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: () => void }) {
   const [pressed, setPressed] = useState(false);
-  const scene = useMemo(() => salonScene({ ...DEFAULT_DECOR, lamba: 'lamba-kagit', bitki: 'bitki-bambu', tablo: 'tablo-fuji' }, 'gunbatimi'), []);
+  const scene = useMemo(
+    () =>
+      salonScene(
+        { ...DEFAULT_DECOR, lamba: 'lamba-kagit', bitki: 'bitki-bambu', tablo: 'tablo-fuji' },
+        'gunbatimi'
+      ),
+    []
+  );
   return (
     <div className="screen title">
       <SceneCanvas draw={scene} className="bg" />
@@ -50,7 +57,11 @@ export default function Title({ hasSave, onPlay }: { hasSave: boolean; onPlay: (
             }}
           />
         </div>
-        <button className={`btn big primary ${pressed ? 'pressed' : ''}`} onPointerDown={() => setPressed(true)} onPointerUp={() => setPressed(false)} onClick={onPlay}>
+        <button
+          className={`btn big primary ${pressed ? 'pressed' : ''}`}
+          onPointerDown={() => setPressed(true)}
+          onPointerUp={() => setPressed(false)}
+          onClick={onPlay}>
           {hasSave ? 'Devam Et' : 'Dükkânı Aç'}
         </button>
         <p className="credits">Karakterler: “Toon Head” — Johan Melin, CC BY 4.0 · DiceBear</p>

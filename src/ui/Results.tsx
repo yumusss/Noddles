@@ -4,7 +4,19 @@ import type { DayResult } from '../game/session';
 import { fmt, net } from '../game/money';
 import { sfx } from '../game/audio';
 
-export default function Results({ level, result, onRetry, onNext, onMap }: { level: Level; result: DayResult; onRetry: () => void; onNext: () => void; onMap: () => void }) {
+export default function Results({
+  level,
+  result,
+  onRetry,
+  onNext,
+  onMap,
+}: {
+  level: Level;
+  result: DayResult;
+  onRetry: () => void;
+  onNext: () => void;
+  onMap: () => void;
+}) {
   const [shown, setShown] = useState(0);
   const l = result.ledger;
   const n = net(l);
@@ -46,14 +58,17 @@ export default function Results({ level, result, onRetry, onNext, onMap }: { lev
           ))}
         </div>
         <p className="avg">
-          Ortalama memnuniyet <strong>%{Math.round(result.avg)}</strong> · {l.bowls} kase · {l.changeMistakes ? `${l.changeMistakes} para üstü hatası` : 'para üstleri kusursuz'}
+          Ortalama memnuniyet <strong>%{Math.round(result.avg)}</strong> · {l.bowls} kase ·{' '}
+          {l.changeMistakes ? `${l.changeMistakes} para üstü hatası` : 'para üstleri kusursuz'}
         </p>
         <table>
           <tbody>
             {rows.map(([k, v, good], i) => (
               <tr key={k} className={shown > i ? 'in' : ''}>
                 <td>{k}</td>
-                <td className={v === 0 ? 'muted' : good ? 'good' : 'bad'}>{v === 0 ? '—' : fmt(v)}</td>
+                <td className={v === 0 ? 'muted' : good ? 'good' : 'bad'}>
+                  {v === 0 ? '—' : fmt(v)}
+                </td>
               </tr>
             ))}
             <tr className={`total ${shown > 7 ? 'in' : ''}`}>
@@ -85,7 +100,11 @@ export default function Results({ level, result, onRetry, onNext, onMap }: { lev
             Harita
           </button>
         </div>
-        {result.stars === 0 && <p className="tip">En az %55 memnuniyet gerekiyor. Siparişi dikkatle oku, göstergeleri izle!</p>}
+        {result.stars === 0 && (
+          <p className="tip">
+            En az %55 memnuniyet gerekiyor. Siparişi dikkatle oku, göstergeleri izle!
+          </p>
+        )}
       </div>
     </div>
   );

@@ -180,26 +180,96 @@ export class ParticleSystem {
       let p: Particle;
       switch (kind) {
         case 'steam':
-          p = { x: px, y: py, vx: (r() - 0.5) * 8, vy: -(26 + r() * 22), life: 0, max: 1.6 + r() * 1.2, size: 18 + r() * 18, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 8,
+            vy: -(26 + r() * 22),
+            life: 0,
+            max: 1.6 + r() * 1.2,
+            size: 18 + r() * 18,
+            kind,
+            seed,
+          };
           break;
         case 'smoke':
-          p = { x: px, y: py, vx: (r() - 0.5) * 10, vy: -(18 + r() * 16), life: 0, max: 2 + r() * 1.5, size: 16 + r() * 16, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 10,
+            vy: -(18 + r() * 16),
+            life: 0,
+            max: 2 + r() * 1.5,
+            size: 16 + r() * 16,
+            kind,
+            seed,
+          };
           break;
         case 'spark':
-          p = { x: px, y: py, vx: (r() - 0.5) * 40, vy: -(70 + r() * 110), life: 0, max: 0.5 + r() * 0.9, size: 5 + r() * 5, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 40,
+            vy: -(70 + r() * 110),
+            life: 0,
+            max: 0.5 + r() * 0.9,
+            size: 5 + r() * 5,
+            kind,
+            seed,
+          };
           break;
         case 'sparkle':
-          p = { x: px, y: py, vx: (r() - 0.5) * 24, vy: -(6 + r() * 18), life: 0, max: 0.7 + r() * 0.7, size: 14 + r() * 14, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 24,
+            vy: -(6 + r() * 18),
+            life: 0,
+            max: 0.7 + r() * 0.7,
+            size: 14 + r() * 14,
+            kind,
+            seed,
+          };
           break;
         case 'heart':
-          p = { x: px, y: py, vx: (r() - 0.5) * 16, vy: -(30 + r() * 25), life: 0, max: 1.2 + r() * 0.8, size: 12 + r() * 10, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 16,
+            vy: -(30 + r() * 25),
+            life: 0,
+            max: 1.2 + r() * 0.8,
+            size: 12 + r() * 10,
+            kind,
+            seed,
+          };
           break;
         case 'coin':
-          p = { x: px, y: py, vx: (r() - 0.5) * 160, vy: -(140 + r() * 120), life: 0, max: 1.1 + r() * 0.4, size: 12 + r() * 6, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 160,
+            vy: -(140 + r() * 120),
+            life: 0,
+            max: 1.1 + r() * 0.4,
+            size: 12 + r() * 6,
+            kind,
+            seed,
+          };
           break;
         case 'drop':
         default:
-          p = { x: px, y: py, vx: (r() - 0.5) * 20, vy: 10 + r() * 30, life: 0, max: 0.6 + r() * 0.5, size: 6 + r() * 5, kind, seed };
+          p = {
+            x: px,
+            y: py,
+            vx: (r() - 0.5) * 20,
+            vy: 10 + r() * 30,
+            life: 0,
+            max: 0.6 + r() * 0.5,
+            size: 6 + r() * 5,
+            kind,
+            seed,
+          };
           break;
       }
       this.parts.push(p);
@@ -321,7 +391,15 @@ export class ParticleSystem {
  * Soft steam wisps rising from a w-wide base at (x,y) up to height h.
  * `t` animates, `strength` 0..1 scales opacity and count. No particle state.
  */
-export function drawSteam(c: Ctx, x: number, y: number, w: number, h: number, t: number, strength = 1): void {
+export function drawSteam(
+  c: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  t: number,
+  strength = 1
+): void {
   if (strength <= 0.01) return;
   c.save();
   c.lineCap = 'round';
@@ -350,7 +428,7 @@ export function drawSteam(c: Ctx, x: number, y: number, w: number, h: number, t:
       bx + drift + Math.cos(t * 0.9 + ph) * w * 0.3,
       y - h * 0.7,
       bx + drift * 1.4,
-      top,
+      top
     );
     c.stroke();
   }

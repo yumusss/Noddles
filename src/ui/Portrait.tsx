@@ -15,11 +15,23 @@ export default function Portrait({ who, mood = 'happy' }: { who: CharId | string
           return;
         }
         if (who === 'mahalle') {
-          drawAvatar(c, randomLook(11), 'happy', W / 2 - s * 0.22, H / 2 + s * 0.45, s * 0.8, { bob: Math.sin(t * 2) });
-          drawAvatar(c, randomLook(29), 'neutral', W / 2 + s * 0.22, H / 2 + s * 0.48, s * 0.8, { bob: Math.cos(t * 2) });
+          drawAvatar(c, randomLook(11), 'happy', W / 2 - s * 0.22, H / 2 + s * 0.45, s * 0.8, {
+            bob: Math.sin(t * 2),
+          });
+          drawAvatar(c, randomLook(29), 'neutral', W / 2 + s * 0.22, H / 2 + s * 0.48, s * 0.8, {
+            bob: Math.cos(t * 2),
+          });
           return;
         }
-        drawAvatar(c, { seed: 1, special: who as 'hana' }, mood, W / 2, H / 2 + s * 0.48, s * 0.96, { bob: Math.sin(t * 2) * 2 });
+        drawAvatar(
+          c,
+          { seed: 1, special: who as 'hana' },
+          mood,
+          W / 2,
+          H / 2 + s * 0.48,
+          s * 0.96,
+          { bob: Math.sin(t * 2) * 2 }
+        );
       }}
     />
   );

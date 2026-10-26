@@ -19,33 +19,96 @@ export const INGREDIENTS: Record<string, Ingredient> = {
   ramen: { id: 'ramen', name: 'Ramen', cat: 'noodle', color: '#f3cf7a', price: 18, cost: 4 },
   udon: { id: 'udon', name: 'Udon', cat: 'noodle', color: '#f7ecd4', price: 20, cost: 5 },
   soba: { id: 'soba', name: 'Soba', cat: 'noodle', color: '#a98466', price: 22, cost: 5 },
-  pirinc: { id: 'pirinc', name: 'Pirinç Eriştesi', cat: 'noodle', color: '#fbf6ec', price: 22, cost: 5 },
+  pirinc: {
+    id: 'pirinc',
+    name: 'Pirinç Eriştesi',
+    cat: 'noodle',
+    color: '#fbf6ec',
+    price: 22,
+    cost: 5,
+  },
   // broths (soups)
   shoyu: { id: 'shoyu', name: 'Soya Suyu', cat: 'broth', color: '#8f4a22', price: 12, cost: 3 },
   miso: { id: 'miso', name: 'Miso', cat: 'broth', color: '#d49a4e', price: 14, cost: 3 },
   tavuk: { id: 'tavuk', name: 'Tavuk Suyu', cat: 'broth', color: '#e5b35a', price: 13, cost: 3 },
   acili: { id: 'acili', name: 'Acılı Tantan', cat: 'broth', color: '#d7432a', price: 16, cost: 4 },
   kori: { id: 'kori', name: 'Köri Suyu', cat: 'broth', color: '#c98a24', price: 15, cost: 4 },
-  tonkotsu: { id: 'tonkotsu', name: 'Kemik Suyu', cat: 'broth', color: '#eedcc0', price: 18, cost: 5 },
+  tonkotsu: {
+    id: 'tonkotsu',
+    name: 'Kemik Suyu',
+    cat: 'broth',
+    color: '#eedcc0',
+    price: 18,
+    cost: 5,
+  },
   // sauces (dry noodles)
-  teriyaki: { id: 'teriyaki', name: 'Teriyaki Sos', cat: 'sauce', color: '#5a2c12', price: 12, cost: 3 },
+  teriyaki: {
+    id: 'teriyaki',
+    name: 'Teriyaki Sos',
+    cat: 'sauce',
+    color: '#5a2c12',
+    price: 12,
+    cost: 3,
+  },
   fistik: { id: 'fistik', name: 'Fıstık Sosu', cat: 'sauce', color: '#b9814a', price: 13, cost: 3 },
-  tatliaci: { id: 'tatliaci', name: 'Tatlı Acı Sos', cat: 'sauce', color: '#d6401c', price: 13, cost: 3 },
-  yakisoba: { id: 'yakisoba', name: 'Yakisoba Sosu', cat: 'sauce', color: '#3f2010', price: 14, cost: 3 },
+  tatliaci: {
+    id: 'tatliaci',
+    name: 'Tatlı Acı Sos',
+    cat: 'sauce',
+    color: '#d6401c',
+    price: 13,
+    cost: 3,
+  },
+  yakisoba: {
+    id: 'yakisoba',
+    name: 'Yakisoba Sosu',
+    cat: 'sauce',
+    color: '#3f2010',
+    price: 14,
+    cost: 3,
+  },
   // toppings
   yesil: { id: 'yesil', name: 'Yeşil Soğan', cat: 'topping', color: '#6fbf73', price: 3, cost: 1 },
-  yumurta: { id: 'yumurta', name: 'Marine Yumurta', cat: 'topping', color: '#f4b942', price: 8, cost: 2 },
+  yumurta: {
+    id: 'yumurta',
+    name: 'Marine Yumurta',
+    cat: 'topping',
+    color: '#f4b942',
+    price: 8,
+    cost: 2,
+  },
   chashu: { id: 'chashu', name: 'Chashu', cat: 'topping', color: '#c57c5c', price: 12, cost: 4 },
   nori: { id: 'nori', name: 'Nori', cat: 'topping', color: '#243d2e', price: 4, cost: 1 },
   pakchoi: { id: 'pakchoi', name: 'Pak Choi', cat: 'topping', color: '#5fae5b', price: 5, cost: 1 },
-  filiz: { id: 'filiz', name: 'Fasulye Filizi', cat: 'topping', color: '#efe9d2', price: 4, cost: 1 },
+  filiz: {
+    id: 'filiz',
+    name: 'Fasulye Filizi',
+    cat: 'topping',
+    color: '#efe9d2',
+    price: 4,
+    cost: 1,
+  },
   misir: { id: 'misir', name: 'Mısır', cat: 'topping', color: '#ffd23f', price: 4, cost: 1 },
   mantar: { id: 'mantar', name: 'Shiitake', cat: 'topping', color: '#7a5034', price: 7, cost: 2 },
   aciyag: { id: 'aciyag', name: 'Acı Yağ', cat: 'topping', color: '#e0301e', price: 3, cost: 1 },
-  biber: { id: 'biber', name: 'Kırmızı Biber', cat: 'topping', color: '#d62828', price: 3, cost: 1 },
+  biber: {
+    id: 'biber',
+    name: 'Kırmızı Biber',
+    cat: 'topping',
+    color: '#d62828',
+    price: 3,
+    cost: 1,
+  },
   tofu: { id: 'tofu', name: 'Kızarmış Tofu', cat: 'topping', color: '#eed7a3', price: 7, cost: 2 },
   kimchi: { id: 'kimchi', name: 'Kimchi', cat: 'topping', color: '#e85d2a', price: 6, cost: 2 },
-  karides: { id: 'karides', name: 'Tempura Karides', cat: 'topping', color: '#ff9a6b', price: 14, cost: 5 },
+  karides: {
+    id: 'karides',
+    name: 'Tempura Karides',
+    cat: 'topping',
+    color: '#ff9a6b',
+    price: 14,
+    cost: 5,
+  },
   naruto: { id: 'naruto', name: 'Naruto', cat: 'topping', color: '#ffd6e0', price: 6, cost: 2 },
   lime: { id: 'lime', name: 'Misket Limonu', cat: 'topping', color: '#9ccc65', price: 3, cost: 1 },
   bambu: { id: 'bambu', name: 'Bambu Filizi', cat: 'topping', color: '#cfae63', price: 6, cost: 2 },
@@ -72,12 +135,66 @@ export interface BowlStyle {
 }
 
 export const BOWLS: BowlStyle[] = [
-  { id: 'kirmizi', name: 'Kırmızı lake', outer: '#c9432f', inner: '#f8ede0', rim: '#2b1b16', pattern: 'none', patternColor: '#2b1b16', unlock: 1 },
-  { id: 'beyaz', name: 'Beyaz porselen', outer: '#f6f1ea', inner: '#fbf8f3', rim: '#8fb7cf', pattern: 'ring', patternColor: '#8fb7cf', unlock: 1 },
-  { id: 'indigo', name: 'İndigo seramik', outer: '#3f4f84', inner: '#eef0f6', rim: '#e9e6dc', pattern: 'wave', patternColor: '#dfe6f2', unlock: 3 },
-  { id: 'siyah', name: 'Siyah mat', outer: '#3a332f', inner: '#efe4d3', rim: '#c99a6b', pattern: 'speckle', patternColor: '#857a70', unlock: 4 },
-  { id: 'seladon', name: 'Seladon yeşil', outer: '#a8c6b5', inner: '#eef5f0', rim: '#7fa892', pattern: 'dots', patternColor: '#7fa892', unlock: 6 },
-  { id: 'sakura', name: 'Sakura desenli', outer: '#fbe3ea', inner: '#fff8f6', rim: '#e9a3b7', pattern: 'sakura', patternColor: '#e9a3b7', unlock: 8 },
+  {
+    id: 'kirmizi',
+    name: 'Kırmızı lake',
+    outer: '#c9432f',
+    inner: '#f8ede0',
+    rim: '#2b1b16',
+    pattern: 'none',
+    patternColor: '#2b1b16',
+    unlock: 1,
+  },
+  {
+    id: 'beyaz',
+    name: 'Beyaz porselen',
+    outer: '#f6f1ea',
+    inner: '#fbf8f3',
+    rim: '#8fb7cf',
+    pattern: 'ring',
+    patternColor: '#8fb7cf',
+    unlock: 1,
+  },
+  {
+    id: 'indigo',
+    name: 'İndigo seramik',
+    outer: '#3f4f84',
+    inner: '#eef0f6',
+    rim: '#e9e6dc',
+    pattern: 'wave',
+    patternColor: '#dfe6f2',
+    unlock: 3,
+  },
+  {
+    id: 'siyah',
+    name: 'Siyah mat',
+    outer: '#3a332f',
+    inner: '#efe4d3',
+    rim: '#c99a6b',
+    pattern: 'speckle',
+    patternColor: '#857a70',
+    unlock: 4,
+  },
+  {
+    id: 'seladon',
+    name: 'Seladon yeşil',
+    outer: '#a8c6b5',
+    inner: '#eef5f0',
+    rim: '#7fa892',
+    pattern: 'dots',
+    patternColor: '#7fa892',
+    unlock: 6,
+  },
+  {
+    id: 'sakura',
+    name: 'Sakura desenli',
+    outer: '#fbe3ea',
+    inner: '#fff8f6',
+    rim: '#e9a3b7',
+    pattern: 'sakura',
+    patternColor: '#e9a3b7',
+    unlock: 8,
+  },
 ];
 
 export const bowlStyle = (id?: string | null) => BOWLS.find((b) => b.id === id) ?? BOWLS[0];
@@ -131,16 +248,25 @@ export const LEVELS: Level[] = [
     tip: 'Müşteriyi dinle. Hazırlıkta kaseyi seç, erişteyi koy, suyu basılı tutarak doldur, malzemeleri serp. Kaseyi ocağa taşı, tam kıvamında al, müşteriye götür.',
     intro: [
       { who: 'hana', text: 'Sonunda geldin evladım! Fener Sokağı seni özledi.' },
-      { who: 'hana', text: 'Kırk yıl bu tezgâhın arkasında durdum. Artık dizlerim eskisi gibi değil.' },
+      {
+        who: 'hana',
+        text: 'Kırk yıl bu tezgâhın arkasında durdum. Artık dizlerim eskisi gibi değil.',
+      },
       { who: 'sef', text: 'Nine… Noddles’ı gerçekten bana mı bırakıyorsun?' },
       { who: 'hana', text: 'Sana ve Mochi’ye. O kedi bu dükkânın asıl patronudur, unutma.' },
       { who: 'mochi', text: 'Miyav. (Tezgâhın üstüne kurulur ve seni süzer.)' },
-      { who: 'hana', text: 'Tarif defterimden sadece ilk sayfa kaldı: soya suyu, ramen, yumurta, yeşil soğan.' },
+      {
+        who: 'hana',
+        text: 'Tarif defterimden sadece ilk sayfa kaldı: soya suyu, ramen, yumurta, yeşil soğan.',
+      },
       { who: 'hana', text: 'Gerisini zamanla bulursun. Hadi, kepengi kaldır!' },
     ],
     outro: [
       { who: 'hana', text: 'Gördün mü? Mahalle kokuyu alınca koşa koşa geldi.' },
-      { who: 'mahalle', text: '(Kapının altından bir zarf süzülür. Üzerinde mor bir mühür var: “MegaNoodle”.)' },
+      {
+        who: 'mahalle',
+        text: '(Kapının altından bir zarf süzülür. Üzerinde mor bir mühür var: “MegaNoodle”.)',
+      },
       { who: 'hana', text: 'Hıh. Baron Kraker yine sokağımızı satın almaya çalışıyor. Aldırma.' },
     ],
   },
@@ -161,7 +287,10 @@ export const LEVELS: Level[] = [
       { who: 'hana', text: 'Bugün salona bir masa daha koydum. Kalabalık olacak.' },
     ],
     outro: [
-      { who: 'mahalle', text: 'Manav Sabri: “Çocukluğumun tadı bu! Hana Nine’nin dükkânı geri döndü!”' },
+      {
+        who: 'mahalle',
+        text: 'Manav Sabri: “Çocukluğumun tadı bu! Hana Nine’nin dükkânı geri döndü!”',
+      },
       { who: 'hana', text: 'Ağızdan ağıza yayılıyor. Yarın telefon da çalmaya başlar, görürsün.' },
     ],
   },
@@ -176,15 +305,27 @@ export const LEVELS: Level[] = [
     unlock: ['nori', 'tavuk'],
     tip: 'Telefon çalınca siparişi oku. Hazır kaseyi kapıdaki paket kutusuna bırak; Rüzgar götürür.',
     intro: [
-      { who: 'ruzgar', text: 'Selaaam! Ben Rüzgar, sokağın en hızlı kuryesi. Motorum vızır vızır!' },
-      { who: 'ruzgar', text: 'Uygulamaya dükkânınızı ekledim. Siparişler telefona düşecek, ben kapıyorum!' },
+      {
+        who: 'ruzgar',
+        text: 'Selaaam! Ben Rüzgar, sokağın en hızlı kuryesi. Motorum vızır vızır!',
+      },
+      {
+        who: 'ruzgar',
+        text: 'Uygulamaya dükkânınızı ekledim. Siparişler telefona düşecek, ben kapıyorum!',
+      },
       { who: 'sef', text: 'Hem salona hem telefona mı yetişeceğim?' },
-      { who: 'hana', text: 'Ben senin yaşındayken bir elimde kepçe, bir elimde telefon vardı. Yaparsın.' },
+      {
+        who: 'hana',
+        text: 'Ben senin yaşındayken bir elimde kepçe, bir elimde telefon vardı. Yaparsın.',
+      },
       { who: 'hana', text: 'Al, üçüncü sayfa: nori. Deniz kokulu yosun yaprakları.' },
     ],
     outro: [
       { who: 'ruzgar', text: 'Bugün şehrin öbür ucuna bile götürdüm! Kaseler sıcacık ulaştı.' },
-      { who: 'mahalle', text: '(Dükkânın karşısına dev bir pano asılıyor: “YAKINDA: MegaNoodle Fabrikası”.)' },
+      {
+        who: 'mahalle',
+        text: '(Dükkânın karşısına dev bir pano asılıyor: “YAKINDA: MegaNoodle Fabrikası”.)',
+      },
       { who: 'hana', text: 'Fabrika mı?! Burası çocukların top oynadığı meydan…' },
     ],
   },
@@ -206,7 +347,10 @@ export const LEVELS: Level[] = [
     ],
     outro: [
       { who: 'hana', text: 'Kalın udon, kadife gibi miso… Mahalle bu akşam huzurla uyuyacak.' },
-      { who: 'mahalle', text: '(Pencerede bir gölge: silindir şapka, kıvrık bıyık. Not defterine bir şey yazıp kaybolur.)' },
+      {
+        who: 'mahalle',
+        text: '(Pencerede bir gölge: silindir şapka, kıvrık bıyık. Not defterine bir şey yazıp kaybolur.)',
+      },
     ],
   },
   {
@@ -225,7 +369,10 @@ export const LEVELS: Level[] = [
       { who: 'hana', text: 'Bugün hızlı ol; ıslak müşteri sabırsız müşteridir.' },
     ],
     outro: [
-      { who: 'mahalle', text: 'Islak şemsiyeler, buğulu camlar, kahkahalar… Dükkân hiç bu kadar canlı olmamıştı.' },
+      {
+        who: 'mahalle',
+        text: 'Islak şemsiyeler, buğulu camlar, kahkahalar… Dükkân hiç bu kadar canlı olmamıştı.',
+      },
       { who: 'hana', text: 'Yarın gece Ateş Gecesi. Acı seven herkes buraya gelecek.' },
     ],
   },
@@ -239,12 +386,21 @@ export const LEVELS: Level[] = [
     subtitle: 'Acılı tantan ve gizemli bir misafir',
     unlock: ['acili', 'aciyag', 'biber'],
     intro: [
-      { who: 'hana', text: 'Altıncı sayfa! Acılı tantan suyu ve ev yapımı acı yağ. Dikkat, göz yaşartır.' },
-      { who: 'ruzgar', text: 'Duydum ki bu gece Baron Kraker kılık değiştirip etrafta dolaşıyormuş…' },
+      {
+        who: 'hana',
+        text: 'Altıncı sayfa! Acılı tantan suyu ve ev yapımı acı yağ. Dikkat, göz yaşartır.',
+      },
+      {
+        who: 'ruzgar',
+        text: 'Duydum ki bu gece Baron Kraker kılık değiştirip etrafta dolaşıyormuş…',
+      },
       { who: 'sef', text: 'Gelsin. Ona gerçek noodle neymiş göstereceğim.' },
     ],
     outro: [
-      { who: 'baron', text: '(Şapkasını düzeltir.) Fena değil… Ama festivalde MegaNoodle sizi ezecek!' },
+      {
+        who: 'baron',
+        text: '(Şapkasını düzeltir.) Fena değil… Ama festivalde MegaNoodle sizi ezecek!',
+      },
       { who: 'hana', text: 'Baron?! O silindir şapkayı nereden tanıyacaktım…' },
       { who: 'mochi', text: 'Hhhsss! (Baron’un paçasına pati atar.)' },
     ],
@@ -259,8 +415,14 @@ export const LEVELS: Level[] = [
     subtitle: 'Madam Lezzetova masada',
     unlock: ['soba', 'tofu', 'kimchi', 'tatliaci'],
     intro: [
-      { who: 'ruzgar', text: 'Haber var! Şehrin en korkulan eleştirmeni Madam Lezzetova bugün gelecekmiş!' },
-      { who: 'hana', text: 'Onun bir yıldızı bütün şehri buraya getirir. Yedinci sayfa: soba ve tofu.' },
+      {
+        who: 'ruzgar',
+        text: 'Haber var! Şehrin en korkulan eleştirmeni Madam Lezzetova bugün gelecekmiş!',
+      },
+      {
+        who: 'hana',
+        text: 'Onun bir yıldızı bütün şehri buraya getirir. Yedinci sayfa: soba ve tofu.',
+      },
       { who: 'sef', text: 'Karabuğday eriştesi… Bugün hata yok.' },
     ],
     outro: [
@@ -284,8 +446,14 @@ export const LEVELS: Level[] = [
       { who: 'ruzgar', text: 'Gazete çıktı! Kapıda kuyruk var!' },
     ],
     outro: [
-      { who: 'mahalle', text: 'Balıkçı Remzi: “Dedenin karidesleri! Seni festivalde destekleyeceğiz evlat!”' },
-      { who: 'hana', text: 'Son bir sayfa kaldı… En önemlisi. Ama onu nereye sakladığımı unuttum.' },
+      {
+        who: 'mahalle',
+        text: 'Balıkçı Remzi: “Dedenin karidesleri! Seni festivalde destekleyeceğiz evlat!”',
+      },
+      {
+        who: 'hana',
+        text: 'Son bir sayfa kaldı… En önemlisi. Ama onu nereye sakladığımı unuttum.',
+      },
     ],
   },
   {
@@ -305,8 +473,14 @@ export const LEVELS: Level[] = [
     ],
     outro: [
       { who: 'hana', text: 'İşte bu… Benim kasem. Hayır, artık senin kasen.' },
-      { who: 'baron', text: '(Kapıda.) Yarın festival. Benim fabrikam günde on bin paket üretiyor. Sen?' },
-      { who: 'sef', text: 'Ben her kaseyi tek tek, bir insan için yapıyorum. Yarın görüşürüz Baron.' },
+      {
+        who: 'baron',
+        text: '(Kapıda.) Yarın festival. Benim fabrikam günde on bin paket üretiyor. Sen?',
+      },
+      {
+        who: 'sef',
+        text: 'Ben her kaseyi tek tek, bir insan için yapıyorum. Yarın görüşürüz Baron.',
+      },
     ],
   },
   {
@@ -319,16 +493,31 @@ export const LEVELS: Level[] = [
     subtitle: 'Meydan kimin olacak?',
     unlock: ['pirinc', 'susam', 'yakisoba'],
     intro: [
-      { who: 'mahalle', text: 'Meydan fenerlerle dolu. Bir yanda MegaNoodle’ın dev standı, bir yanda küçük Noddles tezgâhı.' },
-      { who: 'hana', text: 'Son hediyem: incecik pirinç eriştesi ve kavrulmuş susam. Artık bütün defter sende.' },
+      {
+        who: 'mahalle',
+        text: 'Meydan fenerlerle dolu. Bir yanda MegaNoodle’ın dev standı, bir yanda küçük Noddles tezgâhı.',
+      },
+      {
+        who: 'hana',
+        text: 'Son hediyem: incecik pirinç eriştesi ve kavrulmuş susam. Artık bütün defter sende.',
+      },
       { who: 'ruzgar', text: 'Paket sipariş rekoru kırılacak! Motoru ısıttım!' },
       { who: 'sef', text: 'Hadi Noddles. Mahalle için!' },
     ],
     outro: [
       { who: 'baron', text: '(Kaseyi bitirir, uzun süre susar.) Annem… böyle yapardı.' },
-      { who: 'baron', text: 'Fabrikayı başka yere kuracağım. Meydan çocuklarındır. Ve… pazar günleri buraya gelebilir miyim?' },
-      { who: 'lezzetova', text: 'Jüri kararı oybirliğiyle: Meydan, Noddles ve Fener Sokağı’nındır!' },
-      { who: 'hana', text: 'Kırk yıl önce bu dükkânı tek bir kaseyle açmıştım. Sen onu bir mahalleye çevirdin.' },
+      {
+        who: 'baron',
+        text: 'Fabrikayı başka yere kuracağım. Meydan çocuklarındır. Ve… pazar günleri buraya gelebilir miyim?',
+      },
+      {
+        who: 'lezzetova',
+        text: 'Jüri kararı oybirliğiyle: Meydan, Noddles ve Fener Sokağı’nındır!',
+      },
+      {
+        who: 'hana',
+        text: 'Kırk yıl önce bu dükkânı tek bir kaseyle açmıştım. Sen onu bir mahalleye çevirdin.',
+      },
       { who: 'mochi', text: 'Mrrrr. (Kucağına kıvrılır. Bu, Mochi’nin en büyük ödülüdür.)' },
     ],
   },

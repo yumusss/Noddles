@@ -36,7 +36,10 @@ export const PAL = {
 export type Tod = 'sabah' | 'ogle' | 'gunbatimi' | 'aksam';
 
 /** Ambient light for each time of day: a tint drawn over the scene and a lamp strength. */
-export const TOD_LIGHT: Record<Tod, { tint: string; alpha: number; lamp: number; sky: [string, string] }> = {
+export const TOD_LIGHT: Record<
+  Tod,
+  { tint: string; alpha: number; lamp: number; sky: [string, string] }
+> = {
   sabah: { tint: '#ffe9c2', alpha: 0.12, lamp: 0, sky: ['#bfe0f2', '#fff1d6'] },
   ogle: { tint: '#ffffff', alpha: 0.0, lamp: 0, sky: ['#9ccbe6', '#dff0f7'] },
   gunbatimi: { tint: '#ff9a62', alpha: 0.18, lamp: 0.5, sky: ['#f6a56b', '#ffd9a6'] },
@@ -46,15 +49,22 @@ export const TOD_LIGHT: Record<Tod, { tint: string; alpha: number; lamp: number;
 // ---------- colour helpers ----------
 export function hexToRgb(h: string): [number, number, number] {
   const s = h.replace('#', '');
-  const n = parseInt(s.length === 3 ? s.split('').map((c) => c + c).join('') : s, 16);
+  const n = parseInt(
+    s.length === 3
+      ? s
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : s,
+    16
+  );
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
 /** Lighten (amt > 0) or darken (amt < 0) a hex colour; amt in -1..1. */
 export function shade(h: string, amt: number, alpha = 1): string {
   const [r, g, b] = hexToRgb(h);
-  const f = (c: number) =>
-    Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt));
+  const f = (c: number) => Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt));
   return `rgba(${f(r)},${f(g)},${f(b)},${alpha})`;
 }
 
@@ -73,7 +83,7 @@ export function mix(a: string, b: string, t: number): string {
 // ---------- randomness ----------
 /** Small deterministic PRNG (mulberry32). Use for stable textures. */
 export function rng(seed: number) {
-  let a = (seed >>> 0) || 1;
+  let a = seed >>> 0 || 1;
   return () => {
     a |= 0;
     a = (a + 0x6d2b79f5) | 0;
@@ -152,7 +162,16 @@ export function gloss(c: Ctx, x: number, y: number, r: number, alpha = 0.5) {
 }
 
 /** Subtle paper/wood grain noise: a few translucent speckles. */
-export function speckle(c: Ctx, x: number, y: number, w: number, h: number, seed: number, n: number, color = 'rgba(0,0,0,0.05)') {
+export function speckle(
+  c: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  seed: number,
+  n: number,
+  color = 'rgba(0,0,0,0.05)'
+) {
   const r = rng(seed);
   c.fillStyle = color;
   for (let i = 0; i < n; i++) {
@@ -170,7 +189,13 @@ const cache = new Map<string, HTMLCanvasElement>();
  * Draw once into an offscreen canvas and reuse. `draw` receives a context whose
  * origin is the top-left of a w×h box, already scaled by `res` for crispness.
  */
-export function sprite(key: string, w: number, h: number, draw: (c: Ctx) => void, res = 2): HTMLCanvasElement {
+export function sprite(
+  key: string,
+  w: number,
+  h: number,
+  draw: (c: Ctx) => void,
+  res = 2
+): HTMLCanvasElement {
   let cv = cache.get(key);
   if (cv) return cv;
   cv = document.createElement('canvas');
@@ -197,7 +222,16 @@ export function blit(c: Ctx, s: HTMLCanvasElement, x: number, y: number, w: numb
 export const FONT_DISPLAY = '"Baloo 2", "Nunito", system-ui, sans-serif';
 export const FONT_BODY = '"Nunito", system-ui, sans-serif';
 
-export function label(c: Ctx, text: string, x: number, y: number, size: number, color = PAL.ink, weight = 800, align: CanvasTextAlign = 'center') {
+export function label(
+  c: Ctx,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  color = PAL.ink,
+  weight = 800,
+  align: CanvasTextAlign = 'center'
+) {
   c.font = `${weight} ${size}px ${FONT_DISPLAY}`;
   c.textAlign = align;
   c.textBaseline = 'middle';

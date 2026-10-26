@@ -5,7 +5,10 @@ export default function Fullscreen() {
   const [can, setCan] = useState(false);
   useEffect(() => {
     const el = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void };
-    setCan(!!(el.requestFullscreen || el.webkitRequestFullscreen) && !window.matchMedia('(display-mode: standalone)').matches);
+    setCan(
+      !!(el.requestFullscreen || el.webkitRequestFullscreen) &&
+        !window.matchMedia('(display-mode: standalone)').matches
+    );
     const h = () => setOn(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', h);
     return () => document.removeEventListener('fullscreenchange', h);

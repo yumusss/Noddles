@@ -13,7 +13,10 @@ export function price(o: Order): number {
   let p = 10;
   p += o.noodle ? INGREDIENTS[o.noodle].price : 20;
   p += o.broth ? INGREDIENTS[o.broth].price : 14;
-  for (const r of o.reqs) p += INGREDIENTS[r.id].price * (r.mode === 'exact' ? Math.min(3, r.n ?? 1) : r.mode === 'bol' ? 2 : 1);
+  for (const r of o.reqs)
+    p +=
+      INGREDIENTS[r.id].price *
+      (r.mode === 'exact' ? Math.min(3, r.n ?? 1) : r.mode === 'bol' ? 2 : 1);
   if (o.rules.some((r) => r.t === 'variety' || r.t === 'free')) p += 12;
   return Math.round(p);
 }
@@ -33,7 +36,8 @@ export function paid(score: number, p: number): number {
 }
 
 export function tip(score: number, p: number, bonusPct: number): number {
-  const rate = score >= 95 ? 0.35 : score >= 85 ? 0.25 : score >= 70 ? 0.15 : score >= 55 ? 0.05 : 0;
+  const rate =
+    score >= 95 ? 0.35 : score >= 85 ? 0.25 : score >= 70 ? 0.15 : score >= 55 ? 0.05 : 0;
   if (!rate) return 0;
   return Math.max(1, Math.round(p * (rate + bonusPct / 100)));
 }
@@ -83,7 +87,18 @@ export const RENT = (level: number) => 120 + level * 20;
 export const UTILITIES = (level: number) => 40 + level * 8;
 
 export function emptyLedger(level: number): DayLedger {
-  return { sales: 0, tips: 0, bonus: 0, ingredients: 0, waste: 0, overChange: 0, bowls: 0, changeMistakes: 0, rent: RENT(level), utilities: UTILITIES(level) };
+  return {
+    sales: 0,
+    tips: 0,
+    bonus: 0,
+    ingredients: 0,
+    waste: 0,
+    overChange: 0,
+    bowls: 0,
+    changeMistakes: 0,
+    rent: RENT(level),
+    utilities: UTILITIES(level),
+  };
 }
 
 export function net(l: DayLedger) {
