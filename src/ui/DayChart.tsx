@@ -50,7 +50,7 @@ export default function DayChart({
           y2={yRate(GOAL_RATING)}
           className="goal"
         />
-        <text x={padL + 4} y={yRate(GOAL_RATING) - 6} className="goal-label">
+        <text x={W - padR - 4} y={yRate(GOAL_RATING) - 6} className="goal-label">
           {t('goal')} {GOAL_RATING.toFixed(1)}★
         </text>
         <line x1={padL} x2={W - padR} y1={zeroY} y2={zeroY} className="zero" />

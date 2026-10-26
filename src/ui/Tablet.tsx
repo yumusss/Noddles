@@ -159,21 +159,23 @@ export default function Tablet({
                     </div>
                   ))}
                 </section>
-                <section className="tags-box">
-                  <h4>{t('topTags')}</h4>
-                  <div className="tag-cloud">
-                    {tagStats.good.map((g) => (
-                      <span key={g.l.en} className="tag good">
-                        {tx(g.l)} ×{g.n}
-                      </span>
-                    ))}
-                    {tagStats.bad.map(([k, n]) => (
-                      <span key={k} className="tag bad">
-                        {tx(REASON_TAG[k])} ×{n}
-                      </span>
-                    ))}
-                  </div>
-                </section>
+                {(tagStats.good.length > 0 || tagStats.bad.length > 0) && (
+                  <section className="tags-box">
+                    <h4>{t('topTags')}</h4>
+                    <div className="tag-cloud">
+                      {tagStats.good.map((g) => (
+                        <span key={g.l.en} className="tag good">
+                          {tx(g.l)} ×{g.n}
+                        </span>
+                      ))}
+                      {tagStats.bad.map(([k, n]) => (
+                        <span key={k} className="tag bad">
+                          {tx(REASON_TAG[k])} ×{n}
+                        </span>
+                      ))}
+                    </div>
+                  </section>
+                )}
                 <section className="latest">
                   {reviews
                     .slice(-3)
