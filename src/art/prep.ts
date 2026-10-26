@@ -1011,6 +1011,7 @@ const COOK_ZONES: { to: number; name: string; col: string }[] = [
   { to: 82, name: 'Tam kıvam', col: PAL.honey },
   { to: 102, name: 'Yumuşak', col: PAL.coral },
   { to: 120, name: 'Lapa', col: PAL.tomato },
+  { to: 140, name: 'Yanık', col: '#4a3328' },
 ];
 
 /** Optional translated labels the game can set: cook zones (5) and gauge (az/tam/taşma). */
@@ -1022,16 +1023,17 @@ export const PREP_LABELS = {
 export function cookLabel(progress: number): string {
   for (let i = 0; i < COOK_ZONES.length; i++)
     if (progress < COOK_ZONES[i].to) return PREP_LABELS.zones?.[i] ?? COOK_ZONES[i].name;
-  return 'Lapa';
+  return PREP_LABELS.zones?.[COOK_ZONES.length - 1] ?? 'Yanık';
 }
 
 const RING_START = Math.PI * 0.75; // bottom-left
 const RING_SWEEP = Math.PI * 1.5;
-const angOf = (p: number) => RING_START + (clamp(p, 0, 120) / 120) * RING_SWEEP;
+const RING_MAX = 140;
+const angOf = (p: number) => RING_START + (clamp(p, 0, RING_MAX) / RING_MAX) * RING_SWEEP;
 
 export function drawCookRing(c: Ctx, x: number, y: number, r: number, progress: number): void {
   const R = Math.round(r);
-  const face = sprite(`prep:ring:${R}`, R * 2.3, R * 2.3, (g) => {
+  const face = sprite(`prep:ring2:${R}`, R * 2.3, R * 2.3, (g) => {
     const cx = R * 1.15;
     const cy = R * 1.15;
     // shadow + wooden rim
@@ -1080,7 +1082,7 @@ export function drawCookRing(c: Ctx, x: number, y: number, r: number, progress: 
     }
     // ticks
     g.strokeStyle = 'rgba(60,35,20,0.35)';
-    for (let p = 0; p <= 120; p += 10) {
+    for (let p = 0; p <= RING_MAX; p += 10) {
       const a = angOf(p);
       const major = p % 20 === 0;
       g.lineWidth = major ? 1.6 : 1;

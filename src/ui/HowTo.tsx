@@ -105,7 +105,7 @@ const PAGES: Page[] = [
       [
         'Önce malzeme kabına dokun (seçilir), sonra kasede istediğin yere dokun.',
         'Her dokunuş bir parça koyar. "3 dilim" diyorsa tam 3 tane koy.',
-        '"Bol" diyorsa en az 5 parça. İstemediği şeyi koyma!',
+        '"Bol" diyorsa en az 5 parça. İstemediği şeyi koyma — müşteriler fazladan malzemeyi hiç sevmez ve şikâyet eder!',
         'Yanlış olduysa çöp kutusu kaseyi boşaltır.',
       ],
     ],
@@ -114,7 +114,7 @@ const PAGES: Page[] = [
       [
         'First tap a topping tub (it gets picked), then tap where you want it in the bowl.',
         'Every tap adds one piece. If it says "3 slices", add exactly 3.',
-        '"Lots of" means at least 5 pieces. Don’t add things they didn’t ask for!',
+        '"Lots of" means at least 5 pieces. Don’t add things they didn’t ask for — customers hate extras and will complain!',
         'Made a mistake? The trash bin empties the bowl.',
       ],
     ],
@@ -125,16 +125,16 @@ const PAGES: Page[] = [
       'Pişirme',
       [
         'Hazır kaseye dokun, sonra Ocak’a git ve kaseyi ocağa koy.',
-        'Saat ilerler: çiğ → diri → tam kıvam → yumuşak → lapa.',
-        'Fişteki pişirme seviyesine gelince kaseye dokunup al. Geç kalırsan lapa olur!',
+        'Saat ilerler: çiğ → diri → tam kıvam → yumuşak → lapa → YANIK.',
+        'Fişteki pişirme seviyesine gelince kaseye dokunup al. Geç kalırsan lapa olur, daha da beklersen yanar — yanık erişteyi kimse yemez!',
       ],
     ],
     en: [
       'Cooking',
       [
         'Tap the finished bowl, go to the Stove and put it on the fire.',
-        'The dial moves: raw → firm → perfect → soft → mushy.',
-        'When it reaches the level on the ticket, tap the bowl to take it. Too late and it turns to mush!',
+        'The dial moves: raw → firm → perfect → soft → mushy → BURNT.',
+        'When it reaches the level on the ticket, tap the bowl to take it. Too late and it turns to mush, even later it burns — nobody eats burnt noodles!',
       ],
     ],
   },

@@ -74,6 +74,19 @@ export default function Play({
             lines: o.lines,
             phone: o.cu.phone,
           }))}
+          stats={{
+            earned: session.earned,
+            sales: session.ledger.sales,
+            tips: session.ledger.tips,
+            bowls: session.ledger.bowls,
+            scores: [...session.scores],
+            lost: session.lost,
+            complaints: session.complaints,
+            jar: session.tipJarCoins,
+          }}
+          stars={save.stars}
+          music={save.music}
+          onToggleMusic={() => onToggle('music')}
           onClose={() => setTablet(false)}
         />
       )}
@@ -261,11 +274,11 @@ function Overlays({
                       <span className="mood-face">
                         {m.free
                           ? '😠'
-                          : m.v > 0.75
-                            ? '😄'
-                            : m.v > 0.5
-                              ? '🙂'
-                              : m.v > 0.25
+                          : m.v > 0.66
+                            ? '🙂'
+                            : m.v > 0.4
+                              ? '😐'
+                              : m.v > 0.2
                                 ? '😟'
                                 : '😣'}
                       </span>

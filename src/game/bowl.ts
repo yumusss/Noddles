@@ -6,22 +6,25 @@ export const BOWL_SPACE = 300;
 export const BOWL_C = 150;
 export const BOWL_R = 112;
 
-export type CookState = 'raw' | 'dente' | 'perfect' | 'soft' | 'burnt';
+export type CookState = 'raw' | 'dente' | 'perfect' | 'soft' | 'mushy' | 'burnt';
 
 export const COOK_LABEL: Record<CookState, string> = {
   raw: 'Çiğ',
   dente: 'Diri',
   perfect: 'Tam kıvam',
   soft: 'Yumuşak',
-  burnt: 'Lapa',
+  mushy: 'Lapa',
+  burnt: 'Yanık',
 };
 
-/** Cooking progress 0..120 → state. */
+/** Cooking progress 0..COOK_MAX → state. After mushy the noodles burn. */
+export const COOK_MAX = 140;
 export function cookStateAt(p: number): CookState {
   if (p < 40) return 'raw';
   if (p < 58) return 'dente';
   if (p < 82) return 'perfect';
   if (p < 102) return 'soft';
+  if (p < 120) return 'mushy';
   return 'burnt';
 }
 
@@ -41,7 +44,7 @@ export interface BowlState {
   broth?: string; // broth or sauce id
   fill: number; // 0..1.2 (over 1 = overflow)
   pieces: Piece[];
-  progress: number; // cooking progress 0..120
+  progress: number; // cooking progress 0..COOK_MAX
 }
 
 export function newBowl(style = 'kirmizi'): BowlState {

@@ -42,8 +42,7 @@ export function paid(score: number, p: number): number {
 }
 
 export function tip(score: number, p: number, bonusPct: number): number {
-  const rate =
-    score >= 95 ? 0.35 : score >= 85 ? 0.25 : score >= 70 ? 0.15 : score >= 55 ? 0.05 : 0;
+  const rate = score >= 97 ? 0.3 : score >= 90 ? 0.2 : score >= 80 ? 0.1 : 0; // tips have to be earned
   if (!rate) return 0;
   return Math.max(1, Math.round(p * (rate + bonusPct / 100)));
 }

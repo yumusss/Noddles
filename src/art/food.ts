@@ -1922,7 +1922,8 @@ const NOODLES: Record<string, NoodleCfg> = {
       dente: '#f5d478',
       perfect: '#f4cc5c',
       soft: '#f4df9e',
-      burnt: '#d9d0ae',
+      mushy: '#d9d0ae',
+      burnt: '#6e4a24',
     },
     dark: '#a06a1e',
     cool: '#b3903f',
@@ -1943,7 +1944,8 @@ const NOODLES: Record<string, NoodleCfg> = {
       dente: '#f6f1e8',
       perfect: '#faf6ee',
       soft: '#f3eee4',
-      burnt: '#ddd6c8',
+      mushy: '#ddd6c8',
+      burnt: '#7a5a3c',
     },
     dark: '#8c7a63',
     cool: '#b3a894',
@@ -1964,7 +1966,8 @@ const NOODLES: Record<string, NoodleCfg> = {
       dente: '#a88a6d',
       perfect: '#9f7e62',
       soft: '#ac8d72',
-      burnt: '#a69a8c',
+      mushy: '#a69a8c',
+      burnt: '#3e2c22',
     },
     dark: '#4a2f1d',
     cool: '#6d5443',
@@ -1986,7 +1989,8 @@ const NOODLES: Record<string, NoodleCfg> = {
       dente: '#f9f6ef',
       perfect: '#fbf9f4',
       soft: '#f5f2eb',
-      burnt: '#e3ded5',
+      mushy: '#e3ded5',
+      burnt: '#7d6248',
     },
     dark: '#a08f74',
     cool: '#c2b8a6',
@@ -2003,14 +2007,16 @@ const COOK_W: Record<CookState, number> = {
   dente: 0.97,
   perfect: 1.08,
   soft: 1.18,
-  burnt: 1.32,
+  mushy: 1.32,
+  burnt: 1.3,
 };
 const COOK_GLOSS: Record<CookState, number> = {
   raw: 0.0,
   dente: 0.6,
   perfect: 0.9,
   soft: 0.45,
-  burnt: 0.1,
+  mushy: 0.1,
+  burnt: 0.0,
 };
 
 interface SauceOpt {
@@ -2073,7 +2079,7 @@ function renderNoodles(
   );
   const glossA = COOK_GLOSS[cook] * cfg.spec;
   const sharp = cook === 'raw';
-  const limp = cook === 'soft' || cook === 'burnt';
+  const limp = cook === 'soft' || cook === 'mushy' || cook === 'burnt';
   c.lineCap = 'round';
   c.lineJoin = 'round';
 
@@ -2237,7 +2243,7 @@ function renderNoodles(
   const dark = hexToRgb(cfg.dark);
   const light = hexToRgb(cfg.light);
   const bodyA = cfg.alpha;
-  const shA = (cook === 'burnt' ? 0.5 : 1) * cfg.shadow;
+  const shA = (cook === 'mushy' || cook === 'burnt' ? 0.5 : 1) * cfg.shadow;
   const matte = glossA <= 0.05;
 
   for (const st of strands) {
@@ -2318,8 +2324,8 @@ function renderNoodles(
   }
   c.restore();
 
-  if (cook === 'burnt') {
-    // mushy: strands merge into a pale blob
+  if (cook === 'mushy' || cook === 'burnt') {
+    // mushy: strands merge into a pale blob (burnt: the same blob, charred)
     const body = cfg.col[cook];
     c.save();
     blobPath(c, 0, 0, r * 0.9, r * 0.85, rand, 0.1, 11);
@@ -2349,6 +2355,31 @@ function renderNoodles(
     c.fillStyle = 'rgba(120,120,110,0.08)';
     circle(c, 0, 0, r * 0.9);
     c.fill();
+    if (cook === 'burnt') {
+      // charred patches and black crispy ends
+      for (let i = 0; i < 14; i++) {
+        const a = rand() * TAU;
+        const d = rand() * r * 0.75;
+        blobPath(
+          c,
+          Math.cos(a) * d,
+          Math.sin(a) * d,
+          r * (0.08 + rand() * 0.12),
+          r * (0.06 + rand() * 0.09),
+          rand,
+          0.3,
+          7
+        );
+        c.fillStyle = `rgba(${20 + rand() * 20},${12 + rand() * 10},8,${0.45 + rand() * 0.35})`;
+        c.fill();
+      }
+      c.fillStyle = radial(c, 0, 0, r * 0.1, r * 0.95, [
+        [0, 'rgba(40,22,10,0.15)'],
+        [1, 'rgba(25,12,5,0.45)'],
+      ]);
+      circle(c, 0, 0, r * 0.92);
+      c.fill();
+    }
     c.restore();
   }
 }
@@ -3040,7 +3071,7 @@ export function drawBowlTop(
       const fs = noodleFloatSprite(b.noodle, b.thick, cook, noodleR, 11);
       const box = Math.round(noodleR) * 2 + 12;
       c.save();
-      c.globalAlpha = cook === 'burnt' ? 0.6 : 1;
+      c.globalAlpha = cook === 'mushy' ? 0.6 : cook === 'burnt' ? 0.85 : 1;
       c.drawImage(fs, -box / 2, -box / 2, box, box);
       c.restore();
     }

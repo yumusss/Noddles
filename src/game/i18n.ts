@@ -20,7 +20,7 @@ export function setLang(l: Lang) {
   SALON_LABELS.open = l === 'tr' ? 'AÇIK' : 'OPEN';
   SALON_LABELS.tips = l === 'tr' ? 'bahşiş' : 'tips';
   SALON_LABELS.newOrder = l === 'tr' ? 'Yeni sipariş!' : 'New order!';
-  PREP_LABELS.zones = l === 'tr' ? null : ['Raw', 'Firm', 'Perfect', 'Soft', 'Mushy'];
+  PREP_LABELS.zones = l === 'tr' ? null : ['Raw', 'Firm', 'Perfect', 'Soft', 'Mushy', 'Burnt'];
   PREP_LABELS.gauge = l === 'tr' ? null : ['low', 'full', 'over'];
   clearSprites('salon:');
   clearSprites('prep:');
@@ -301,7 +301,9 @@ export const UI = {
   'g.dente': ['Diri', 'Firm'],
   'g.perfect': ['Tam kıvam', 'Perfect'],
   'g.soft': ['Yumuşak', 'Soft'],
-  'g.burnt': ['Lapa', 'Mushy'],
+  'g.mushy': ['Lapa', 'Mushy'],
+  'g.burnt': ['Yanık', 'Burnt'],
+  'g.burntToast': ['Eyvah, erişte yandı!', 'Oh no, the noodles burned!'],
   'g.az': ['az', 'low'],
   'g.tam': ['tam', 'full'],
   'g.tasma': ['taşma', 'over'],

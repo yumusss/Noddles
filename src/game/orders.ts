@@ -867,6 +867,8 @@ export interface Verdict {
   score: number; // 0..100
   notes: string[];
   praise: string[];
+  /** a serious mistake (unwanted extras, a "no" ignored, burnt noodles…): always a complaint */
+  strong: boolean;
 }
 
 function countOf(b: BowlState) {
@@ -900,6 +902,7 @@ function note(key: keyof typeof NOTE, vars: Record<string, string | number>): st
 export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   const notes: string[] = [];
   const praise: string[] = [];
+  let strong = false;
   let score = 0;
   // noodle 20
   if (!b.noodle) notes.push(L('Erişte yok!'));
@@ -944,7 +947,8 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
       let v = 0;
       if (r.mode === 'exact') {
         const n = r.n ?? 1;
-        v = have === n ? 1 : Math.max(0, 1 - Math.abs(have - n) / n);
+        v = have === n ? 1 : Math.max(0, 1 - (1.5 * Math.abs(have - n)) / n);
+        if (have > n + 1) strong = true;
         if (have === 0) notes.push(note('none', { name: en() ? lo : nm }));
         else if (have < n) notes.push(note('missing', { name: nm, have, n }));
         else if (have > n) notes.push(note('tooMany', { name: en() ? lo : nm, have, n }));
@@ -953,7 +957,7 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
         if (have === 0) notes.push(note('none', { name: en() ? lo : nm }));
         else if (have < 5) notes.push(note('moreOf', { name: lo }));
       } else if (r.mode === 'biraz') {
-        v = have === 0 ? 0 : have <= 3 ? 1 : Math.max(0.4, 1 - (have - 3) * 0.15);
+        v = have === 0 ? 0 : have <= 3 ? 1 : Math.max(0.2, 1 - (have - 3) * 0.25);
         if (have === 0) notes.push(note('none', { name: en() ? lo : nm }));
         else if (have > 3) notes.push(note('bitMuch', { name: en() ? lo : nm }));
       } else {
@@ -968,7 +972,9 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   if (!allowExtra) {
     const extras = [...cnt.keys()].filter((k) => !reqIds.has(k));
     if (extras.length) {
-      topScore -= Math.min(24, extras.length * 8);
+      // customers really don't like things they didn't ask for
+      topScore -= Math.min(36, extras.length * 14);
+      strong = true;
       notes.push(note('unwanted', { list: extras.map((e) => name(e)).join(', ') }));
     }
   }
@@ -976,10 +982,12 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   for (const r of o.rules) {
     if (r.t === 'no' && (cnt.get(r.id) ?? 0) > 0) {
       score -= 30;
+      strong = true;
       notes.push(note('saidNo', { name: en() ? lower(r.id) : name(r.id) }));
     }
     if (r.t === 'veg' && MEAT.some((m) => cnt.has(m))) {
       score -= 30;
+      strong = true;
       notes.push(L('Et yemiyorum demiştim!'));
     }
     if (r.t === 'spicy') {
@@ -1000,12 +1008,19 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   // cook 20
   const cs = cookOf(b);
   const want: CookState = o.cook;
-  const seq: CookState[] = ['raw', 'dente', 'perfect', 'soft', 'burnt'];
+  const seq: CookState[] = ['raw', 'dente', 'perfect', 'soft', 'mushy', 'burnt'];
   const d = Math.abs(seq.indexOf(cs) - seq.indexOf(want));
   if (!b.noodle) {
     /* already noted */
-  } else if (cs === 'burnt') notes.push(L('Erişte lapa olmuş'));
-  else if (cs === 'raw') notes.push(L('Erişte çiğ kalmış'));
+  } else if (cs === 'burnt') {
+    // burnt noodles ruin the whole bowl
+    score -= 35;
+    strong = true;
+    notes.push(L('Erişte yanmış! Bunu yiyemem.'));
+  } else if (cs === 'mushy') {
+    strong = true;
+    notes.push(L('Erişte lapa olmuş'));
+  } else if (cs === 'raw') notes.push(L('Erişte çiğ kalmış'));
   else if (d === 0) {
     score += 20;
     praise.push(L(want === 'perfect' ? 'Erişte tam kıvamında!' : 'Erişte tam istediğim gibi!'));
@@ -1037,13 +1052,14 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   } else if (waitFrac < 0.3) praise.push(L('Çok hızlıydı!'));
   score = Math.round(Math.max(0, Math.min(100, score)));
   if (score >= 95 && !praise.length) praise.push(L('Kusursuz!'));
-  return { score, notes, praise };
+  return { score, notes, praise, strong };
 }
 
 export function reactionLine(c: Customer, score: number): string {
   if (c.reactions)
-    return score >= 85 ? c.reactions.great : score >= 55 ? c.reactions.ok : c.reactions.bad;
-  if (score >= 95)
+    return score >= 92 ? c.reactions.great : score >= 70 ? c.reactions.ok : c.reactions.bad;
+  // customers are hard to impress: only a near-perfect bowl gets real delight
+  if (score >= 97)
     return L(
       pick([
         'Bu hayatımda yediğim en iyi noodle!',
@@ -1051,9 +1067,10 @@ export function reactionLine(c: Customer, score: number): string {
         'Mükemmel! Ellerine sağlık şef!',
       ])
     );
-  if (score >= 80)
+  if (score >= 90)
     return L(pick(['Çok lezzetli, teşekkürler!', 'Harika olmuş!', 'Tam aradığım tat!']));
-  if (score >= 55) return L(pick(['Fena değil.', 'İdare eder.', 'Güzel ama…']));
+  if (score >= 75) return L(pick(['Fena değil.', 'Güzel ama…', 'İyi, ama daha iyisini yemiştim.']));
+  if (score >= 55) return L(pick(['İdare eder.', 'Pek beğenmedim.', 'Hmm… olmamış biraz.']));
   if (score >= 30) return L(pick(['Hmm… ben bunu istememiştim.', 'Bu biraz farklı olmuş.']));
   return L(pick(['Bu ne böyle?!', 'Bir daha gelmem!', 'Ciddi misin şef?']));
 }

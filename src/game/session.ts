@@ -53,6 +53,7 @@ import {
   type BowlState,
   type CookState,
   COOK_LABEL,
+  COOK_MAX,
 } from './bowl';
 import {
   makeCustomer,
@@ -257,6 +258,7 @@ export class DaySession {
     t: number;
     score: number;
     notes: string[];
+    complaint: boolean;
     tone: Bubble['tone'];
     bowl: BowlState | null;
   } | null = null;
@@ -548,7 +550,7 @@ export class DaySession {
     if (!slot) return active ? 'neutral' : i < this.mi ? 'happy' : 'neutral';
     if (slot.free) return 'angry';
     const v = 1 - slot.waitT / cu.patience;
-    return v > 0.6 ? 'happy' : v > 0.3 ? 'neutral' : 'worried';
+    return v > 0.5 ? 'neutral' : v > 0.25 ? 'worried' : 'angry'; // waiting never makes anyone happy
   }
 
   /** the chef answers the customer's order */
@@ -742,7 +744,8 @@ export class DaySession {
     g.full += p;
     if (s.free) g.free = true;
     g.served++;
-    const complaint = v.score < 70 && v.notes.length > 0;
+    // serious mistakes always get a complaint; small ones once the bowl drops below 85%
+    const complaint = v.strong || (v.score < 85 && v.notes.length > 0);
     if (complaint) {
       g.complained = true;
       this.complaints++;
@@ -752,7 +755,7 @@ export class DaySession {
     this.bowl = newBowl(this.bowl.style);
     this.reviews.push({
       name: m.name,
-      stars: Math.max(1, Math.min(5, Math.round(v.score / 20))),
+      stars: v.score >= 95 ? 5 : v.score >= 82 ? 4 : v.score >= 65 ? 3 : v.score >= 45 ? 2 : 1,
       text: complaint
         ? T('g.complain', {
             notes: v.notes
@@ -764,7 +767,8 @@ export class DaySession {
       delivery: viaBox,
       day: this.level.id,
     });
-    const tone: Bubble['tone'] = v.score >= 70 ? 'good' : v.score >= 45 ? 'neutral' : 'bad';
+    const tone: Bubble['tone'] =
+      v.score >= 88 && !complaint ? 'good' : v.score >= 55 ? 'neutral' : 'bad';
     this.bubble = null;
     if (v.score >= 85) this.fx.emit('sparkle', this.bowlPos.x, this.bowlPos.y - 40, 14, 60);
     if (viaBox) {
@@ -795,6 +799,7 @@ export class DaySession {
         t: 0,
         score: v.score,
         notes: complaint ? v.notes : v.notes.concat(v.praise),
+        complaint,
         tone,
         bowl: served,
       };
@@ -938,7 +943,7 @@ export class DaySession {
         this.diners.push({
           seat: this.freeSeat(),
           look: m.look,
-          mood: tp > 0 ? 'love' : 'happy',
+          mood: tp >= 10 ? 'love' : tp > 0 ? 'happy' : 'neutral',
           bob: 0,
           eating: true,
           leaveT: 1e9,
@@ -1471,7 +1476,7 @@ export class DaySession {
     if (this.bowlAt === 'stove') {
       const cs = cookOf(this.bowl);
       const want = o.cook;
-      if (cs === want || (cs === 'soft' && want !== 'soft') || cs === 'burnt')
+      if (cs === want || (cs === 'soft' && want !== 'soft') || cs === 'mushy' || cs === 'burnt')
         return {
           station: 2,
           x: this.bowlPos.x,
@@ -1581,14 +1586,23 @@ export class DaySession {
       if (this.bowl.fill >= 1.2 && before < 1.2) this.showToast(T('g.overflow'));
     }
     if (this.bowlAt === 'stove' && this.bowl.noodle) {
-      this.bowl.progress = Math.min(120, this.bowl.progress + COOK_RATE * dt);
+      this.bowl.progress = Math.min(COOK_MAX, this.bowl.progress + COOK_RATE * dt);
       const cs = cookOf(this.bowl);
       if (cs !== this.lastCook) {
         this.lastCook = cs;
-        sfx(cs === 'burnt' ? 'fail' : 'bubble');
+        sfx(cs === 'mushy' || cs === 'burnt' ? 'fail' : 'bubble');
+        if (cs === 'burnt') this.showToast(T('g.burntToast'));
         if (cs === 'perfect') buzz(12);
         this.notify();
       }
+      if (cs === 'burnt' && Math.random() < dt * 8)
+        this.fx.emit(
+          'smoke',
+          this.bowlPos.x + (Math.random() - 0.5) * 60,
+          this.bowlPos.y - 30,
+          1,
+          14
+        );
       if (Math.random() < dt * 6)
         this.fx.emit(
           'steam',
@@ -1764,7 +1778,7 @@ export class DaySession {
         this.pickY = Math.min(1, this.pickY + dt * 1.3);
         if (pk.t > 2.4) {
           const sc = pk.score;
-          const complaint = pk.score < 70 && pk.notes.length > 0;
+          const complaint = pk.complaint;
           pk.phase = complaint ? 'complain' : 'react';
           pk.t = 0;
           const notes = pk.notes
@@ -1781,7 +1795,7 @@ export class DaySession {
               'pickup',
               pk.tone
             );
-            if (sc >= 85) {
+            if (sc >= 95) {
               sfx('perfect');
               this.fx.emit(
                 'heart',
