@@ -1028,16 +1028,16 @@ interface NoodleCfg {
 
 const NOODLES: Record<string, NoodleCfg> = {
   ramen: {
-    density: 46,
-    width: 3.3,
+    density: 95,
+    width: 3.4,
     wave: 0.85,
     wavelen: 5.2,
     rhoMin: 0.3,
     rhoMax: 0.8,
     len: [1.2, 2.4],
     col: {
-      raw: '#efe3bc',
-      dente: '#f4d98c',
+      raw: '#f3ecd3',
+      dente: '#f5d98a',
       perfect: '#f3cb62',
       soft: '#f1d894',
       burnt: '#d9d0ad',
@@ -1046,15 +1046,15 @@ const NOODLES: Record<string, NoodleCfg> = {
     alpha: 1,
   },
   udon: {
-    density: 30,
-    width: 7.4,
+    density: 34,
+    width: 8.0,
     wave: 0.22,
     wavelen: 6,
     rhoMin: 0.3,
     rhoMax: 0.8,
     len: [1.4, 2.6],
     col: {
-      raw: '#f0e9dc',
+      raw: '#ece5d8',
       dente: '#f8f3e8',
       perfect: '#fbf6ec',
       soft: '#f6f1e6',
@@ -1064,7 +1064,7 @@ const NOODLES: Record<string, NoodleCfg> = {
     alpha: 1,
   },
   soba: {
-    density: 70,
+    density: 130,
     width: 2.9,
     wave: 0.15,
     wavelen: 8,
@@ -1072,7 +1072,7 @@ const NOODLES: Record<string, NoodleCfg> = {
     rhoMax: 1.0,
     len: [1.0, 1.9],
     col: {
-      raw: '#bba58d',
+      raw: '#c7b49f',
       dente: '#ad8c6e',
       perfect: '#a88466',
       soft: '#b29176',
@@ -1082,7 +1082,7 @@ const NOODLES: Record<string, NoodleCfg> = {
     alpha: 1,
   },
   pirinc: {
-    density: 80,
+    density: 150,
     width: 2.0,
     wave: 0.5,
     wavelen: 6,
@@ -1103,16 +1103,16 @@ const NOODLES: Record<string, NoodleCfg> = {
 
 const THICK_MUL: Record<Thick, number> = { ince: 0.72, orta: 1, kalin: 1.45 };
 const COOK_W: Record<CookState, number> = {
-  raw: 0.9,
+  raw: 0.82,
   dente: 0.97,
-  perfect: 1.05,
+  perfect: 1.08,
   soft: 1.18,
   burnt: 1.32,
 };
 const COOK_GLOSS: Record<CookState, number> = {
-  raw: 0.12,
-  dente: 0.4,
-  perfect: 0.6,
+  raw: 0.0,
+  dente: 0.45,
+  perfect: 0.7,
   soft: 0.35,
   burnt: 0.12,
 };
@@ -1160,7 +1160,7 @@ function renderNoodles(
   const w = cfg.width * THICK_MUL[thick] * COOK_W[cook] * clamp(r / 112, 0.6, 1.6);
   const n = Math.round(
     cfg.density *
-      clamp(Math.pow(r / 112, 1.6), 0.25, 1.6) *
+      clamp(Math.pow(r / 112, 1.3), 0.25, 1.6) *
       (thick === 'kalin' ? 0.72 : thick === 'ince' ? 1.3 : 1)
   );
   const body = cfg.col[cook];
@@ -1179,8 +1179,8 @@ function renderNoodles(
   c.fill();
 
   const strands: [number, number][][] = [];
-  const amp = cfg.wave * w * (sharp ? 0.8 : limp ? 0.6 : 1);
-  const wl = cfg.wavelen * w * (sharp ? 1.3 : 1);
+  const amp = cfg.wave * w * (sharp ? 1.1 : limp ? 0.6 : 1);
+  const wl = cfg.wavelen * w * (sharp ? 1.1 : 1);
   const spin = rand() < 0.5 ? 1 : -1;
   for (let i = 0; i < n; i++) {
     let rho = r * lerp(cfg.rhoMin, cfg.rhoMax, rand());
@@ -1198,7 +1198,7 @@ function renderNoodles(
     const th0 = rand() * TAU;
     const L = r * lerp(cfg.len[0], cfg.len[1], rand());
     const span = Math.min(L / rho, TAU * 0.9) * side;
-    const steps = Math.max(8, Math.ceil(L / (sharp ? 5 : 3)));
+    const steps = Math.max(8, Math.ceil(L / (sharp ? 6 : 3)));
     const ph0 = rand() * TAU;
     const pts: [number, number][] = [];
     for (let s = 0; s <= steps; s++) {
@@ -1239,14 +1239,21 @@ function renderNoodles(
     c.lineWidth = w;
     c.strokeStyle = body;
     c.stroke();
-    // highlight line, offset up-left
-    c.save();
-    c.translate(-w * 0.16, -w * 0.22);
-    path(pts, !sharp);
-    c.lineWidth = Math.max(0.8, w * 0.28);
-    c.strokeStyle = hiCol;
-    c.stroke();
-    c.restore();
+    if (glossA > 0) {
+      // highlight line, offset up-left
+      c.save();
+      c.translate(-w * 0.16, -w * 0.22);
+      path(pts, !sharp);
+      c.lineWidth = Math.max(0.8, w * 0.3);
+      c.strokeStyle = hiCol;
+      c.stroke();
+      if (cook === 'perfect') {
+        c.lineWidth = Math.max(0.5, w * 0.12);
+        c.strokeStyle = 'rgba(255,255,255,0.55)';
+        c.stroke();
+      }
+      c.restore();
+    }
   }
   c.globalAlpha = 1;
 
@@ -1255,7 +1262,12 @@ function renderNoodles(
     c.save();
     circle(c, 0, 0, r);
     c.clip();
-    speckle(c, -r, -r, r * 2, r * 2, seed + 3, Math.round(r * 2.5), 'rgba(255,255,255,0.55)');
+    // matte wash + flour dusting
+    c.globalCompositeOperation = 'source-atop';
+    c.fillStyle = 'rgba(245,240,228,0.28)';
+    c.fillRect(-r, -r, r * 2, r * 2);
+    c.globalCompositeOperation = 'source-over';
+    speckle(c, -r, -r, r * 2, r * 2, seed + 3, Math.round(r * 3), 'rgba(255,255,255,0.7)');
     c.restore();
   }
   if (cook === 'burnt') {
@@ -1313,9 +1325,9 @@ function noodleFloatSprite(
       c.drawImage(base, -box / 2, -box / 2, box, box);
       c.globalCompositeOperation = 'destination-in';
       c.fillStyle = radial(c, 0, 0, 0, R, [
-        [0, 'rgba(0,0,0,0.9)'],
-        [0.45, 'rgba(0,0,0,0.85)'],
-        [0.8, 'rgba(0,0,0,0.35)'],
+        [0, 'rgba(0,0,0,1)'],
+        [0.6, 'rgba(0,0,0,0.95)'],
+        [0.85, 'rgba(0,0,0,0.5)'],
         [1, 'rgba(0,0,0,0)'],
       ]);
       c.fillRect(-box / 2, -box / 2, box, box);
@@ -1354,7 +1366,7 @@ interface BrothCfg {
 }
 
 const BROTHS: Record<string, BrothCfg> = {
-  shoyu: { col: '#8c4a1c', alpha: 0.72, creamy: 0, oil: '#f5bd55' },
+  shoyu: { col: '#8a461a', alpha: 0.68, creamy: 0, oil: '#f5bd55' },
   miso: { col: '#d19546', alpha: 0.92, creamy: 0.65 },
   tavuk: { col: '#e2ae57', alpha: 0.66, creamy: 0.05, oil: '#fbe08a' },
   acili: { col: '#c9412a', alpha: 0.88, creamy: 0.2, oil: '#f0712f', chilli: true, sesame: true },
@@ -1440,10 +1452,10 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
     }
   }
   if (cfg.oil) {
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 10; i++) {
       const ang = rand() * TAU;
       const d = Math.sqrt(rand()) * R * 0.92;
-      const rr = R * (0.015 + rand() * 0.035);
+      const rr = R * (0.012 + rand() * 0.022);
       const x = Math.cos(ang) * d;
       const y = Math.sin(ang) * d;
       circle(c, x, y, rr);
@@ -1499,7 +1511,7 @@ function applySauce(c: Ctx, sauce: SauceOpt, R: number) {
   const col = SAUCES[sauce.id] ?? '#5a2c12';
   c.save();
   c.globalCompositeOperation = 'source-atop';
-  c.fillStyle = rgba(col, 0.22 + 0.3 * sauce.amt);
+  c.fillStyle = rgba(col, 0.12 + 0.2 * sauce.amt);
   c.fillRect(-R - 6, -R - 6, R * 2 + 12, R * 2 + 12);
   // darker pooling near centre
   c.fillStyle = radial(c, 0, 0, 0, R, [
@@ -1510,7 +1522,7 @@ function applySauce(c: Ctx, sauce: SauceOpt, R: number) {
   // glaze shine: diagonal highlight streaks
   c.globalCompositeOperation = 'source-atop';
   c.lineCap = 'round';
-  c.strokeStyle = 'rgba(255,255,255,0.35)';
+  c.strokeStyle = 'rgba(255,255,255,0.45)';
   c.lineWidth = R * 0.04;
   const rand = rng(sauce.id.length * 11);
   for (let i = 0; i < 14; i++) {
@@ -1863,7 +1875,7 @@ export function drawBowlTop(
       const fs = noodleFloatSprite(b.noodle, b.thick, cook, noodleR, 11);
       const box = Math.round(noodleR) * 2 + 12;
       c.save();
-      c.globalAlpha = cook === 'burnt' ? 0.55 : 0.9;
+      c.globalAlpha = cook === 'burnt' ? 0.6 : 1;
       c.drawImage(fs, -box / 2, -box / 2, box, box);
       c.restore();
     }
