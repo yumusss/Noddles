@@ -87,7 +87,7 @@ for (const lang of ['tr', 'en'])
         return {
           over: s.over,
           served: s.ledger.served,
-          avg: s.avgSat,
+          rating: +s.dayRating.toFixed(2),
           net: Math.round(s.net),
           stars: s.stars,
         };
