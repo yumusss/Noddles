@@ -11,7 +11,7 @@ import { sfx, unlockAudio, buzz } from '../game/audio';
 import { anchors, renderWorld } from '../art/scene';
 import { findHot, hitTest, type Hot } from '../art/hs';
 import { boardLayout } from '../art/board';
-import { prepLayout } from '../art/prep';
+import { prepLayout, setReserves, RESERVE } from '../art/prep';
 import { useLang } from '../App';
 import Tablet from './Tablet';
 import PauseMenu from './PauseMenu';
@@ -32,7 +32,7 @@ declare global {
     __session?: Session;
     __engine?: Engine;
     __tap?: (id: string, lx?: number, ly?: number) => void;
-    __hot?: (id: string) => { x: number; y: number } | null;
+    __hot?: (id: string) => { x: number; y: number; w: number; h: number } | null;
   }
 }
 
@@ -52,6 +52,7 @@ export default function Play({ day, save, tipBonus, onDone, onQuit, onRestart, o
   const pointerRef = useRef<HTMLDivElement>(null);
   const tabletBubbleRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [uiK, setUiK] = useState(1);
   const [portrait, setPortrait] = useState(false);
   const [station, setStation] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -74,7 +75,20 @@ export default function Play({ day, save, tipBonus, onDone, onQuit, onRestart, o
     window.__engine = eng;
     const dpr = () => Math.min(window.devicePixelRatio || 1, 2.5);
     eng.onResize = (v) => {
+      // DOM text scales with the canvas but never gets too small to read
+      const k = Math.max(0.72, Math.min(1, v.scale * 1.15));
+      const probe = document.createElement('div');
+      probe.style.paddingTop = 'env(safe-area-inset-top, 0px)';
+      document.body.appendChild(probe);
+      const sat = parseFloat(getComputedStyle(probe).paddingTop) || 0;
+      probe.remove();
+      const ticket = (v.portrait ? 150 : 104) * k;
+      setReserves(
+        Math.max(150, (56 + sat + ticket + 14) / v.scale),
+        Math.max(112, (78 * k + 18) / v.scale)
+      );
       setScale(v.scale);
+      setUiK(k);
       setPortrait(v.portrait);
     };
     eng.resize();
@@ -155,10 +169,23 @@ export default function Play({ day, save, tipBonus, onDone, onQuit, onRestart, o
       const x = (anchors.head.x - eng.camX) * v.scale;
       const y = anchors.head.y * v.scale;
       const w = b.offsetWidth;
-      const right = x + 70 * v.scale + w < v.cssW - 8;
-      const left = right ? x + 62 * v.scale : x - 62 * v.scale - w;
-      b.style.transform = `translate(${Math.max(8, Math.min(v.cssW - w - 8, left))}px, ${Math.max(150 * v.scale, y - b.offsetHeight * 0.5)}px)`;
-      b.dataset.side = right ? 'r' : 'l';
+      const bh = b.offsetHeight;
+      const gap = 70 * v.scale;
+      const right = x + gap + w < v.cssW - 8;
+      const leftOk = x - gap - w > 8;
+      let bx: number;
+      let by: number;
+      if (right || leftOk) {
+        bx = right ? x + gap * 0.9 : x - gap * 0.9 - w;
+        by = Math.max(RESERVE.top * v.scale * 0.6, y - bh * 0.5);
+        b.dataset.side = right ? 'r' : 'l';
+      } else {
+        // narrow screens: above the head, centred
+        bx = Math.max(8, Math.min(v.cssW - w - 8, x - w / 2));
+        by = Math.max(60, y - 90 * v.scale - bh);
+        b.dataset.side = 't';
+      }
+      b.style.transform = `translate(${bx}px, ${by}px)`;
     }
     const tb = tabletBubbleRef.current;
     if (tb) {
@@ -370,6 +397,8 @@ export default function Play({ day, save, tipBonus, onDone, onQuit, onRestart, o
       return {
         x: r.left + (h.x + h.w / 2 - eng.camX) * eng.view.scale,
         y: r.top + (h.y + h.h / 2) * eng.view.scale,
+        w: h.w * eng.view.scale,
+        h: h.h * eng.view.scale,
       };
     };
     window.__tap = (id: string, lx?: number, ly?: number) => {
@@ -417,7 +446,14 @@ export default function Play({ day, save, tipBonus, onDone, onQuit, onRestart, o
     !!ringing || cu?.state === 'pay' || cu?.state === 'complain' || cu?.state === 'order';
 
   return (
-    <div className="screen play" ref={wrapRef} style={{ ['--u' as string]: `${scale}px` }}>
+    <div
+      className={'screen play' + (portrait ? ' portrait' : ' landscape')}
+      ref={wrapRef}
+      style={{
+        ['--u' as string]: `${scale}px`,
+        ['--k' as string]: String(uiK),
+        ['--top' as string]: `${RESERVE.top * scale}px`,
+      }}>
       <canvas
         ref={canvasRef}
         className="world"
@@ -490,7 +526,7 @@ export default function Play({ day, save, tipBonus, onDone, onQuit, onRestart, o
               <ul>
                 {rows.map((r, i) => (
                   <li key={i} className={(r.ok ? 'ok' : '') + (r.bad ? ' bad' : '')}>
-                    <span className="box">{r.ok ? '☑' : '☐'}</span>
+                    <span className={'box' + (r.ok ? ' on' : '')} />
                     <span className="txt">
                       {r.text}
                       {r.sub && <em>{r.sub}</em>}

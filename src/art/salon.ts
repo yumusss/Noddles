@@ -938,7 +938,19 @@ export function drawTabletProp(
       ]);
   c.fill();
   if (ringing) {
-    text(c, '☎', 0, -h * 0.58, h * 0.38, '#fff6e9', { weight: 700 });
+    // a drawn phone handset
+    c.save();
+    c.translate(0, -h * 0.56);
+    c.rotate(-0.5);
+    const k = h * 0.16;
+    c.fillStyle = '#fff6e9';
+    rr(c, -k * 1.3, -k * 0.35, k * 2.6, k * 0.7, k * 0.3);
+    c.fill();
+    rr(c, -k * 1.5, -k * 0.6, k * 0.8, k * 1.2, k * 0.35);
+    c.fill();
+    rr(c, k * 0.7, -k * 0.6, k * 0.8, k * 1.2, k * 0.35);
+    c.fill();
+    c.restore();
     for (let i = 0; i < 2; i++) {
       c.strokeStyle = `rgba(239,143,122,${0.6 - ((t * 1.5 + i * 0.5) % 1) * 0.6})`;
       c.lineWidth = 2;

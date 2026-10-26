@@ -20,6 +20,7 @@
   --u: 1px;
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
+  --k: 1;
 }
 
 * {
@@ -409,21 +410,121 @@ canvas {
   align-items: center;
   padding: 24px 16px calc(28px + var(--sab));
 }
+.backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.story-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 234, 214, 0.55),
+    rgba(247, 234, 214, 0.1) 40%,
+    rgba(74, 51, 38, 0.25)
+  );
+}
+.story-head h1,
+.story-head small {
+  text-shadow: 0 2px 0 rgba(255, 247, 234, 0.8);
+}
 .story-sky {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, #bfe0ee, #fbe7cf 60%, #f7ead6);
 }
-.story.noon .story-sky {
+.story.noon .backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.story-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 234, 214, 0.55),
+    rgba(247, 234, 214, 0.1) 40%,
+    rgba(74, 51, 38, 0.25)
+  );
+}
+.story-head h1,
+.story-head small {
+  text-shadow: 0 2px 0 rgba(255, 247, 234, 0.8);
+}
+.story-sky {
   background: linear-gradient(180deg, #9fd0ea, #e6f3f2 60%, #f7ead6);
 }
-.story.sunset .story-sky {
+.story.sunset .backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.story-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 234, 214, 0.55),
+    rgba(247, 234, 214, 0.1) 40%,
+    rgba(74, 51, 38, 0.25)
+  );
+}
+.story-head h1,
+.story-head small {
+  text-shadow: 0 2px 0 rgba(255, 247, 234, 0.8);
+}
+.story-sky {
   background: linear-gradient(180deg, #f0a988, #fcd9a3 60%, #f7ead6);
 }
-.story.evening .story-sky {
+.story.evening .backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.story-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 234, 214, 0.55),
+    rgba(247, 234, 214, 0.1) 40%,
+    rgba(74, 51, 38, 0.25)
+  );
+}
+.story-head h1,
+.story-head small {
+  text-shadow: 0 2px 0 rgba(255, 247, 234, 0.8);
+}
+.story-sky {
   background: linear-gradient(180deg, #2e3a66, #6a5f8e 60%, #c9a9a0);
 }
-.story.rain .story-sky {
+.story.rain .backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.story-veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(247, 234, 214, 0.55),
+    rgba(247, 234, 214, 0.1) 40%,
+    rgba(74, 51, 38, 0.25)
+  );
+}
+.story-head h1,
+.story-head small {
+  text-shadow: 0 2px 0 rgba(255, 247, 234, 0.8);
+}
+.story-sky {
   filter: saturate(0.6) brightness(0.92);
 }
 .story-head {
@@ -440,9 +541,14 @@ canvas {
 }
 .story.evening .story-head small,
 .story.evening .story-head h1 {
-  color: #fff6e9;
+  color: var(--walnut);
 }
 .story-head h1 {
+  display: inline-block;
+  background: rgba(255, 247, 234, 0.9);
+  padding: 6px 22px;
+  border-radius: 20px;
+  box-shadow: 0 8px 20px rgba(74, 51, 38, 0.15);
   font-family: var(--font-display);
   margin: 6px 16px;
   font-size: clamp(26px, 5vmin, 44px);
@@ -715,17 +821,17 @@ canvas {
   position: relative;
   pointer-events: auto;
   margin-top: 4px;
-  min-width: 240px;
-  max-width: min(92vw, 520px);
+  min-width: calc(240px * var(--k));
+  max-width: min(92vw, 560px);
   background: linear-gradient(180deg, #fffdf6, #fbf4e4);
   font-family: var(--font-type);
   color: #3e2e24;
-  padding: 16px 16px 12px;
+  padding: calc(14px * var(--k)) 14px calc(10px * var(--k));
   box-shadow: 0 8px 18px rgba(74, 51, 38, 0.22);
   transform-origin: top center;
   animation: drop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
   transform: rotate(-0.6deg);
-  max-height: calc(var(--u) * 132 + 70px);
+  max-height: calc(var(--top) - 64px);
   overflow: hidden;
 }
 @keyframes drop {
@@ -751,7 +857,7 @@ canvas {
   display: flex;
   justify-content: space-between;
   gap: 14px;
-  font-size: 13px;
+  font-size: calc(13px * var(--k));
   color: #8a6f5c;
   border-bottom: 1px dashed #d6c6ae;
   padding-bottom: 4px;
@@ -763,16 +869,14 @@ canvas {
   list-style: none;
   columns: 1;
 }
-@media (min-width: 900px) {
-  .ticket ul {
-    columns: 2;
-    column-gap: 22px;
-  }
+.landscape .ticket ul {
+  columns: 2;
+  column-gap: 22px;
 }
 .ticket li {
   display: flex;
   gap: 6px;
-  font-size: 15px;
+  font-size: calc(15px * var(--k));
   font-weight: 700;
   line-height: 1.2;
   margin: 3px 0;
@@ -782,7 +886,7 @@ canvas {
   display: block;
   font-style: normal;
   font-weight: 400;
-  font-size: 13px;
+  font-size: calc(13px * var(--k));
   color: #7a6656;
 }
 .ticket li.ok {
@@ -792,8 +896,27 @@ canvas {
   color: #c2412b;
 }
 .ticket .box {
-  font-size: 17px;
-  line-height: 1;
+  flex: none;
+  position: relative;
+  width: 13px;
+  height: 13px;
+  margin-top: 2px;
+  border: 1.8px solid #6b5546;
+  border-radius: 2px;
+}
+.ticket .box.on {
+  border-color: #4f7a3e;
+}
+.ticket .box.on::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: -3px;
+  width: 5px;
+  height: 10px;
+  border: solid #4f7a3e;
+  border-width: 0 2.4px 2.4px 0;
+  transform: rotate(40deg);
 }
 .ticket .fold-line {
   font-size: 13px;
@@ -853,7 +976,7 @@ canvas {
 }
 .bubble p {
   margin: 2px 0 0;
-  font-size: 17px;
+  font-size: calc(17px * var(--k));
   line-height: 1.38;
   min-height: 1.4em;
 }
@@ -897,9 +1020,9 @@ canvas {
 .drawer {
   position: absolute;
   left: 50%;
-  bottom: calc(14px + var(--sab));
+  bottom: calc(10px + var(--sab));
   transform: translateX(-50%);
-  width: min(560px, 96vw);
+  width: min(calc(560px * var(--k)), 96vw);
   background: linear-gradient(180deg, #c99a45, #9a6e28);
   border-radius: 20px;
   padding: 10px 12px 12px;
@@ -917,9 +1040,9 @@ canvas {
 .drawer-sum {
   font-family: var(--font-display);
   color: #fff6e9;
-  font-size: 16px;
+  font-size: calc(16px * var(--k));
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: calc(8px * var(--k));
 }
 .drawer-sum b {
   font-family: var(--font-type);
@@ -936,8 +1059,8 @@ canvas {
 .cash {
   font-family: var(--font-type);
   font-weight: 700;
-  font-size: 14px;
-  height: 56px;
+  font-size: calc(14px * var(--k));
+  height: calc(56px * var(--k));
   border-radius: 8px;
   color: #3a2a22;
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15);
@@ -948,7 +1071,7 @@ canvas {
   height: auto;
   background: radial-gradient(circle at 35% 35%, #fff3c4, #e9c25a 60%, #b8902c);
   justify-self: center;
-  width: 56px;
+  width: calc(56px * var(--k));
 }
 .cash.note {
   background: linear-gradient(135deg, #cfe3bd, #a5c48e);
@@ -971,19 +1094,23 @@ canvas {
 .drawer-act {
   display: flex;
   justify-content: space-between;
-  margin-top: 10px;
+  margin-top: calc(10px * var(--k));
+}
+.drawer .btn {
+  font-size: calc(17px * var(--k));
+  padding: calc(9px * var(--k)) calc(18px * var(--k));
 }
 
 .serve-btn {
   position: absolute;
   left: 50%;
-  bottom: calc(20px + var(--sab));
+  bottom: calc(16px + var(--sab));
   transform: translateX(-50%);
   font-family: var(--font-display);
-  font-size: 21px;
+  font-size: calc(21px * var(--k));
   font-weight: 700;
   color: #fff;
-  padding: 14px 38px;
+  padding: calc(13px * var(--k)) calc(36px * var(--k));
   border-radius: 999px;
   background: linear-gradient(180deg, #b7d6a0, #7fb064);
   box-shadow:
@@ -1001,7 +1128,7 @@ canvas {
 .toasts {
   position: absolute;
   left: 50%;
-  top: calc(var(--u) * 158 + var(--sat));
+  top: calc(var(--top) + 6px);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -1041,20 +1168,21 @@ canvas {
   max-width: 90vw;
   text-align: center;
   font-family: var(--font-display);
-  font-size: 17px;
+  font-size: calc(17px * var(--k));
   background: rgba(86, 99, 140, 0.92);
   color: #fff;
-  padding: 9px 18px;
+  padding: calc(8px * var(--k)) calc(16px * var(--k));
   border-radius: 16px;
   pointer-events: none;
   z-index: 5;
+  opacity: 0.94;
 }
 .hint-bar.top {
   bottom: auto;
-  top: calc(var(--u) * 196 + var(--sat));
+  top: calc(var(--top) + 6px);
 }
 .hint-bar.up {
-  bottom: calc(220px + var(--sab));
+  bottom: calc(190px * var(--k) + 22px + var(--sab));
 }
 .pointer {
   position: absolute;

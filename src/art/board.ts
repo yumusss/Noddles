@@ -29,7 +29,7 @@ import {
 } from './common';
 import { drawIngredient, riceBed, ingColor } from './food';
 import { hs, hsOrigin } from './hs';
-import { BOTTOM_RESERVE, TOP_RESERVE, drawPrepBg } from './prep';
+import { RESERVE, drawPrepBg } from './prep';
 
 interface Box {
   x: number;
@@ -47,8 +47,8 @@ export interface BoardLayout {
 }
 
 export function boardLayout(W: number, H: number, portrait: boolean, heatOn: boolean): BoardLayout {
-  const top = TOP_RESERVE;
-  const bottom = BOTTOM_RESERVE;
+  const top = RESERVE.top;
+  const bottom = RESERVE.bottom;
   if (!portrait) {
     const areaW = heatOn ? W * 0.6 : W;
     const area = { x: 0, y: top, w: areaW, h: H - top - bottom };
@@ -63,11 +63,11 @@ export function boardLayout(W: number, H: number, portrait: boolean, heatOn: boo
       portrait,
     };
   }
-  const areaH = heatOn ? (H - top - bottom) * 0.62 : H - top - bottom;
+  const areaH = heatOn ? (H - top - bottom) * 0.72 : H - top - bottom;
   const area = { x: 0, y: top, w: W, h: areaH };
-  const bw = Math.min(W * 0.6, 440);
-  const bh = bw * 0.72;
-  const board = { x: W / 2 - bw / 2, y: top + 70, w: bw, h: bh };
+  const bw = Math.max(300, Math.min(W * 0.7, 500, (areaH - 420) / 0.62));
+  const bh = bw * 0.62;
+  const board = { x: W / 2 - bw / 2, y: top + 58, w: bw, h: bh };
   return {
     area,
     board,
@@ -148,6 +148,26 @@ function chipGrid(
   W: number
 ): { pos: { x: number; y: number }[]; s: number } {
   const B = L.board;
+  if (L.portrait) {
+    // phones held upright: a tray of chips under the board
+    const y0 = B.y + B.h + 124;
+    const y1 = L.area.y + L.area.h - 4;
+    for (let cs = 124; cs >= 60; cs -= 4) {
+      const cw = cs * 1.06;
+      const ch = cs * 0.92;
+      const cols = Math.max(1, Math.min(n, Math.floor((W - 24) / cw)));
+      const rows = Math.ceil(n / cols);
+      if (rows * ch > y1 - y0 && cs > 60) continue;
+      const pos: { x: number; y: number }[] = [];
+      for (let i = 0; i < n; i++) {
+        const r = Math.floor(i / cols);
+        const inRow = Math.min(cols, n - r * cols);
+        const k = i - r * cols;
+        pos.push({ x: W / 2 - ((inRow - 1) * cw) / 2 + k * cw, y: y0 + cs * 0.43 + r * ch });
+      }
+      return { pos, s: cs };
+    }
+  }
   const areaX0 = L.area.x + 10;
   const areaX1 = L.area.x + L.area.w - 10;
   const y0 = L.area.y + 6;
@@ -467,8 +487,21 @@ export function drawBoardStation(
       { id: 'board:maki', label: tt('bNori'), ic: icon('nori') },
     ];
     if (s.n >= 8) starts.push({ id: 'board:temaki', label: tt('bTemaki'), ic: icon('nori') });
-    starts.forEach((st, i) => chip(c, st.id, leftX, colY(i, starts.length), cs, st.label, st.ic));
-    if (s.n >= 4) {
+    const fishList = s.n >= 4 ? (['salmon', 'tuna'] as IngId[]).filter((f) => s.have.has(f)) : [];
+    if (L.portrait) {
+      const all = [
+        ...starts,
+        ...fishList.map((f) => ({
+          id: 'board:fish:' + f,
+          label: 'Sashimi · ' + tx(ING[f].name),
+          ic: icon(f),
+        })),
+      ];
+      const g = chipGrid(all.length, L, W);
+      all.forEach((st, i) => chip(c, st.id, g.pos[i].x, g.pos[i].y - 40, g.s, st.label, st.ic));
+    } else
+      starts.forEach((st, i) => chip(c, st.id, leftX, colY(i, starts.length), cs, st.label, st.ic));
+    if (s.n >= 4 && !L.portrait) {
       const fish = (['salmon', 'tuna'] as IngId[]).filter((f) => s.have.has(f));
       text(c, tt('bFish'), rightX, colY(0, fish.length) - cs * 0.62, 14, '#6e4b32', {
         weight: 700,
@@ -578,11 +611,19 @@ export function drawBoardStation(
     }
     // rice gauge
     if (b.stage === 'rice') {
-      verticalGauge(c, rightX - cs * 0.2, B.y + 10, B.h - 20, b.rice, RICE_MAX, [
-        [0, 0.62, '#f3e0c0', tt('gLess')],
-        [0.62, 1.02, '#b9d99a', tt('gJust')],
-        [1.02, RICE_MAX, '#f2b3a3', tt('gMore')],
-      ]);
+      verticalGauge(
+        c,
+        L.portrait ? B.x + B.w - 30 : rightX - cs * 0.2,
+        B.y + 10,
+        B.h - 20,
+        b.rice,
+        RICE_MAX,
+        [
+          [0, 0.62, '#f3e0c0', tt('gLess')],
+          [0.62, 1.02, '#b9d99a', tt('gJust')],
+          [1.02, RICE_MAX, '#f2b3a3', tt('gMore')],
+        ]
+      );
       hint(c, B, tt('bRice'));
     }
     // fillings (and the outside coating for uramaki), split on both sides of the board
@@ -692,8 +733,8 @@ export function drawBoardStation(
         pillBtn(
           c,
           'board:count:' + n,
-          leftX,
-          B.y + B.h * 0.3 + i * 54,
+          L.portrait ? W / 2 - 62 + i * 124 : leftX,
+          L.portrait ? B.y + B.h + 150 : B.y + B.h * 0.3 + i * 54,
           Math.min(pw, cs + 10),
           44,
           tt('bSlices', { n }),
@@ -736,8 +777,8 @@ export function drawBoardStation(
       pillBtn(
         c,
         'board:count:' + n,
-        leftX,
-        B.y + B.h * 0.3 + i * 54,
+        L.portrait ? W / 2 - 62 + i * 124 : leftX,
+        L.portrait ? B.y + B.h + 150 : B.y + B.h * 0.3 + i * 54,
         Math.min(96, cs + 10),
         44,
         tt('bPieces', { n }),

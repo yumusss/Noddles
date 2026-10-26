@@ -5,6 +5,7 @@ import { type Day, type Line, SPEAKERS, ACTS } from '../game/data';
 import { t, tx } from '../game/i18n';
 import { sfx } from '../game/audio';
 import Portrait from './Portrait';
+import Backdrop from './Backdrop';
 import { useLang } from '../App';
 
 export default function Story({
@@ -47,7 +48,8 @@ export default function Story({
   };
   return (
     <div className={'screen story ' + day.time + (day.rain ? ' rain' : '')} onClick={next}>
-      <div className="story-sky" />
+      <Backdrop day={day} />
+      <div className="story-veil" />
       <div className="story-head">
         {mode === 'intro' && (
           <>
@@ -61,7 +63,7 @@ export default function Story({
         )}
       </div>
       <div className="story-card">
-        <Portrait who={line.who} size={160} talking={n < full.length} />
+        <Portrait who={line.who} size={200} talking={n < full.length} />
         <div className="story-text">
           <b>{tx(SPEAKERS[line.who])}</b>
           <p>{full.slice(0, n)}</p>

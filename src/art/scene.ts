@@ -351,6 +351,30 @@ export function isTalking(s: Session, cu: Customer, t: number): number {
   return 0;
 }
 
+function heart(c: Ctx, x: number, y: number, s: number) {
+  c.beginPath();
+  c.moveTo(x, y + s * 0.9);
+  c.bezierCurveTo(x - s * 1.6, y - s * 0.2, x - s * 0.5, y - s * 1.4, x, y - s * 0.4);
+  c.bezierCurveTo(x + s * 0.5, y - s * 1.4, x + s * 1.6, y - s * 0.2, x, y + s * 0.9);
+  c.fillStyle = '#e2475a';
+  c.fill();
+  ellipse(c, x - s * 0.45, y - s * 0.45, s * 0.25, s * 0.15, -0.5);
+  c.fillStyle = 'rgba(255,255,255,0.7)';
+  c.fill();
+}
+
+function sparkle(c: Ctx, x: number, y: number, s: number) {
+  c.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const r = i % 2 ? s * 0.3 : s;
+    c.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+  }
+  c.closePath();
+  c.fillStyle = '#f2c766';
+  c.fill();
+}
+
 function drawFx(c: Ctx, s: Session, v: ViewInfo) {
   for (const f of s.fx) {
     const k = f.t / f.life;
@@ -370,10 +394,10 @@ function drawFx(c: Ctx, s: Session, v: ViewInfo) {
     c.globalAlpha = 1 - k;
     switch (f.kind) {
       case 'heart':
-        text(c, '♥', x, y - k * 60, 22 * f.s, '#e2475a', { weight: 700 });
+        heart(c, x, y - k * 60, 11 * f.s);
         break;
       case 'sparkle':
-        text(c, '✦', x, y - k * 40, 18 * f.s, '#e9b45c', { weight: 700 });
+        sparkle(c, x, y - k * 40, 9 * f.s);
         break;
       case 'grain':
         ellipse(c, x, y, 2.4, 1.3, f.t * 6);

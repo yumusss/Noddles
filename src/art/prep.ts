@@ -34,8 +34,15 @@ export interface PrepLayout {
   float: { x: number; y: number };
 }
 
-export const TOP_RESERVE = 150;
-export const BOTTOM_RESERVE = 112;
+/**
+ * Space kept free (in logical units) for the HUD + paper ticket on top and the serve button below.
+ * Set by the view from real CSS sizes, so on small phones nothing on the counter hides under the ticket.
+ */
+export const RESERVE = { top: 150, bottom: 112 };
+export function setReserves(top: number, bottom: number) {
+  RESERVE.top = Math.round(top);
+  RESERVE.bottom = Math.round(bottom);
+}
 
 export function prepLayout(
   W: number,
@@ -44,8 +51,8 @@ export function prepLayout(
   tubs: IngId[],
   plates: PlateId[]
 ): PrepLayout {
-  const top = TOP_RESERVE;
-  const bottom = BOTTOM_RESERVE;
+  const top = RESERVE.top;
+  const bottom = RESERVE.bottom;
   const N = tubs.length;
   const rackSz = 64;
   const rack = (y: number) =>
@@ -93,20 +100,27 @@ export function prepLayout(
       float: { x: px - u * 0.34, y: py - u * 0.36 },
     };
   }
-  // portrait: plate on top, tubs in a centered grid below
-  const u = Math.min(W * 0.84, 600);
-  const plateH = u * 0.6;
-  const py = top + 20 + plateH / 2;
-  const gridTop = py + plateH / 2 + 34;
-  const availH = H - bottom - gridTop;
-  let cols = 4;
-  let T = Math.min(150, (W - 40) / cols / 1.1);
-  let rows = Math.ceil(N / cols);
-  while (rows * T * 1.16 > availH && T > 70) {
-    if (cols < 5) cols++;
-    T = Math.min(T - 4, (W - 40) / cols / 1.1);
-    rows = Math.ceil(N / cols);
+  // portrait: plate on top, tubs in a centered grid below; the block is centred vertically
+  const availH = H - top - bottom - 20;
+  let u = Math.min(W * 0.88, 620);
+  let best: { cols: number; T: number; rows: number } | null = null;
+  for (let tries = 0; tries < 12 && !best; tries++) {
+    for (let cols = 3; cols <= 5; cols++) {
+      const T = Math.min(200, (W - 40) / cols / 1.1);
+      const rows = Math.ceil(N / cols);
+      if (u * 0.6 + 40 + rows * T * 1.16 <= availH) {
+        best = { cols, T, rows };
+        break;
+      }
+    }
+    if (!best) u *= 0.92;
   }
+  const { cols, T, rows } = best ?? { cols: 5, T: (W - 40) / 5 / 1.1, rows: Math.ceil(N / 5) };
+  const plateH = u * 0.6;
+  const blockH = plateH + 40 + rows * T * 1.16;
+  const y0 = top + 10 + Math.max(0, (availH - blockH) / 2);
+  const py = y0 + plateH / 2;
+  const gridTop = py + plateH / 2 + 40;
   const out: PrepLayout['tubs'] = [];
   for (let r = 0; r < rows; r++) {
     const items = tubs.slice(r * cols, r * cols + cols);
@@ -552,7 +566,7 @@ export function drawPrep(
   if (rice && (s.squeeze.on || s.squeeze.a > 0)) {
     const gy = portrait
       ? P.y + P.u * 0.3 - 10
-      : Math.min(H - BOTTOM_RESERVE - 30, P.y + P.u * 0.3 + 44);
+      : Math.min(H - RESERVE.bottom - 30, P.y + P.u * 0.3 + 44);
     drawSqueezeGauge(c, P.x, gy, s.squeeze.a, lang);
   }
   drawFloating(c, s, L.float.x, L.float.y, P.u, t);
