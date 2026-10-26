@@ -99,6 +99,101 @@ const FISH: Record<string, { a: string; b: string; fat?: string; gloss: number }
 };
 
 /** a fish slice (top view, slightly draped): length along x */
+/** butterflied cooked shrimp: white flesh with coral stripes and a red tail fan */
+function ebiSlice(c: Ctx, len: number, wid: number, seed: number) {
+  const hl = len / 2;
+  const hw = wid / 2;
+  const body = () => {
+    c.beginPath();
+    c.moveTo(-hl * 0.95, 0);
+    c.bezierCurveTo(-hl * 0.9, -hw * 1.2, hl * 0.55, -hw * 1.15, hl * 0.72, -hw * 0.25);
+    c.lineTo(hl * 0.72, hw * 0.25);
+    c.bezierCurveTo(hl * 0.55, hw * 1.15, -hl * 0.9, hw * 1.2, -hl * 0.95, 0);
+    c.closePath();
+  };
+  // tail fan
+  c.save();
+  c.translate(hl * 0.7, 0);
+  for (const s of [-1, 1]) {
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.quadraticCurveTo(hl * 0.25, s * hw * 0.9, hl * 0.42, s * hw * 0.75);
+    c.quadraticCurveTo(hl * 0.3, s * hw * 0.2, 0, 0);
+    c.fillStyle = lin(c, 0, 0, hl * 0.4, 0, [
+      [0, '#f0663f'],
+      [1, '#c43a22'],
+    ]);
+    c.fill();
+  }
+  c.restore();
+  body();
+  c.fillStyle = lin(c, 0, -hw, 0, hw, [
+    [0, '#fff8f0'],
+    [1, '#f3dfd0'],
+  ]);
+  c.fill();
+  c.save();
+  body();
+  c.clip();
+  const r = srand(seed);
+  for (let i = 0; i < 6; i++) {
+    const x = -hl * 0.75 + i * hl * 0.27 + (r() - 0.5) * 2;
+    c.beginPath();
+    c.moveTo(x, -hw * 1.3);
+    c.quadraticCurveTo(x + hl * 0.08, 0, x, hw * 1.3);
+    c.strokeStyle = 'rgba(240,110,70,0.85)';
+    c.lineWidth = hl * 0.1;
+    c.stroke();
+    c.strokeStyle = 'rgba(255,170,130,0.6)';
+    c.lineWidth = hl * 0.04;
+    c.stroke();
+  }
+  // the butterflied centre line
+  c.beginPath();
+  c.moveTo(-hl * 0.9, 0);
+  c.quadraticCurveTo(0, hw * 0.08, hl * 0.7, 0);
+  c.strokeStyle = 'rgba(200,150,130,0.5)';
+  c.lineWidth = 1;
+  c.stroke();
+  c.restore();
+  body();
+  c.strokeStyle = 'rgba(190,110,80,0.5)';
+  c.lineWidth = 0.7;
+  c.stroke();
+  sheen(c, -hl * 0.2, -hw * 0.45, hl * 0.4, hw * 0.16, 0.5);
+}
+
+/** torch marks on top of a slice (aburi) */
+export function aburiMarks(c: Ctx, len: number, wid: number, level: Done, seed: number) {
+  const r = srand(seed + 77);
+  const hl = len / 2;
+  const hw = wid / 2;
+  const strength = level === 'raw' ? 0.25 : level === 'done' ? 0.6 : level === 'over' ? 0.85 : 1;
+  c.save();
+  ellipse(c, 0, -hw * 0.1, hl * 0.95, hw * 0.95);
+  c.clip();
+  const g = c.createLinearGradient(0, -hw, 0, hw);
+  g.addColorStop(0, `rgba(120,55,20,${0.55 * strength})`);
+  g.addColorStop(1, `rgba(200,110,50,${0.15 * strength})`);
+  c.fillStyle = g;
+  c.fillRect(-hl, -hw * 1.2, len, wid * 1.2);
+  for (let i = 0; i < 14; i++) {
+    ellipse(
+      c,
+      -hl * 0.85 + r() * len * 0.85,
+      -hw * 0.6 + r() * hw,
+      1.5 + r() * hl * 0.12,
+      1 + r() * hw * 0.2,
+      r()
+    );
+    c.fillStyle =
+      level === 'burnt' ? 'rgba(30,18,12,0.85)' : `rgba(90,40,15,${0.35 + 0.4 * strength})`;
+    c.fill();
+  }
+  if (level !== 'burnt') sheen(c, -hl * 0.2, -hw * 0.4, hl * 0.5, hw * 0.15, 0.55);
+  c.restore();
+}
+
 function fishSlice(
   c: Ctx,
   fish: IngId,
@@ -108,6 +203,7 @@ function fishSlice(
   opts: { thick?: number; done?: Done; curve?: number } = {}
 ) {
   const r = srand(seed);
+  if (fish === 'ebi') return ebiSlice(c, len, wid, seed);
   const f = FISH[fish] ?? FISH.salmon;
   const th = opts.thick ?? wid * 0.18;
   const curve = opts.curve ?? 0.12;
@@ -430,7 +526,7 @@ const RICE_SCALE: Record<RiceQ, number> = { less: 0.78, just: 1, more: 1.25 };
 export function drawNigiri(
   c: Ctx,
   u: number,
-  p: { rice: RiceQ; neta?: IngId; band?: boolean; done?: Done; tops: IngId[] },
+  p: { rice: RiceQ; neta?: IngId; band?: boolean; done?: Done; tops: IngId[]; aburi?: Done },
   seed: number
 ) {
   const k = RICE_SCALE[p.rice];
@@ -447,6 +543,7 @@ export function drawNigiri(
     c.save();
     c.translate(0, -rh * 0.62);
     fishSlice(c, p.neta, u * 0.215, u * 0.082, seed + 1, { done: p.done, thick: u * 0.013 });
+    if (p.aburi) aburiMarks(c, u * 0.215, u * 0.082, p.aburi, seed);
     if (p.band) {
       // nori belt wrapped over the middle
       c.save();
@@ -475,6 +572,7 @@ const FILL_COL: Partial<Record<IngId, string>> = {
   tamago: '#f4cc5c',
   tempura: '#e4a547',
   unagi: '#8a4a24',
+  ebi: '#f6a184',
 };
 
 function fillingChunk(c: Ctx, f: IngId, x: number, y: number, s: number, seed: number) {
@@ -897,7 +995,7 @@ function pieceKey(p: PieceBody & { tops: IngId[] }): string {
   const t = p.tops.join('+');
   switch (p.kind) {
     case 'nigiri':
-      return `n.${p.rice}.${p.neta ?? '-'}.${p.band ? 1 : 0}.${p.done ?? ''}.${t}`;
+      return `n.${p.rice}.${p.neta ?? '-'}.${p.band ? 1 : 0}.${p.done ?? ''}.${p.aburi ?? ''}.${t}`;
     case 'maki':
       return `m.${p.style}.${p.fill.join('+')}.${p.coat ?? ''}.${p.roll}.${p.cut}.${p.rice}.${t}`;
     case 'sashimi':
@@ -1097,6 +1195,15 @@ export function drawIngredient(c: Ctx, ing: IngId, s: number, seed = 1, done?: D
         c.translate((i - 1) * s * 0.08, (i - 1) * s * 0.12);
         c.rotate(-0.1 + i * 0.05);
         fishSlice(c, ing, s * 0.7, s * 0.3, seed + i, { done, thick: s * 0.04 });
+        c.restore();
+      }
+      return;
+    case 'ebi':
+      for (let i = 2; i >= 0; i--) {
+        c.save();
+        c.translate((i - 1) * s * 0.06, (i - 1) * s * 0.13);
+        c.rotate(-0.08 + i * 0.05);
+        ebiSlice(c, s * 0.68, s * 0.28, seed + i);
         c.restore();
       }
       return;

@@ -1,5 +1,4 @@
-// Static game content: ingredients, plates, decor and the 50-day calendar.
-// Phase 1 ships days 1–10 fully playable; days 11–50 are on the map as "coming soon".
+// Static content for Yuki Sushi: ingredients, plates, the animal cast, 10 five-minute days, decor.
 
 import type { L } from './i18n';
 
@@ -8,6 +7,7 @@ export type IngId =
   | 'salmon'
   | 'tuna'
   | 'tamago'
+  | 'ebi'
   | 'unagi'
   | 'wasabi'
   | 'ginger'
@@ -27,128 +27,56 @@ export type IngId =
   | 'shrimp'
   | 'eel';
 
-export type IngRole = 'base' | 'neta' | 'side' | 'topping' | 'filling' | 'heat';
+export type IngRole = 'base' | 'neta' | 'side' | 'topping' | 'filling';
 
 export interface Ingredient {
   id: IngId;
   name: L;
-  /** where it lives: prep counter tub, rolling board chip, heat station */
   roles: IngRole[];
   cost: number;
-  /** fish/meat → not vegetarian */
   fish?: boolean;
-  /** cooked at the heat station; becomes a prepared tub */
-  cookedFrom?: IngId;
 }
 
+const I = (
+  id: IngId,
+  tr: string,
+  en: string,
+  roles: IngRole[],
+  cost: number,
+  fish = false
+): Ingredient => ({
+  id,
+  name: { tr, en },
+  roles,
+  cost,
+  fish,
+});
+
 export const ING: Record<IngId, Ingredient> = {
-  rice: { id: 'rice', name: { tr: 'Sushi pirinci', en: 'Sushi rice' }, roles: ['base'], cost: 1 },
-  salmon: {
-    id: 'salmon',
-    name: { tr: 'Somon', en: 'Salmon' },
-    roles: ['neta', 'filling'],
-    cost: 3,
-    fish: true,
-  },
-  tuna: {
-    id: 'tuna',
-    name: { tr: 'Ton balığı', en: 'Tuna' },
-    roles: ['neta', 'filling'],
-    cost: 3,
-    fish: true,
-  },
-  tamago: {
-    id: 'tamago',
-    name: { tr: 'Tamago (omlet)', en: 'Tamago (omelette)' },
-    roles: ['neta', 'filling'],
-    cost: 1,
-  },
-  unagi: {
-    id: 'unagi',
-    name: { tr: 'Izgara yılan balığı', en: 'Grilled eel' },
-    roles: ['neta', 'filling'],
-    cost: 4,
-    fish: true,
-    cookedFrom: 'eel',
-  },
-  wasabi: { id: 'wasabi', name: { tr: 'Wasabi', en: 'Wasabi' }, roles: ['side'], cost: 0.5 },
-  ginger: { id: 'ginger', name: { tr: 'Zencefil', en: 'Ginger' }, roles: ['side'], cost: 0.5 },
-  soy: { id: 'soy', name: { tr: 'Soya sosu', en: 'Soy sauce' }, roles: ['side'], cost: 0.5 },
-  nori: { id: 'nori', name: { tr: 'Nori', en: 'Nori' }, roles: ['base'], cost: 1 },
-  cucumber: {
-    id: 'cucumber',
-    name: { tr: 'Salatalık', en: 'Cucumber' },
-    roles: ['filling'],
-    cost: 0.5,
-  },
-  avocado: { id: 'avocado', name: { tr: 'Avokado', en: 'Avocado' }, roles: ['filling'], cost: 1.5 },
-  crab: {
-    id: 'crab',
-    name: { tr: 'Yengeç', en: 'Crab' },
-    roles: ['filling'],
-    cost: 2,
-    fish: true,
-  },
-  creamcheese: {
-    id: 'creamcheese',
-    name: { tr: 'Krem peynir', en: 'Cream cheese' },
-    roles: ['filling'],
-    cost: 1,
-  },
-  tempura: {
-    id: 'tempura',
-    name: { tr: 'Tempura karides', en: 'Shrimp tempura' },
-    roles: ['filling'],
-    cost: 3,
-    fish: true,
-    cookedFrom: 'shrimp',
-  },
-  sesame: { id: 'sesame', name: { tr: 'Susam', en: 'Sesame' }, roles: ['topping'], cost: 0.3 },
-  tobiko: {
-    id: 'tobiko',
-    name: { tr: 'Tobiko', en: 'Tobiko' },
-    roles: ['topping'],
-    cost: 1.5,
-    fish: true,
-  },
-  scallion: {
-    id: 'scallion',
-    name: { tr: 'Taze soğan', en: 'Scallion' },
-    roles: ['topping'],
-    cost: 0.3,
-  },
-  spicymayo: {
-    id: 'spicymayo',
-    name: { tr: 'Acı mayo', en: 'Spicy mayo' },
-    roles: ['topping'],
-    cost: 0.5,
-  },
-  unagisauce: {
-    id: 'unagisauce',
-    name: { tr: 'Unagi sosu', en: 'Eel sauce' },
-    roles: ['topping'],
-    cost: 0.5,
-  },
-  noriband: {
-    id: 'noriband',
-    name: { tr: 'Nori kuşağı', en: 'Nori belt' },
-    roles: ['topping'],
-    cost: 0.3,
-  },
-  shrimp: {
-    id: 'shrimp',
-    name: { tr: 'Karides (tempura için)', en: 'Shrimp (for tempura)' },
-    roles: ['heat'],
-    cost: 2,
-    fish: true,
-  },
-  eel: {
-    id: 'eel',
-    name: { tr: 'Yılan balığı (ızgara)', en: 'Eel (for grilling)' },
-    roles: ['heat'],
-    cost: 3,
-    fish: true,
-  },
+  rice: I('rice', 'Sushi pirinci', 'Sushi rice', ['base'], 1),
+  salmon: I('salmon', 'Somon', 'Salmon', ['neta', 'filling'], 3, true),
+  tuna: I('tuna', 'Ton balığı', 'Tuna', ['neta', 'filling'], 3, true),
+  tamago: I('tamago', 'Tamago', 'Tamago', ['neta', 'filling'], 1),
+  ebi: I('ebi', 'Karides', 'Shrimp', ['neta', 'filling'], 2, true),
+  wasabi: I('wasabi', 'Wasabi', 'Wasabi', ['side'], 0.5),
+  ginger: I('ginger', 'Zencefil', 'Ginger', ['side'], 0.5),
+  soy: I('soy', 'Soya sosu', 'Soy sauce', ['side'], 0.5),
+  nori: I('nori', 'Nori', 'Nori', ['base'], 1),
+  cucumber: I('cucumber', 'Salatalık', 'Cucumber', ['filling'], 0.5),
+  avocado: I('avocado', 'Avokado', 'Avocado', ['filling'], 1.5),
+  crab: I('crab', 'Yengeç', 'Crab', ['filling'], 2, true),
+  creamcheese: I('creamcheese', 'Krem peynir', 'Cream cheese', ['filling'], 1),
+  sesame: I('sesame', 'Susam', 'Sesame', ['topping'], 0.3),
+  tobiko: I('tobiko', 'Tobiko', 'Tobiko', ['topping'], 1.5, true),
+  scallion: I('scallion', 'Taze soğan', 'Scallion', ['topping'], 0.3),
+  spicymayo: I('spicymayo', 'Acı mayo', 'Spicy mayo', ['topping'], 0.5),
+  noriband: I('noriband', 'Nori kuşağı', 'Nori belt', ['topping'], 0.3),
+  // kept for the drawing code, not used in this game
+  unagi: I('unagi', 'Unagi', 'Eel', [], 4, true),
+  tempura: I('tempura', 'Tempura', 'Tempura', [], 3, true),
+  unagisauce: I('unagisauce', 'Unagi sosu', 'Eel sauce', [], 0.5),
+  shrimp: I('shrimp', 'Karides', 'Shrimp', [], 2, true),
+  eel: I('eel', 'Yılan balığı', 'Eel', [], 3, true),
 };
 
 export type PlateId = 'geta' | 'slate' | 'porcelain' | 'celadon' | 'sakura' | 'box';
@@ -161,25 +89,73 @@ export const PLATES: Plate[] = [
   { id: 'geta', name: { tr: 'Ahşap geta', en: 'Wooden geta' }, unlockDay: 1 },
   { id: 'slate', name: { tr: 'Kayrak', en: 'Slate' }, unlockDay: 5 },
   { id: 'porcelain', name: { tr: 'Porselen', en: 'Porcelain' }, unlockDay: 9 },
-  { id: 'celadon', name: { tr: 'Seladon', en: 'Celadon' }, unlockDay: 14 },
-  { id: 'sakura', name: { tr: 'Sakura tabak', en: 'Sakura plate' }, unlockDay: 22 },
 ];
-export const BOX_NAME: L = { tr: 'Paket kutusu', en: 'Takeout box' };
 
-// ---------- calendar ----------
+// ---------- cast ----------
 
-export type TimeOfDay = 'morning' | 'noon' | 'sunset' | 'evening';
+export type Species =
+  | 'penguin'
+  | 'seal'
+  | 'otter'
+  | 'bear'
+  | 'arcticfox'
+  | 'hare'
+  | 'puffin'
+  | 'redpanda'
+  | 'tanuki'
+  | 'owl'
+  | 'walrus'
+  | 'reindeer'
+  | 'fox'
+  | 'gull';
 
-export type Speaker = 'ume' | 'tuna' | 'gleam' | 'mina' | 'stranger' | 'critic' | 'inky' | 'me';
+/** species that walk in as everyday customers */
+export const CUSTOMER_SPECIES: Species[] = [
+  'penguin',
+  'seal',
+  'otter',
+  'bear',
+  'arcticfox',
+  'hare',
+  'puffin',
+  'redpanda',
+  'tanuki',
+  'reindeer',
+];
+
+export const SPECIES_NAME: Record<Species, L> = {
+  penguin: { tr: 'Penguen', en: 'Penguin' },
+  seal: { tr: 'Fok', en: 'Seal' },
+  otter: { tr: 'Su samuru', en: 'Otter' },
+  bear: { tr: 'Kutup ayısı', en: 'Polar bear' },
+  arcticfox: { tr: 'Kutup tilkisi', en: 'Arctic fox' },
+  hare: { tr: 'Kar tavşanı', en: 'Snow hare' },
+  puffin: { tr: 'Deniz papağanı', en: 'Puffin' },
+  redpanda: { tr: 'Kızıl panda', en: 'Red panda' },
+  tanuki: { tr: 'Rakun köpeği', en: 'Tanuki' },
+  owl: { tr: 'Kar baykuşu', en: 'Snowy owl' },
+  walrus: { tr: 'Mors', en: 'Walrus' },
+  reindeer: { tr: 'Ren geyiği', en: 'Reindeer' },
+  fox: { tr: 'Tilki', en: 'Fox' },
+  gull: { tr: 'Martı', en: 'Seagull' },
+};
+
+export type Speaker = 'tusk' | 'pip' | 'hazel' | 'squawk' | 'bulut' | 'hoot';
 export const SPEAKERS: Record<Speaker, L> = {
-  ume: { tr: 'Ume Nine', en: 'Grandma Ume' },
-  tuna: { tr: 'Kaptan Tuna', en: 'Captain Tuna' },
-  gleam: { tr: 'Bay Parlak', en: 'Mr. Gleam' },
-  mina: { tr: 'Mina', en: 'Mina' },
-  stranger: { tr: 'Yağmurluklu yabancı', en: 'Stranger in a raincoat' },
-  critic: { tr: 'Eleştirmen Kalem Hanım', en: 'Critic Ms. Quill' },
-  inky: { tr: 'Mürekkep', en: 'Inky' },
-  me: { tr: 'Sen', en: 'You' },
+  tusk: { tr: 'Mors Dede', en: 'Grandpa Tusk' },
+  pip: { tr: 'Pıtırcık', en: 'Pip' },
+  hazel: { tr: 'Fındık', en: 'Hazel' },
+  squawk: { tr: 'Kaptan Gak', en: 'Captain Squawk' },
+  bulut: { tr: 'Bulut', en: 'Cloud' },
+  hoot: { tr: 'Baykuş Hanım', en: 'Madame Hoot' },
+};
+export const SPEAKER_SPECIES: Record<Speaker, Species> = {
+  tusk: 'walrus',
+  pip: 'penguin',
+  hazel: 'fox',
+  squawk: 'gull',
+  bulut: 'bear',
+  hoot: 'owl',
 };
 
 export interface Line {
@@ -187,514 +163,456 @@ export interface Line {
   text: L;
 }
 
-/** a hand-written order for a special guest; uses only what is unlocked that day */
 export interface SpecialGuest {
   who: Speaker;
-  /** at which fraction of the day they arrive */
+  /** fraction of the day when they arrive (they take the next free turn) */
   at: number;
   greet: L;
-  /** order template id understood by orders.ts */
   order: string;
   bonus: number;
 }
 
+// ---------- the ten days ----------
+
+export type TimeOfDay = 'morning' | 'noon' | 'sunset' | 'evening';
+
 export interface Day {
   n: number;
-  act: number;
   title: L;
   time: TimeOfDay;
-  rain: boolean;
-  /** real seconds */
+  snow: 'light' | 'storm' | 'none';
+  /** real seconds — every day is five minutes */
   duration: number;
-  /** seconds between walk-in arrivals */
-  spawn: number;
-  /** patience in seconds while seated */
+  /** patience in seconds */
   patience: number;
   /** order complexity tier 1..6 */
   tier: number;
   unlock: IngId[];
   plates?: PlateId[];
-  station2?: boolean;
-  heat?: boolean;
+  maki?: boolean;
+  sashimi?: boolean;
+  torch?: boolean;
   online?: boolean;
   guests?: SpecialGuest[];
+  /** a short line under the day on the map: what's new */
+  news: L;
   intro: Line[];
   outro: Line[];
   rent: number;
-  bills: number;
 }
 
-const D = (d: Day) => d;
+export const DAY_SECONDS = 300;
+
+const D = (d: Omit<Day, 'duration'>): Day => ({ ...d, duration: DAY_SECONDS });
 
 export const DAYS: Day[] = [
   D({
     n: 1,
-    act: 1,
-    title: { tr: 'Feribottan inen', en: 'Off the ferry' },
+    title: { tr: 'Karlı Liman', en: 'Snowy Harbor' },
     time: 'morning',
-    rain: false,
-    duration: 300,
-    spawn: 50,
+    snow: 'light',
     patience: 999,
     tier: 1,
     unlock: ['rice', 'salmon', 'wasabi', 'soy'],
-    rent: 20,
-    bills: 5,
+    rent: 15,
+    news: { tr: 'Somon nigiri', en: 'Salmon nigiri' },
     intro: [
       {
-        who: 'ume',
+        who: 'tusk',
         text: {
-          tr: 'Hoş geldin torunum! Kirazlı Liman seni özlemiş. Ben de… ama bileğim incindi, bıçağı tutamıyorum.',
-          en: 'Welcome, dear! Cherry Harbor has missed you. So have I… but I hurt my wrist and can’t hold a knife.',
+          tr: 'Hoş geldin evlat! Kırk kış bu kulübede sushi yaptım. Ama yüzgeçlerim artık bu soğuğa dayanmıyor.',
+          en: 'Welcome, kiddo! Forty winters I made sushi in this hut. But my flippers can’t take the cold anymore.',
         },
       },
       {
-        who: 'ume',
+        who: 'pip',
         text: {
-          tr: 'Nami-ya kırk yıldır bu tezgâhta. Bu yaz tezgâh senin. Önce nigiri: pirinç topu, üstüne somon.',
-          en: 'Nami-ya has stood at this counter for forty years. This summer it’s yours. First, nigiri: a rice ball with salmon on top.',
+          tr: 'Ben Pıtırcık! Tezgâhın yardımcısıyım. Bugün sana her şeyi adım adım göstereceğim!',
+          en: 'I’m Pip! The counter helper. Today I’ll show you everything, step by step!',
         },
       },
       {
-        who: 'inky',
+        who: 'hazel',
         text: {
-          tr: '*Akvaryumdan bir dokunaç el sallıyor*',
-          en: '*A tentacle waves from the fish bowl*',
+          tr: 'Selam! Ben Fındık, Nefis uygulamasını ben yaptım. Yuki Sushi’nin puanı şu an 2,3 yıldız… Epey düşük.',
+          en: 'Hi! I’m Hazel, I made the Yumm app. Yuki Sushi is rated 2.3 stars right now… pretty low.',
         },
       },
       {
-        who: 'ume',
+        who: 'squawk',
         text: {
-          tr: 'Bu da Mürekkep. Tezgâhın bekçisi. Ona balık verme, şımarıyor.',
-          en: 'That’s Inky, guardian of the counter. Don’t feed him fish, it spoils him.',
+          tr: 'GAK! Kar Festivali’ne kadar puanınız 4,2 olmazsa bu kulübe benim! Yerine Gak Gak Balık-Patates açacağım!',
+          en: 'SQUAWK! If your rating isn’t 4.2 by the Snow Festival, this hut is mine! I’ll open Squawk’s Fish & Chips!',
+        },
+      },
+      {
+        who: 'tusk',
+        text: {
+          tr: 'Kulak asma o martıya. Her müşteriyi mutlu et, gerisi gelir. Hadi, pencereyi aç!',
+          en: 'Don’t mind that gull. Make every customer happy and the rest will follow. Go on, open the window!',
         },
       },
     ],
     outro: [
       {
-        who: 'ume',
+        who: 'pip',
         text: {
-          tr: 'İlk günün için hiç fena değil! Pirinç elinde konuşmaya başladı bile.',
-          en: 'Not bad at all for a first day! The rice is already listening to your hands.',
+          tr: 'İlk gün bitti! Tablete bak: yeni yorumlar geldi. Her yorum puanı değiştiriyor.',
+          en: 'First day done! Check the tablet: new reviews came in. Every review moves the rating.',
         },
       },
     ],
   }),
   D({
     n: 2,
-    act: 1,
-    title: { tr: 'Sabah balık hali', en: 'The dawn fish market' },
+    title: { tr: 'Buzlu iskele', en: 'The icy pier' },
     time: 'morning',
-    rain: false,
-    duration: 300,
-    spawn: 46,
-    patience: 95,
+    snow: 'none',
+    patience: 90,
     tier: 1,
     unlock: ['tuna', 'ginger'],
-    rent: 20,
-    bills: 5,
+    rent: 15,
+    news: { tr: 'Ton balığı, zencefil', en: 'Tuna, ginger' },
     intro: [
       {
-        who: 'tuna',
+        who: 'bulut',
         text: {
-          tr: 'Günaydın! Kaptan Tuna, balık halinin en erkencisi. Ume Hanım’ın torunu sen misin? Al, bugünün ton balığı.',
-          en: 'Morning! Captain Tuna, first boat at the market. You’re Ume’s grandkid? Here, today’s tuna.',
+          tr: 'Günaydın! Ben Bulut. Buzun altından ton balığı tuttum, kulübeye getirdim. Karşılığında… bir tabak sushi?',
+          en: 'Morning! I’m Cloud. Caught some tuna under the ice and brought it over. In return… a plate of sushi?',
         },
       },
       {
-        who: 'ume',
+        who: 'pip',
         text: {
-          tr: 'Tuna’nın balığı limanın en tazesi. Zencefili de unutma; ağzı tazeler.',
-          en: 'Tuna’s fish is the freshest in the harbor. And don’t forget ginger; it refreshes the mouth.',
+          tr: 'Bugünden itibaren müşteriler sabırsız. Sipariş kartının altındaki çizgiye dikkat!',
+          en: 'From today customers get impatient. Watch the bar under the order card!',
         },
       },
     ],
     outro: [
       {
-        who: 'tuna',
+        who: 'tusk',
         text: {
-          tr: 'Bugün tezgâhın önünden geçerken kuyruk gördüm. Eski günler gibi!',
-          en: 'Saw a line outside your counter today. Just like the old days!',
+          tr: 'Müşterilerle konuşmayı unutma. Güzel bir söz, soğuk bir günü ısıtır.',
+          en: 'Don’t forget to talk to your customers. A kind word warms a cold day.',
         },
       },
     ],
   }),
   D({
     n: 3,
-    act: 1,
-    title: { tr: 'Ninemin hasırı', en: 'Grandma’s bamboo mat' },
+    title: { tr: 'Dedemin hasırı', en: 'Grandpa’s mat' },
     time: 'noon',
-    rain: false,
-    duration: 300,
-    spawn: 46,
-    patience: 100,
+    snow: 'light',
+    patience: 95,
     tier: 2,
     unlock: ['nori', 'cucumber'],
-    station2: true,
-    rent: 20,
-    bills: 6,
+    maki: true,
+    rent: 16,
+    news: { tr: 'Hoso maki (hasır)', en: 'Hosomaki (bamboo mat)' },
     intro: [
       {
-        who: 'ume',
+        who: 'tusk',
         text: {
-          tr: 'Bugün maki öğreniyorsun. Bu hasır benim ustamındı. Nori, ince bir kat pirinç, ortaya salatalık… sonra sar.',
-          en: 'Today you learn maki. This mat belonged to my master. Nori, a thin layer of rice, cucumber in the middle… then roll.',
+          tr: 'Bu bambu hasır benden de yaşlı. Nori koy, pirinci yay, salatalığı ortaya diz… ve sar!',
+          en: 'This bamboo mat is older than me. Lay the nori, spread the rice, line up the cucumber… and roll!',
         },
       },
       {
-        who: 'ume',
+        who: 'pip',
         text: {
-          tr: 'Yan taraftaki kesme tahtasına geç. Ne çok hızlı, ne çok yavaş. Rulo nefes almalı.',
-          en: 'Head to the cutting board on the side. Not too fast, not too slow. A roll should breathe.',
+          tr: 'Tezgâhın altındaki “Hasır”a dokun. Çok hızlı sararsan rulo dağılır, dikkat!',
+          en: 'Tap “Mat” under the counter. Roll too fast and it falls apart, careful!',
         },
       },
     ],
     outro: [
       {
-        who: 'ume',
+        who: 'hazel',
         text: {
-          tr: 'Ustam Hayato da böyle sarardı. Bir gün gitti… ve bıçağıyla birlikte kayboldu.',
-          en: 'My master Hayato rolled just like that. One day he left… and vanished with his knife.',
+          tr: 'Nefis’te biri “Maki’ler çok düzgün!” yazmış. Puan yavaş yavaş kıpırdıyor!',
+          en: 'Someone on Yumm wrote “The maki are so neat!” The rating is starting to move!',
         },
       },
     ],
   }),
   D({
     n: 4,
-    act: 1,
-    title: { tr: 'Bıçak dersi', en: 'The knife lesson' },
+    title: { tr: 'Ayının iştahı', en: 'A bear’s appetite' },
     time: 'noon',
-    rain: false,
-    duration: 330,
-    spawn: 44,
-    patience: 95,
+    snow: 'none',
+    patience: 90,
     tier: 2,
     unlock: ['avocado'],
-    rent: 22,
-    bills: 6,
+    sashimi: true,
+    rent: 16,
+    news: { tr: 'Sashimi, avokado', en: 'Sashimi, avocado' },
     guests: [
       {
-        who: 'tuna',
+        who: 'bulut',
         at: 0.45,
         greet: {
-          tr: 'Kendi balığımı bir de senin bıçağından tadayım! 3 ince ton sashimi, lütfen.',
-          en: 'Let me taste my own fish off your knife! 3 thin tuna sashimi, please.',
+          tr: 'Ben geldim! Beş tane kalın somon sashimi. Kalın ama, ayı kalınlığında!',
+          en: 'It’s me! Five thick salmon sashimi. Thick, bear-sized thick!',
         },
-        order: 'tuna-sashimi',
+        order: 'bear-sashimi',
         bonus: 15,
       },
     ],
     intro: [
       {
-        who: 'ume',
+        who: 'tusk',
         text: {
-          tr: 'Sashimi pirinçsiz, sadece balık. Kesme tahtasında balığı seç, doğru anda kes: ince, tam ya da kalın.',
-          en: 'Sashimi is fish alone, no rice. Pick the fish on the cutting board and slice at the right moment: thin, regular or thick.',
-        },
-      },
-      {
-        who: 'ume',
-        text: {
-          tr: 'Bu bıçak körleşti ama idare eder. Asıl bıçak… neyse. Avokado da geldi!',
-          en: 'This knife is dull but it’ll do. The real knife… never mind. Avocados arrived too!',
+          tr: 'Sashimi pirinçsizdir, sadece balık. Bıçağın doğru anda inerse dilim ince, tam ya da kalın olur.',
+          en: 'Sashimi is just fish, no rice. Drop the knife at the right moment for thin, regular or thick slices.',
         },
       },
     ],
     outro: [
       {
-        who: 'tuna',
+        who: 'bulut',
         text: {
-          tr: 'Ume, bu çocuk Hayato gibi kesiyor. Söyleyeyim dedim.',
-          en: 'Ume, this kid cuts like Hayato. Just saying.',
+          tr: 'Mmm! Bunu bütün iskeleye anlatacağım. Nefis’e beş yıldız bırakıyorum!',
+          en: 'Mmm! I’m telling the whole pier. Leaving five stars on Yumm!',
         },
-      },
-      {
-        who: 'ume',
-        text: { tr: '…Biliyorum, Tuna. Biliyorum.', en: '…I know, Tuna. I know.' },
       },
     ],
   }),
   D({
     n: 5,
-    act: 1,
-    title: { tr: 'Mürekkep’in suçu', en: 'Inky’s crime' },
+    title: { tr: 'Yorumlara cevap', en: 'Answering reviews' },
     time: 'sunset',
-    rain: false,
-    duration: 330,
-    spawn: 42,
-    patience: 90,
+    snow: 'light',
+    patience: 85,
     tier: 3,
-    unlock: ['sesame'],
+    unlock: ['tamago', 'noriband', 'sesame'],
     plates: ['slate'],
-    rent: 22,
-    bills: 6,
+    rent: 17,
+    news: {
+      tr: 'Tamago, kayrak tabak, “olmasın” istekleri',
+      en: 'Tamago, slate plate, “no …” requests',
+    },
     intro: [
       {
-        who: 'mina',
+        who: 'hazel',
         text: {
-          tr: 'Merhaba! Ben Mina, karşıdaki dondurmacının kızıyım. Ahtapotun dün bizim salatalığı çaldı!',
-          en: 'Hi! I’m Mina from the ice-cream shop across the street. Your octopus stole our cucumber yesterday!',
+          tr: 'Bir ipucu: Nefis’te kötü yorumlara nazikçe cevap verirsen bazıları puanını düzeltir. Kaba cevap verirsen… tersi olur.',
+          en: 'A tip: reply kindly to bad reviews on Yumm and some will raise their score. Reply rudely and… the opposite.',
         },
       },
       {
-        who: 'inky',
-        text: { tr: '*Masum masum baloncuk üflüyor*', en: '*Blows innocent little bubbles*' },
-      },
-      {
-        who: 'ume',
+        who: 'pip',
         text: {
-          tr: 'Artık müşteriler “şu olmasın” da diyecek. Fişi iyi oku. Bir de kayrak tabağımız var, bazıları onu ister.',
-          en: 'Now customers will say “no this, no that”. Read the ticket carefully. We also have a slate plate; some will ask for it.',
+          tr: 'Artık “wasabi olmasın” diyenler var. Kartta kırmızı yazar, iyi oku!',
+          en: 'Now some say “no wasabi”. It’s written in red on the card, read carefully!',
         },
       },
     ],
     outro: [
       {
-        who: 'mina',
+        who: 'tusk',
         text: {
-          tr: 'Yarın arkadaşlarımı getireceğim. Söz, Mürekkep’e balık vermeyeceğiz!',
-          en: 'I’ll bring my friends tomorrow. Promise we won’t feed Inky fish!',
+          tr: 'Gün batımında liman ne güzel, değil mi? Bu kulübeyi o martıya bırakmayalım.',
+          en: 'The harbor is lovely at sunset, isn’t it? Let’s not leave this hut to that gull.',
         },
       },
     ],
   }),
   D({
     n: 6,
-    act: 1,
-    title: { tr: 'Yağmurlu yabancı', en: 'Stranger in the rain' },
+    title: { tr: 'Kar fırtınası', en: 'Snowstorm' },
     time: 'noon',
-    rain: true,
-    duration: 360,
-    spawn: 42,
-    patience: 90,
+    snow: 'storm',
+    patience: 85,
     tier: 3,
     unlock: ['crab', 'tobiko'],
-    rent: 24,
-    bills: 7,
+    rent: 17,
+    news: { tr: 'Ura maki, yengeç, tobiko', en: 'Uramaki, crab, tobiko' },
     guests: [
       {
-        who: 'stranger',
-        at: 0.55,
+        who: 'squawk',
+        at: 0.5,
         greet: {
-          tr: '…Bir ura maki. Yengeçli, avokadolu. Dışı susamlı. Hayato’nun tarifi gibi.',
-          en: '…One uramaki. Crab and avocado. Sesame outside. Like Hayato’s recipe.',
+          tr: 'Gak! Ben… ehem… sıradan bir müşteriyim. Bir ura maki: yengeçli, avokadolu, dışı susamlı. Hata ararım!',
+          en: 'Squawk! I’m… ahem… a regular customer. One uramaki: crab, avocado, sesame outside. I WILL find a mistake!',
         },
-        order: 'stranger-ura',
-        bonus: 20,
+        order: 'gull-ura',
+        bonus: 25,
       },
     ],
     intro: [
       {
-        who: 'ume',
+        who: 'tusk',
         text: {
-          tr: 'Yağmur yağınca liman sakinleşir ama sıcak bir tezgâh arayanlar gelir. Bugün ura maki: pirinç dışarıda!',
-          en: 'Rain quiets the harbor, but people come looking for a warm counter. Today: uramaki, rice on the outside!',
+          tr: 'Fırtınada az müşteri gelir ama gelenler sıcak bir tabak ister. Bugün ura maki: pirinç dışarıda!',
+          en: 'Few come in a storm, but those who do want a warm plate. Today: uramaki, rice on the outside!',
         },
       },
     ],
     outro: [
       {
-        who: 'ume',
+        who: 'hazel',
         text: {
-          tr: 'O yağmurluklu adam tabağın altına bir şey bırakmış… bir bıçak çizimi. Bu… Hayato’nun bıçağı!',
-          en: 'That man in the raincoat left something under the plate… a drawing of a knife. That’s… Hayato’s knife!',
+          tr: 'Kaptan Gak kılık değiştirip gelmiş! Kötü yorum yazmaya çalıştı ama tabak o kadar iyiydi ki…',
+          en: 'Captain Squawk came in disguise! He tried to post a bad review, but the plate was so good…',
         },
       },
     ],
   }),
   D({
     n: 7,
-    act: 1,
-    title: { tr: 'Tavanın sesi', en: 'The sound of the fryer' },
+    title: { tr: 'Alevli somon', en: 'Flame-kissed salmon' },
     time: 'sunset',
-    rain: false,
-    duration: 360,
-    spawn: 40,
-    patience: 88,
+    snow: 'none',
+    patience: 80,
     tier: 4,
-    unlock: ['shrimp', 'tempura', 'creamcheese'],
-    heat: true,
-    rent: 24,
-    bills: 8,
+    unlock: ['scallion', 'spicymayo'],
+    torch: true,
+    rent: 18,
+    news: { tr: 'Aburi (pürmüz), acı mayo', en: 'Aburi (torch), spicy mayo' },
     intro: [
       {
-        who: 'tuna',
+        who: 'tusk',
         text: {
-          tr: 'Eski fritözü tamir ettim! Karidesleri at, kadrana bak, tam kızarınca al. Yanarsa çöpe!',
-          en: 'Fixed the old fryer! Drop the shrimp in, watch the dial, take them out when they’re golden. Burnt ones go in the bin!',
-        },
-      },
-      {
-        who: 'tuna',
-        text: {
-          tr: 'Bu arada… limana bir afiş astılar. “DönDön Sushi — Çok yakında!” Konveyör bantlı zincir.',
-          en: 'By the way… someone put up a poster at the harbor. “SpinSushi — Coming soon!” A conveyor-belt chain.',
+          tr: 'Aburi: somonun üstünü pürmüzle hafifçe yak. Basılı tut, kadran yeşildeyken bırak. Fazlası kömür olur!',
+          en: 'Aburi: lightly sear the top of the salmon with a torch. Hold, let go when the dial is green. Any more and it’s charcoal!',
         },
       },
     ],
     outro: [
       {
-        who: 'ume',
+        who: 'pip',
         text: {
-          tr: 'Bant üstünde dönen sushi… Pirinç el ister, makine değil. Endişelenme.',
-          en: 'Sushi spinning on a belt… Rice wants hands, not machines. Don’t worry.',
+          tr: 'Kulübe mis gibi yanık somon kokuyor. Yarın tablet de çalacak, hazır ol!',
+          en: 'The hut smells of seared salmon. Tomorrow the tablet will ring too, get ready!',
         },
       },
     ],
   }),
   D({
     n: 8,
-    act: 1,
-    title: { tr: 'Parlak bir teklif', en: 'A shiny offer' },
+    title: { tr: 'Tablet çalıyor', en: 'The tablet rings' },
     time: 'noon',
-    rain: false,
-    duration: 390,
-    spawn: 40,
-    patience: 85,
+    snow: 'light',
+    patience: 80,
     tier: 4,
-    unlock: ['scallion', 'spicymayo'],
-    rent: 26,
-    bills: 8,
-    guests: [
-      {
-        who: 'gleam',
-        at: 0.5,
-        greet: {
-          tr: 'Merhaba merhaba! İki acılı somon temaki. Hızlı olsun, zaman paradır.',
-          en: 'Hello, hello! Two spicy salmon temaki. Make it quick, time is money.',
-        },
-        order: 'gleam-temaki',
-        bonus: 20,
-      },
-    ],
+    unlock: ['creamcheese'],
+    online: true,
+    rent: 18,
+    news: { tr: 'Online siparişler, krem peynir', en: 'Online orders, cream cheese' },
     intro: [
       {
-        who: 'ume',
+        who: 'hazel',
         text: {
-          tr: 'Temaki: yarım nori, pirinç, iç malzeme, sonra külah gibi sar. Elle yenir, çocuklar bayılır.',
-          en: 'Temaki: half a nori sheet, rice, filling, then roll it into a cone. Eaten by hand; kids love it.',
+          tr: 'Nefis’e sipariş özelliği ekledim! Tablet çalınca siparişi al, paket kutusuna hazırla, kızak kurye götürsün.',
+          en: 'I added ordering to Yumm! When the tablet rings, take the order, pack it in a box, and the sled courier delivers it.',
         },
       },
     ],
     outro: [
       {
-        who: 'gleam',
+        who: 'hazel',
         text: {
-          tr: 'Hoş dükkân. Satarsanız iyi para veririm. DönDön Sushi burayı… bekleme salonu yapar.',
-          en: 'Cute shop. I’d pay well if you sold. SpinSushi could make this place… a waiting room.',
-        },
-      },
-      {
-        who: 'ume',
-        text: {
-          tr: 'Nami-ya satılık değil, Bay Parlak. Kapı orada.',
-          en: 'Nami-ya is not for sale, Mr. Gleam. The door is right there.',
+          tr: 'Paket yorumları da puana sayılıyor. Kaptan Gak’ın büfesine kimse sipariş vermemiş, hi hi!',
+          en: 'Delivery reviews count toward the rating too. Nobody ordered from Squawk’s stand, hee hee!',
         },
       },
     ],
   }),
   D({
     n: 9,
-    act: 1,
-    title: { tr: 'Eleştirmenin kalemi', en: 'The critic’s pen' },
+    title: { tr: 'Eleştirmenin gözü', en: 'The critic’s eye' },
     time: 'evening',
-    rain: false,
-    duration: 390,
-    spawn: 38,
-    patience: 85,
+    snow: 'light',
+    patience: 80,
     tier: 5,
-    unlock: ['tamago', 'noriband'],
+    unlock: ['ebi'],
     plates: ['porcelain'],
-    rent: 26,
-    bills: 9,
+    rent: 19,
+    news: { tr: 'Futo maki, karides, porselen tabak', en: 'Futomaki, shrimp, porcelain plate' },
     guests: [
       {
-        who: 'critic',
+        who: 'hoot',
         at: 0.5,
         greet: {
-          tr: 'Kalem Hanım, Liman Gazetesi. Porselen tabakta: 2 somon nigiri, 2 tamago nigiri ve zencefil. Wasabi istemem.',
-          en: 'Ms. Quill, Harbor Gazette. On a porcelain plate: 2 salmon nigiri, 2 tamago nigiri and ginger. No wasabi.',
+          tr: 'Hu-hu. Baykuş Hanım, Kuzey Gazetesi. Porselen tabakta: iki aburi somon, iki karides nigiri ve zencefil. Wasabi istemem.',
+          en: 'Hoo-hoo. Madame Hoot, Northern Gazette. On porcelain: two aburi salmon, two shrimp nigiri and ginger. No wasabi.',
         },
-        order: 'critic-plate',
-        bonus: 30,
+        order: 'owl-plate',
+        bonus: 35,
       },
     ],
     intro: [
       {
-        who: 'ume',
+        who: 'tusk',
         text: {
-          tr: 'Bu akşam Liman Gazetesi’nden eleştirmen gelecek. Tamago’yu nori kuşağıyla bağla; ustam öyle yapardı.',
-          en: 'A critic from the Harbor Gazette is coming tonight. Tie the tamago with a nori belt; that’s how my master did it.',
+          tr: 'Futo maki kalın bir rulodur, en az üç malzeme ister. Bu gece de eleştirmen geliyor; gözünü dört aç.',
+          en: 'Futomaki is a fat roll with at least three fillings. And tonight a critic is coming; stay sharp.',
         },
       },
     ],
     outro: [
       {
-        who: 'critic',
+        who: 'hoot',
         text: {
-          tr: '“Nami-ya, limanın unutulmuş incisi.” Yarınki gazeteye böyle yazacağım.',
-          en: '“Nami-ya, the harbor’s forgotten pearl.” That’s what tomorrow’s paper will say.',
-        },
-      },
-      {
-        who: 'ume',
-        text: {
-          tr: 'Bak! Limanın karşısında neon yandı: DönDön Sushi açıldı. Daha çok müşteriye ihtiyacımız var…',
-          en: 'Look! A neon sign just lit up across the harbor: SpinSushi is open. We need more customers…',
+          tr: '“Karlı Liman’ın saklı hazinesi.” Yarınki gazeteye böyle yazacağım. Hu-hu.',
+          en: '“Snowy Harbor’s hidden treasure.” That’s what tomorrow’s paper will say. Hoo-hoo.',
         },
       },
     ],
   }),
   D({
     n: 10,
-    act: 2,
-    title: { tr: 'Tablet çalıyor', en: 'The tablet rings' },
-    time: 'noon',
-    rain: false,
-    duration: 420,
-    spawn: 40,
+    title: { tr: 'Kar Festivali', en: 'Snow Festival' },
+    time: 'evening',
+    snow: 'light',
     patience: 85,
-    tier: 5,
-    unlock: ['eel', 'unagi', 'unagisauce'],
-    online: true,
-    rent: 28,
-    bills: 10,
+    tier: 6,
+    unlock: [],
+    rent: 20,
+    news: {
+      tr: 'Final: kuzey ışıkları, büyük siparişler',
+      en: 'Finale: northern lights, big orders',
+    },
+    guests: [
+      {
+        who: 'hazel',
+        at: 0.6,
+        greet: {
+          tr: 'Festival tabağı benden! Kayrakta: altı ura maki (somon, avokado, dışı tobiko) ve iki tamago. Soya sosu da lütfen!',
+          en: 'Festival plate’s on me! On slate: six uramaki (salmon, avocado, tobiko outside) and two tamago. Soy sauce too, please!',
+        },
+        order: 'fox-festival',
+        bonus: 40,
+      },
+    ],
     intro: [
       {
-        who: 'mina',
+        who: 'tusk',
         text: {
-          tr: 'Sürpriz! Annem eski tabletini verdi. Nami-ya artık online sipariş alıyor! Paketleri kapıdaki kutuya koy, kurye alır.',
-          en: 'Surprise! Mom gave us her old tablet. Nami-ya takes online orders now! Put packages in the box by the door; the courier picks them up.',
+          tr: 'Bu gece kuzey ışıkları var ve bütün liman burada. Gün sonunda Nefis puanı belli olacak.',
+          en: 'Northern lights tonight and the whole harbor is here. At the end of the day the Yumm rating decides.',
         },
       },
       {
-        who: 'ume',
+        who: 'squawk',
         text: {
-          tr: 'Izgara da hazır: yılan balığını kızart, unagi sosuyla parlat. Futo maki de yapabilirsin artık, bol malzemeli.',
-          en: 'The grill is ready too: grill the eel, glaze it with eel sauce. You can make futomaki now as well, packed with fillings.',
+          tr: 'Gak gak! Kâğıtlar hazır, imzalamak için bekliyorum!',
+          en: 'Squawk squawk! The papers are ready, I’m waiting to sign!',
         },
       },
     ],
-    outro: [
-      {
-        who: 'ume',
-        text: {
-          tr: 'Paketler limanın her köşesine gitti. DönDön’ün neonu parlak olabilir… ama bizim pirincimiz sıcak.',
-          en: 'Our packages reached every corner of the harbor. SpinSushi’s neon may be bright… but our rice is warm.',
-        },
-      },
-    ],
+    outro: [],
   }),
 ];
 
-export const TOTAL_DAYS = 50;
-export const PLAYABLE_DAYS = DAYS.length;
+export const TOTAL_DAYS = DAYS.length;
+export const GOAL_RATING = 4.2;
 
 export function dayDef(n: number): Day {
-  return DAYS[Math.min(n, DAYS.length) - 1];
+  return DAYS[Math.max(1, Math.min(n, DAYS.length)) - 1];
 }
 
-/** everything unlocked up to and including day n */
 export function unlockedIngs(n: number): Set<IngId> {
   const s = new Set<IngId>();
   for (const d of DAYS) if (d.n <= n) d.unlock.forEach((i) => s.add(i));
@@ -703,173 +621,179 @@ export function unlockedIngs(n: number): Set<IngId> {
 export function unlockedPlates(n: number): PlateId[] {
   return PLATES.filter((p) => p.unlockDay <= n).map((p) => p.id);
 }
-export function hasStation2(n: number) {
-  return DAYS.some((d) => d.n <= n && d.station2);
+export const firstDay = (k: 'maki' | 'sashimi' | 'torch' | 'online') =>
+  DAYS.find((d) => d[k])?.n ?? 99;
+
+/** the finale: the outro depends on the Yumm rating */
+export function finaleLines(rating: number): Line[] {
+  if (rating >= GOAL_RATING)
+    return [
+      {
+        who: 'hazel',
+        text: {
+          tr: `Nefis puanı: ${rating.toFixed(1).replace('.', ',')} yıldız! Hedef geçildi! Yuki Sushi limanın en sevilen yeri oldu!`,
+          en: `Yumm rating: ${rating.toFixed(1)} stars! Goal beaten! Yuki Sushi is the harbor’s favorite spot!`,
+        },
+      },
+      {
+        who: 'squawk',
+        text: {
+          tr: 'Gak… peki, kaybettim. Ama… bir tabak somon nigiri alabilir miyim? Wasabisiz.',
+          en: 'Squawk… fine, I lost. But… could I get a plate of salmon nigiri? No wasabi.',
+        },
+      },
+      {
+        who: 'tusk',
+        text: {
+          tr: 'Aferin evlat. Kulübe artık gerçekten senin. Kırk kış daha!',
+          en: 'Well done, kiddo. The hut is truly yours now. Forty more winters!',
+        },
+      },
+    ];
+  return [
+    {
+      who: 'hazel',
+      text: {
+        tr: `Nefis puanı: ${rating.toFixed(1).replace('.', ',')} yıldız. Hedef ${GOAL_RATING.toFixed(1).replace('.', ',')}… az kaldı!`,
+        en: `Yumm rating: ${rating.toFixed(1)} stars. The goal is ${GOAL_RATING.toFixed(1)}… so close!`,
+      },
+    },
+    {
+      who: 'tusk',
+      text: {
+        tr: 'Üzülme. Festivali bir kez daha oynayabilirsin; yorumlara cevap vermeyi ve müşterilerle konuşmayı unutma.',
+        en: 'Don’t worry. You can play the festival again; remember to answer reviews and talk to your customers.',
+      },
+    },
+  ];
 }
-export function hasHeat(n: number) {
-  return DAYS.some((d) => d.n <= n && d.heat);
-}
 
-export const ACTS: L[] = [
-  { tr: 'Açılış', en: 'Opening' },
-  { tr: 'Büyüme', en: 'Growing' },
-  { tr: 'Rakibin oyunları', en: 'The rival’s games' },
-  { tr: 'Fırtına ve sır', en: 'Storm and secret' },
-  { tr: 'Liman Festivali', en: 'Harbor Festival' },
-];
+// ---------- decor for the hut ----------
 
-// ---------- decor ----------
-
-export type DecorSlot = 'wall' | 'floor' | 'lamp' | 'table' | 'plant';
+export type DecorSlot = 'awning' | 'lantern' | 'charm' | 'plant';
 export interface DecorItem {
   id: string;
   slot: DecorSlot;
   name: L;
   price: number;
-  tip: number; // % tip bonus
+  tip: number;
 }
 export const DECOR: DecorItem[] = [
   {
-    id: 'wall-plain',
-    slot: 'wall',
-    name: { tr: 'Krem sıva', en: 'Cream plaster' },
+    id: 'awning-indigo',
+    slot: 'awning',
+    name: { tr: 'Lacivert perde', en: 'Indigo awning' },
     price: 0,
     tip: 0,
   },
   {
-    id: 'wall-wave',
-    slot: 'wall',
-    name: { tr: 'Dalga kâğıdı', en: 'Wave paper' },
-    price: 240,
+    id: 'awning-coral',
+    slot: 'awning',
+    name: { tr: 'Mercan perde', en: 'Coral awning' },
+    price: 120,
     tip: 3,
   },
   {
-    id: 'wall-indigo',
-    slot: 'wall',
-    name: { tr: 'İndigo ahşap', en: 'Indigo wood' },
-    price: 420,
+    id: 'awning-matcha',
+    slot: 'awning',
+    name: { tr: 'Matcha perde', en: 'Matcha awning' },
+    price: 160,
+    tip: 4,
+  },
+  {
+    id: 'lantern-paper',
+    slot: 'lantern',
+    name: { tr: 'Kâğıt fener', en: 'Paper lanterns' },
+    price: 0,
+    tip: 0,
+  },
+  {
+    id: 'lantern-fish',
+    slot: 'lantern',
+    name: { tr: 'Balık fenerler', en: 'Fish lanterns' },
+    price: 140,
+    tip: 3,
+  },
+  {
+    id: 'lantern-star',
+    slot: 'lantern',
+    name: { tr: 'Yıldız ışıklar', en: 'Star lights' },
+    price: 200,
     tip: 5,
   },
+  { id: 'charm-none', slot: 'charm', name: { tr: 'Süs yok', en: 'No charm' }, price: 0, tip: 0 },
   {
-    id: 'floor-plank',
-    slot: 'floor',
-    name: { tr: 'Çam döşeme', en: 'Pine planks' },
-    price: 0,
-    tip: 0,
-  },
-  {
-    id: 'floor-stone',
-    slot: 'floor',
-    name: { tr: 'Dere taşı', en: 'River stone' },
-    price: 280,
-    tip: 3,
-  },
-  {
-    id: 'lamp-paper',
-    slot: 'lamp',
-    name: { tr: 'Kâğıt fener', en: 'Paper lantern' },
-    price: 0,
-    tip: 0,
-  },
-  {
-    id: 'lamp-coral',
-    slot: 'lamp',
-    name: { tr: 'Mercan fenerler', en: 'Coral lanterns' },
-    price: 180,
+    id: 'charm-cat',
+    slot: 'charm',
+    name: { tr: 'Maneki-neko', en: 'Lucky cat' },
+    price: 100,
     tip: 2,
   },
   {
-    id: 'lamp-brass',
-    slot: 'lamp',
-    name: { tr: 'Pirinç lamba', en: 'Brass lamp' },
-    price: 360,
-    tip: 4,
-  },
-  { id: 'table-pine', slot: 'table', name: { tr: 'Çam masa', en: 'Pine table' }, price: 0, tip: 0 },
-  {
-    id: 'table-walnut',
-    slot: 'table',
-    name: { tr: 'Ceviz masa', en: 'Walnut table' },
-    price: 320,
+    id: 'charm-daruma',
+    slot: 'charm',
+    name: { tr: 'Daruma bebeği', en: 'Daruma doll' },
+    price: 150,
     tip: 3,
   },
   { id: 'plant-none', slot: 'plant', name: { tr: 'Bitki yok', en: 'No plant' }, price: 0, tip: 0 },
-  { id: 'plant-bonsai', slot: 'plant', name: { tr: 'Bonsai', en: 'Bonsai' }, price: 160, tip: 2 },
   {
-    id: 'plant-sakura',
+    id: 'plant-pine',
     slot: 'plant',
-    name: { tr: 'Sakura dalı', en: 'Sakura branch' },
-    price: 300,
+    name: { tr: 'Minik çam', en: 'Little pine' },
+    price: 90,
+    tip: 2,
+  },
+  {
+    id: 'plant-camellia',
+    slot: 'plant',
+    name: { tr: 'Kamelya', en: 'Camellia' },
+    price: 170,
     tip: 4,
   },
 ];
 export const DECOR_SLOTS: { slot: DecorSlot; name: L }[] = [
-  { slot: 'wall', name: { tr: 'Duvar', en: 'Wall' } },
-  { slot: 'floor', name: { tr: 'Zemin', en: 'Floor' } },
-  { slot: 'lamp', name: { tr: 'Lamba', en: 'Lamp' } },
-  { slot: 'table', name: { tr: 'Masa', en: 'Table' } },
+  { slot: 'awning', name: { tr: 'Perde', en: 'Awning' } },
+  { slot: 'lantern', name: { tr: 'Işıklar', en: 'Lights' } },
+  { slot: 'charm', name: { tr: 'Uğur', en: 'Charm' } },
   { slot: 'plant', name: { tr: 'Bitki', en: 'Plant' } },
 ];
 
 // ---------- names ----------
 
-export const NAMES_TR = {
-  f: [
-    'Elif',
-    'Zeynep',
-    'Defne',
-    'Ece',
-    'Selin',
-    'Nehir',
-    'Ada',
-    'Melis',
-    'Aylin',
-    'Derya',
-    'Sevgi',
-    'Gül',
-  ],
-  m: [
-    'Can',
-    'Emre',
-    'Kerem',
-    'Baran',
-    'Ozan',
-    'Mert',
-    'Arda',
-    'Deniz',
-    'Umut',
-    'Hakan',
-    'Kaan',
-    'Rüzgar',
-  ],
-};
-export const NAMES_EN = {
-  f: [
-    'Emma',
-    'Olivia',
-    'Ava',
-    'Mia',
-    'Chloe',
-    'Grace',
-    'Lily',
-    'Ruby',
-    'Hannah',
-    'Zoe',
-    'Nora',
-    'Ella',
-  ],
-  m: [
-    'Liam',
-    'Noah',
-    'Oliver',
-    'Ethan',
-    'Leo',
-    'Jack',
-    'Lucas',
-    'Henry',
-    'Owen',
-    'Sam',
-    'Theo',
-    'Max',
-  ],
-};
+export const NAMES_TR = [
+  'Pamuk',
+  'Fıstık',
+  'Kartopu',
+  'Minnoş',
+  'Bıdık',
+  'Lokum',
+  'Tarçın',
+  'Zeytin',
+  'Poğaça',
+  'Badem',
+  'Kestane',
+  'Boncuk',
+  'Mısır',
+  'Pufidik',
+  'Çilek',
+  'Kurabiye',
+];
+export const NAMES_EN = [
+  'Snowball',
+  'Peanut',
+  'Biscuit',
+  'Maple',
+  'Pebble',
+  'Muffin',
+  'Cinnamon',
+  'Olive',
+  'Pretzel',
+  'Almond',
+  'Chestnut',
+  'Button',
+  'Popcorn',
+  'Puffin',
+  'Berry',
+  'Cookie',
+];

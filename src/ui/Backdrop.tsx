@@ -1,56 +1,58 @@
-// The dining room painted behind story screens (same art as the game, softly dimmed).
+// The hut window painted behind menus and story screens (same art as the game).
 
 import { useEffect, useRef } from 'react';
-import type { Day } from '../game/data';
-import { getLang } from '../game/i18n';
+import type { DecorSlot, TimeOfDay } from '../game/data';
 import { setPx } from '../art/common';
-import {
-  drawCounter,
-  drawLanterns,
-  drawSalonBg,
-  drawWindowLife,
-  salonLayout,
-  skyFor,
-} from '../art/salon';
-import { drawInky } from '../art/people';
-import { loadSave } from '../game/save';
+import { computeLayout } from '../art/layout';
+import { outsideLife, paintOutside, skyFor } from '../art/outside';
+import { drawHutFrame } from '../art/hut';
 
-export default function Backdrop({ day }: { day: Day }) {
+export default function Backdrop({
+  time,
+  snow,
+  decor,
+  aurora = false,
+}: {
+  time: TimeOfDay;
+  snow: 'light' | 'storm' | 'none';
+  decor: Record<DecorSlot, string>;
+  aurora?: boolean;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current!;
-    const decor = loadSave().equipped;
     let raf = 0;
     const t0 = performance.now();
     const draw = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cw = cv.clientWidth;
       const ch = cv.clientHeight;
-      const portrait = ch > cw;
-      const scale = (portrait ? cw : ch) / 720;
-      const W = portrait ? 720 : Math.round(cw / scale);
-      const H = portrait ? Math.round(ch / scale) : 720;
+      if (!cw || !ch) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
       if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) {
         cv.width = Math.round(cw * dpr);
         cv.height = Math.round(ch * dpr);
       }
+      const portrait = ch > cw;
+      const scale = (portrait ? cw : ch) / 720;
+      const W = portrait ? 720 : Math.round(cw / scale);
+      const H = portrait ? Math.round(ch / scale) : 720;
       const c = cv.getContext('2d')!;
       c.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
       setPx(dpr * scale);
       const t = (performance.now() - t0) / 1000;
-      const L = salonLayout(W, H, portrait);
-      drawSalonBg(c, L, day.time, day.rain, decor, getLang());
-      drawWindowLife(c, L, t, day.time, day.rain);
-      drawLanterns(c, L, t, skyFor(day.time, day.rain).lamps, decor.lamp);
-      drawCounter(c, L);
-      c.save();
-      c.translate(L.inky.x, L.inky.y + L.inky.s * 0.45);
-      drawInky(c, L.inky.s, t, 'idle');
-      c.restore();
+      const L = computeLayout(W, H, portrait, [], [], []);
+      // stretch the window down to the bottom for a big view
+      const win = { ...L.win, h: H - L.win.y, w: L.win.w };
+      paintOutside(c, win, time, snow === 'storm');
+      outsideLife(c, win, t, time, snow === 'storm', snow !== 'none', aurora);
+      drawHutFrame(c, { ...L, win, sillY: H + 2 }, decor, skyFor(time, snow === 'storm').glow, t);
       raf = requestAnimationFrame(draw);
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [day]);
+  }, [time, snow, decor, aurora]);
   return <canvas ref={ref} className="backdrop" />;
 }

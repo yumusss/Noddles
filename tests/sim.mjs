@@ -38,7 +38,7 @@ for (const lang of ['tr', 'en'])
       page.on('pageerror', (e) => errors.push(e.message));
       await page.addInitScript(
         ([lang, day]) => {
-          localStorage.setItem('sushi.lang', lang);
+          localStorage.setItem('yuki.lang', lang);
           localStorage.setItem(
             'sushi.save',
             JSON.stringify({ unlocked: day, wallet: 0, seenHowTo: true })
@@ -49,14 +49,14 @@ for (const lang of ['tr', 'en'])
       await page.addInitScript({ content: solver });
       await page.goto(BASE, { waitUntil: 'networkidle' });
       await page.click('.title-actions .btn', { force: true });
-      await page.click('.node.today', { force: true });
+      await page.click('.day-card.today', { force: true });
       await page.click('.skip', { force: true });
       if (await page.$('.howto')) await page.click('.howto .skip', { force: true });
       await page.waitForTimeout(3800);
       await page.evaluate(() => {
         const s = window.__session;
         const tick = s.tick.bind(s);
-        s.tick = (dt) => tick(dt * 8);
+        s.tick = (dt) => tick(dt * 6);
       });
       let shot = 0;
       for (let i = 0; i < 3000; i++) {
@@ -64,7 +64,9 @@ for (const lang of ['tr', 'en'])
           const s = window.__session;
           return {
             over: s.over,
-            st: s.counter?.state,
+            st: s.cust?.state,
+            ask: s.cust?.ask,
+            done: s.cust ? s.lineDone(s.cust) : false,
             ring: !!s.ringing,
             online: !!s.activeOnline,
           };
@@ -76,7 +78,8 @@ for (const lang of ['tr', 'en'])
           await page.evaluate(() => window.__solve());
         }
         if (st.st === 'pay') await page.evaluate(() => window.__pay());
-        if (st.st === 'complain') await page.evaluate(() => window.__session.apologize());
+        if (st.st === 'verdict' && st.ask && st.done)
+          await page.evaluate(() => window.__session.answer(window.__session.choices()[0].id));
         await page.waitForTimeout(120);
       }
       const res = await page.evaluate(() => {
@@ -93,10 +96,12 @@ for (const lang of ['tr', 'en'])
       await page.screenshot({ path: `${OUT}/${tag}-ledger.png` });
       // in English mode no Turkish-only letters may be visible anywhere in the DOM
       if (lang === 'en') {
-        const tr = await page.evaluate(() => /[ğışİĞŞ]/.test(document.body.innerText));
+        const tr = await page.evaluate(() =>
+          /[ğışİĞŞ]/.test(document.body.innerText.replace(/Yuki Sushi/g, ''))
+        );
         if (tr) errors.push('Turkish text visible in English mode');
       }
-      const ok = res.over && res.served > 0 && res.avg >= 95 && !errors.length;
+      const ok = res.over && res.served > 0 && res.rating >= 4.5 && !errors.length;
       if (!ok) failed++;
       console.log(ok ? 'ok  ' : 'FAIL', tag, JSON.stringify(res), errors.join(' | '));
       await page.close();

@@ -1,26 +1,25 @@
-// Decor shop: walls, floors, lamps, tables, plants. Each item gives a small tip bonus.
+// Decorate the hut: awning, lights, a lucky charm, a plant. Each adds a little to tips.
 
-import { DECOR, DECOR_SLOTS } from '../game/data';
+import { DECOR, DECOR_SLOTS, type DecorSlot } from '../game/data';
 import { money, t, tx } from '../game/i18n';
-import type { Save } from '../game/save';
-import { tipBonus } from '../game/save';
+import { tipBonus, type Save } from '../game/save';
 import { sfx } from '../game/audio';
+import Backdrop from './Backdrop';
 import { useLang } from '../App';
 
 const SWATCH: Record<string, string> = {
-  'wall-plain': '#f3e4cc',
-  'wall-wave': 'repeating-radial-gradient(circle at 50% 100%, #dfe7ec 0 6px, #c8d5df 6px 12px)',
-  'wall-indigo': '#5c6b94',
-  'floor-plank': 'repeating-linear-gradient(0deg, #d9b48a 0 14px, #c99a6b 14px 16px)',
-  'floor-stone': 'radial-gradient(circle at 30% 30%, #e3dbcd, #b9ae9c)',
-  'lamp-paper': 'radial-gradient(circle, #fff3d8, #f6e7c8)',
-  'lamp-coral': 'radial-gradient(circle, #ffd2c6, #ef8f7a)',
-  'lamp-brass': 'linear-gradient(90deg, #a87a2e, #f0c870, #8a6020)',
-  'table-pine': '#d6ae80',
-  'table-walnut': '#7a5236',
+  'awning-indigo': 'linear-gradient(90deg,#3a4677,#46548a,#3a4677)',
+  'awning-coral': 'linear-gradient(90deg,#d9705b,#e98d7a,#d9705b)',
+  'awning-matcha': 'linear-gradient(90deg,#75996a,#8fb37f,#75996a)',
+  'lantern-paper': 'radial-gradient(circle,#fff3d8,#e9c98a)',
+  'lantern-fish': 'radial-gradient(circle,#ffe3cf,#ef8f6a)',
+  'lantern-star': 'radial-gradient(circle,#fff6c8 10%,#2a3466 70%)',
+  'charm-none': '#f4efe3',
+  'charm-cat': 'radial-gradient(circle,#ffffff,#f1e6d6)',
+  'charm-daruma': 'radial-gradient(circle,#ee6a5a,#c23a2e)',
   'plant-none': '#f4efe3',
-  'plant-bonsai': 'radial-gradient(circle, #a9c98e, #5f8a52)',
-  'plant-sakura': 'radial-gradient(circle, #f6c2cc, #f3a9b9)',
+  'plant-pine': 'radial-gradient(circle,#9fc39a,#5f8a52)',
+  'plant-camellia': 'radial-gradient(circle,#f3a9b9,#d94a5a)',
 };
 
 export default function DecorShop({
@@ -35,6 +34,9 @@ export default function DecorShop({
   useLang();
   return (
     <div className="screen decor">
+      <div className="decor-preview">
+        <Backdrop time="sunset" snow="light" decor={save.equipped as Record<DecorSlot, string>} />
+      </div>
       <header className="map-head">
         <button className="btn ghost small" onClick={onBack}>
           ←
@@ -53,27 +55,26 @@ export default function DecorShop({
               {DECOR.filter((d) => d.slot === sl.slot).map((d) => {
                 const owned = save.owned.includes(d.id);
                 const using = save.equipped[d.slot] === d.id;
-                const afford = save.wallet >= d.price;
                 return (
                   <div key={d.id} className={'decor-card' + (using ? ' using' : '')}>
                     <div className="swatch" style={{ background: SWATCH[d.id] }} />
                     <b>{tx(d.name)}</b>
                     {d.tip > 0 && <small>{t('tipBonus', { n: d.tip })}</small>}
                     {using ? (
-                      <span className="tag done">{t('inUse')}</span>
+                      <span className="tag good">{t('inUse')}</span>
                     ) : owned ? (
                       <button
                         className="btn small"
-                        onClick={() => {
-                          sfx('tap');
-                          update((s) => ({ ...s, equipped: { ...s.equipped, [d.slot]: d.id } }));
-                        }}>
+                        onClick={() => (
+                          sfx('tap'),
+                          update((s) => ({ ...s, equipped: { ...s.equipped, [d.slot]: d.id } }))
+                        )}>
                         {t('equip')}
                       </button>
                     ) : (
                       <button
                         className="btn small coral"
-                        disabled={!afford}
+                        disabled={save.wallet < d.price}
                         onClick={() => {
                           sfx('coins');
                           update((s) => ({

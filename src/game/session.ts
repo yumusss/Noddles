@@ -1,30 +1,33 @@
-// One working day at Nami-ya: customers, the plate, the rolling board, heat, money.
-// Plain mutable state; the canvas reads it every frame and React listens to `bump()`.
+// One five-minute day at Yuki Sushi. Plain mutable state: the canvas reads it every frame,
+// React re-renders on `bump()`.
 
-import { sfx, buzz } from './audio';
+import { buzz, sfx } from './audio';
 import {
+  CUSTOMER_SPECIES,
   type Day,
   type IngId,
-  type PlateId,
-  type Speaker,
   ING,
   NAMES_EN,
   NAMES_TR,
-  hasHeat,
-  hasStation2,
+  type PlateId,
+  type Species,
+  type Speaker,
+  SPEAKER_SPECIES,
+  SPEAKERS,
   unlockedIngs,
   unlockedPlates,
+  type SpecialGuest,
 } from './data';
-import { getLang, tx, type L, money, t as tt } from './i18n';
+import { getLang, type L, money, t as tt, tx } from './i18n';
 import {
-  type Order,
-  type Score,
   makeOrder,
   mulberry,
+  type Order,
   orderPrice,
   orderSpeech,
   pieceCost,
-  REASON_TEXT,
+  type Reason,
+  type Score,
   scorePlate,
   specialOrder,
   STYLE_DAY,
@@ -34,78 +37,81 @@ import {
   type Done,
   type Hand,
   type MakiStyle,
+  newUid,
   type Piece,
   type PieceBody,
+  pieceRadius,
   type PlateState,
   type RiceQ,
   type RollQ,
   type Thick,
-  newUid,
-  pieceRadius,
 } from './plate';
+import {
+  chatFor,
+  type Choice,
+  HURRY_LINE,
+  HURRY_REPLIES,
+  ORDER_REPLIES,
+  reactLine,
+  verdictLine,
+  verdictReplies,
+  type VerdictReply,
+  writeReview,
+} from './reviews';
 import type { Review } from './save';
 
 export type Mood = 'happy' | 'neutral' | 'worried' | 'angry' | 'love';
 export type CState =
-  | 'queue'
-  | 'enter'
-  | 'order'
-  | 'wait'
-  | 'eat'
-  | 'react'
-  | 'complain'
-  | 'pay'
-  | 'toTable'
-  | 'table'
-  | 'leave';
+  'arrive' | 'order' | 'wait' | 'eat' | 'verdict' | 'react' | 'pay' | 'bye' | 'leave';
 
 export interface Customer {
   id: number;
   seed: number;
+  species: Species;
   kid: boolean;
-  female: boolean;
   nameIdx: number;
   special?: Speaker;
-  bonus?: number;
+  bonus: number;
   state: CState;
-  st: number; // time in state
-  x: number; // salon fraction 0..1
-  fromX: number;
-  toX: number;
-  walkDur: number;
+  st: number;
   order: Order;
   greet?: L;
-  /** speech is rebuilt from this so it follows the language toggle */
-  say: () => string;
-  sayAt: number;
+  /** what they are saying right now (rebuilt every frame so it follows the language) */
+  line: (() => string) | null;
+  lineAt: number;
+  /** a pending question for the player */
+  ask: 'order' | 'hurry' | 'verdict' | null;
   patience: number;
   patienceMax: number;
-  doorWait: number;
   mood: Mood;
   bill: number;
   cash: number;
   score?: Score;
-  sat?: number;
+  sat: number;
   tip: number;
-  table: number;
-  eatLeft: number;
-  angryLeave?: boolean;
-  apologized?: boolean;
+  chatted: boolean;
+  hurried: boolean;
+  reply: VerdictReply;
+  free: boolean;
+  walkout: boolean;
+  /** time the player started serving (for "fast service") */
+  waited: number;
 }
 
 export interface OnlineOrder {
   id: number;
   nameIdx: number;
-  female: boolean;
+  species: Species;
+  seed: number;
   order: Order;
   status: 'waiting' | 'ringing' | 'active' | 'packed' | 'delivered';
   age: number;
   stars?: number;
-  summary: L;
 }
 
 export type Board =
   | { m: 'idle' }
+  | { m: 'pick' }
   | {
       m: 'maki';
       style: MakiStyle;
@@ -115,24 +121,16 @@ export type Board =
       fill: IngId[];
       coat?: IngId;
       prog: number;
-      speed: number;
       roll?: RollQ;
       n: 6 | 8;
       cutT: number;
-      done?: Done;
     }
-  | { m: 'temaki'; stage: 'rice' | 'fill'; rice: number; riceQ?: RiceQ; fill: IngId[]; n: 1 | 2 }
   | { m: 'sashimi'; fish: IngId; n: 3 | 5; cutT: number };
-
-export interface Cook {
-  ing: IngId; // raw: shrimp | eel
-  t: number; // 0..1+ along the dial
-}
 
 export interface Toast {
   id: number;
   text: string;
-  kind: 'info' | 'good' | 'bad' | 'unlock';
+  kind: 'info' | 'good' | 'bad';
   t: number;
 }
 
@@ -142,12 +140,10 @@ export interface Ledger {
   ing: number;
   waste: number;
   overpaid: number;
+  freebies: number;
   bonus: number;
   served: number;
-  complaints: number;
   walkouts: number;
-  satSum: number;
-  satN: number;
 }
 
 export interface Coin {
@@ -156,11 +152,10 @@ export interface Coin {
   vy: number;
   rest: boolean;
   kind: number;
-  rot: number;
 }
 
 export interface Fx {
-  kind: 'sparkle' | 'smoke' | 'grain' | 'heart' | 'steam' | 'puff' | 'drop';
+  kind: 'sparkle' | 'heart' | 'grain' | 'flame' | 'smoke' | 'snow';
   x: number;
   y: number;
   vx: number;
@@ -168,29 +163,15 @@ export interface Fx {
   t: number;
   life: number;
   s: number;
-  station: number;
+  /** 'scene' coordinates are fractions of the screen; 'plate' are plate-local */
+  space: 'scene' | 'plate';
 }
-
-export interface Courier {
-  t: number;
-  order: OnlineOrder;
-}
-
-/** seats at tables in the back of the dining room, as salon fractions */
-export const TABLE_SEATS = [0.14, 0.24, 0.76, 0.86];
-export const DOOR_X = -0.04;
-export const COUNTER_X = 0.5;
-export const QUEUE_X = [0.1, 0.03];
 
 export const RICE_MAX = 1.45;
-export function riceQuality(a: number): RiceQ {
-  return a < 0.62 ? 'less' : a <= 1.02 ? 'just' : 'more';
-}
-export const DIAL = { done: 0.45, over: 0.7, burnt: 0.88 };
-export function doneness(t: number): Done {
-  return t < DIAL.done ? 'raw' : t < DIAL.over ? 'done' : t < DIAL.burnt ? 'over' : 'burnt';
-}
-/** sashimi cut bar zones */
+export const riceQuality = (a: number): RiceQ => (a < 0.62 ? 'less' : a <= 1.02 ? 'just' : 'more');
+export const DIAL = { done: 0.42, over: 0.7, burnt: 0.88 };
+export const doneness = (t: number): Done =>
+  t < DIAL.done ? 'raw' : t < DIAL.over ? 'done' : t < DIAL.burnt ? 'over' : 'burnt';
 export const SASHIMI_ZONES: { a: number; b: number; q: Thick | null }[] = [
   { a: 0, b: 0.1, q: null },
   { a: 0.1, b: 0.3, q: 'thin' },
@@ -206,6 +187,8 @@ export function cutMarker(t: number, period: number) {
   return p < 1 ? p : 2 - p;
 }
 
+let reviewCounter = 0;
+
 export class Session {
   day: Day;
   n: number;
@@ -214,54 +197,49 @@ export class Session {
   started = false;
   over = false;
   paused = false;
-  customers: Customer[] = [];
-  counter: Customer | null = null;
-  plate: PlateState;
-  served: { plate: PlateState; cust: Customer | null; t: number } | null = null;
+  cust: Customer | null = null;
+  nextIn = 2.5;
+  served: { plate: PlateState; t: number } | null = null;
+  plate: PlateState = { id: 'geta', pieces: [] };
   hand: Hand | null = null;
   board: Board = { m: 'idle' };
-  squeeze: { a: number; on: boolean } = { a: 0, on: false };
-  heat: { fryer: Cook | null; grill: Cook | null } = { fryer: null, grill: null };
-  prepared: Partial<Record<IngId, Done[]>> = {};
+  squeeze = { a: 0, on: false };
+  sear: { uid: number; t: number } | null = null;
   ledger: Ledger = {
     sales: 0,
     tips: 0,
     ing: 0,
     waste: 0,
     overpaid: 0,
+    freebies: 0,
     bonus: 0,
     served: 0,
-    complaints: 0,
     walkouts: 0,
-    satSum: 0,
-    satN: 0,
   };
   online: OnlineOrder[] = [];
   activeOnline: OnlineOrder | null = null;
-  onlineTimer = 70;
-  couriers: Courier[] = [];
-  doorBox: OnlineOrder | null = null;
+  onlineTimer = 45;
+  courier: { t: number; order: OnlineOrder } | null = null;
   coins: Coin[] = [];
   fx: Fx[] = [];
   toasts: Toast[] = [];
   reviews: Review[] = [];
-  drawer: { open: boolean; given: number[]; warn: number } = { open: false, given: [], warn: 0 };
-  spawnTimer = 4;
-  nextId = 1;
+  drawer = { open: false, given: [] as number[], warn: 0 };
   have: Set<IngId>;
   plates: PlateId[];
-  station2: boolean;
-  heatOn: boolean;
+  makiOn: boolean;
+  sashimiOn: boolean;
+  torchOn: boolean;
   tipBonus: number;
   tutorial: boolean;
-  guestsLeft: { who: Speaker; at: number; greet: L; order: string; bonus: number }[];
-  /** set by the view: station requested by game logic */
-  wantStation: number | null = null;
-  /** current station the camera is at (written by the view) */
-  station = 0;
+  guests: SpecialGuest[];
   version = 0;
+  nextId = 1;
+  /** the last review written, for the little "new review" pop */
+  lastReview: Review | null = null;
   private listeners = new Set<() => void>();
-  private tableUse: (Customer | null)[] = [null, null, null, null];
+  private riceHold = false;
+  private rollDrag: { lastY: number; time: number; hold: boolean } | null = null;
 
   constructor(day: Day, opts: { tipBonus: number; seed?: number }) {
     this.day = day;
@@ -269,12 +247,12 @@ export class Session {
     this.rng = mulberry(opts.seed ?? day.n * 7919 + Math.floor(Math.random() * 1e6));
     this.have = unlockedIngs(day.n);
     this.plates = unlockedPlates(day.n);
-    this.station2 = hasStation2(day.n);
-    this.heatOn = hasHeat(day.n);
+    this.makiOn = day.n >= STYLE_DAY.hoso;
+    this.sashimiOn = this.n >= 4;
+    this.torchOn = this.n >= 7;
     this.tipBonus = opts.tipBonus;
     this.tutorial = day.n === 1;
-    this.plate = { id: 'geta', pieces: [] };
-    this.guestsLeft = [...(day.guests ?? [])].sort((a, b) => a.at - b.at);
+    this.guests = [...(day.guests ?? [])].sort((a, b) => a.at - b.at);
   }
 
   // ---------- plumbing ----------
@@ -292,41 +270,33 @@ export class Session {
     if (this.toasts.length > 3) this.toasts.shift();
     this.bump();
   }
-  goStation(i: number) {
-    this.wantStation = i;
+
+  nameOf(c: { nameIdx: number; special?: Speaker }) {
+    if (c.special) return tx(SPEAKERS[c.special]);
+    return (getLang() === 'tr' ? NAMES_TR : NAMES_EN)[c.nameIdx % 16];
   }
 
-  get name() {
-    return (c: { nameIdx: number; female: boolean; special?: Speaker }) => {
-      const list = getLang() === 'tr' ? NAMES_TR : NAMES_EN;
-      return (c.female ? list.f : list.m)[c.nameIdx % 12];
-    };
-  }
-
-  /** current order on the ticket rail */
   get activeOrder(): Order | null {
     if (this.activeOnline) return this.activeOnline.order;
-    const c = this.counter;
-    if (c && (c.state === 'wait' || c.state === 'order')) return c.order;
-    return null;
+    const c = this.cust;
+    return c && c.state === 'wait' ? c.order : null;
   }
 
   get clock(): string {
-    const ranges: Record<string, [number, number]> = {
-      morning: [8 * 60, 11 * 60 + 30],
-      noon: [11 * 60 + 30, 15 * 60],
-      sunset: [16 * 60 + 30, 20 * 60],
-      evening: [19 * 60, 22 * 60 + 30],
+    const start: Record<string, number> = {
+      morning: 8 * 60,
+      noon: 12 * 60,
+      sunset: 16 * 60 + 30,
+      evening: 19 * 60,
     };
-    const [a, b] = ranges[this.day.time];
-    const m = Math.round(a + (b - a) * Math.min(1, this.t / this.day.duration));
-    const hh = Math.floor(m / 60);
-    const mm = m % 60;
-    return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+    const m = Math.round(start[this.day.time] + 180 * Math.min(1, this.t / this.day.duration));
+    return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
   }
-
   get open() {
     return this.t < this.day.duration;
+  }
+  get timeLeft() {
+    return Math.max(0, this.day.duration - this.t);
   }
 
   // ---------- main tick ----------
@@ -334,147 +304,104 @@ export class Session {
   tick(dt: number) {
     if (!this.started || this.over || this.paused) return;
     this.t += dt;
+    for (const x of this.toasts) x.t += dt;
+    const n0 = this.toasts.length;
+    this.toasts = this.toasts.filter((x) => x.t < 3);
+    if (this.toasts.length !== n0) this.bump();
 
-    this.toasts.forEach((x) => (x.t += dt));
-    const before = this.toasts.length;
-    this.toasts = this.toasts.filter((x) => x.t < 3.2);
-    if (this.toasts.length !== before) this.bump();
-
-    this.tickSpawns(dt);
+    this.tickArrivals(dt);
     this.tickOnline(dt);
-    for (const c of [...this.customers]) this.tickCustomer(c, dt);
-    this.tickHeat(dt);
-    this.tickBoard(dt);
-    this.tickSqueeze(dt);
+    if (this.cust) this.tickCustomer(this.cust, dt);
+    this.tickPrep(dt);
     this.tickCoins(dt);
     this.tickFx(dt);
     if (this.served) this.served.t += dt;
-    this.couriers.forEach((c) => (c.t += dt));
-    const leaving = this.couriers.filter((c) => c.t > 9);
-    if (leaving.length) {
-      this.couriers = this.couriers.filter((c) => c.t <= 9);
+    if (this.courier) {
+      this.courier.t += dt;
+      if (this.courier.t > 3 && this.courier.order.status === 'packed')
+        this.deliver(this.courier.order);
+      if (this.courier.t > 7) this.courier = null;
     }
-    for (const c of this.couriers)
-      if (c.t > 3.2 && this.doorBox === c.order) {
-        this.doorBox = null;
-        this.deliver(c.order);
-      }
     this.drawer.warn = Math.max(0, this.drawer.warn - dt);
-
-    if (!this.open && !this.over) this.checkEnd();
-  }
-
-  private checkEnd() {
-    const busy =
-      this.counter ||
-      this.activeOnline ||
-      this.doorBox ||
-      this.customers.some((c) => c.state === 'queue' || c.state === 'enter');
-    if (!busy) {
-      // anyone still calling is told we're closed
-      this.online
-        .filter((o) => o.status === 'waiting' || o.status === 'ringing')
-        .forEach((o) => {
-          o.status = 'delivered';
-          o.stars = 0;
-        });
+    if (!this.open && !this.cust && !this.activeOnline && !this.courier) {
+      // anyone still waiting to call is told the hut is closed
+      for (const o of this.online)
+        if (o.status === 'waiting' || o.status === 'ringing') o.status = 'delivered';
       this.over = true;
       sfx('win');
       this.bump();
     }
   }
 
-  private tickSpawns(dt: number) {
-    if (!this.open) return;
-    // special guests arrive at their moment and jump the queue
-    const g = this.guestsLeft[0];
+  private tickArrivals(dt: number) {
+    if (this.cust || !this.open || this.ringing || this.activeOnline) return;
+    this.nextIn -= dt;
+    if (this.nextIn > 0) return;
+    const g = this.guests[0];
     if (g && this.t >= g.at * this.day.duration) {
-      if (this.queue.length < 2) {
-        this.guestsLeft.shift();
-        this.spawn({
-          special: g.who,
-          greet: g.greet,
-          order: specialOrder(g.order),
-          bonus: g.bonus,
-        });
-      }
-      return;
-    }
-    this.spawnTimer -= dt;
-    if (this.spawnTimer > 0) return;
-    const q = this.queue.length;
-    if (this.tutorial && (this.counter || q > 0)) {
-      this.spawnTimer = 2;
-      return;
-    }
-    if (q >= 2) {
-      this.spawnTimer = 4;
-      return;
-    }
-    this.spawn({});
-    const jitter = 0.75 + this.rng() * 0.5;
-    this.spawnTimer = this.day.spawn * jitter * (this.customers.length === 1 ? 0.6 : 1);
-  }
-
-  get queue() {
-    return this.customers.filter((c) => c.state === 'queue');
+      this.guests.shift();
+      this.spawn({ special: g.who, greet: g.greet, order: specialOrder(g.order), bonus: g.bonus });
+    } else this.spawn({});
   }
 
   private spawn(o: { special?: Speaker; greet?: L; order?: Order; bonus?: number }) {
     const kid = !o.special && this.n >= 2 && this.rng() < 0.2;
-    const female = this.rng() < 0.5;
-    const order = o.order ?? makeOrder(this.day, this.rng, { kid });
     const seed = Math.floor(this.rng() * 1e9);
-    const r2 = mulberry(seed);
+    const species = o.special
+      ? SPEAKER_SPECIES[o.special]
+      : CUSTOMER_SPECIES[Math.floor(this.rng() * CUSTOMER_SPECIES.length)];
+    const order = o.order ?? makeOrder(this.day, this.rng, { kid });
     const c: Customer = {
       id: this.nextId++,
       seed,
+      species,
       kid,
-      female,
-      nameIdx: Math.floor(this.rng() * 12),
+      nameIdx: Math.floor(this.rng() * 16),
       special: o.special,
-      bonus: o.bonus,
-      state: 'queue',
+      bonus: o.bonus ?? 0,
+      state: 'arrive',
       st: 0,
-      x: DOOR_X,
-      fromX: DOOR_X,
-      toX: QUEUE_X[Math.min(1, this.queue.length)],
-      walkDur: 1.6,
       order,
       greet: o.greet,
-      say: () => (o.greet ? tx(o.greet) : orderSpeech(order, mulberry(seed), kid)),
-      sayAt: 0,
+      line: null,
+      lineAt: 0,
+      ask: null,
       patience: this.day.patience,
       patienceMax: this.day.patience,
-      doorWait: 0,
       mood: 'neutral',
       bill: orderPrice(order),
       cash: 0,
+      sat: 0,
       tip: 0,
-      table: -1,
-      eatLeft: 0,
+      chatted: false,
+      hurried: false,
+      reply: 'none',
+      free: false,
+      walkout: false,
+      waited: 0,
     };
-    void r2;
-    if (o.special) {
-      // special guests go to the front of the line
-      this.customers.unshift(c);
-    } else this.customers.push(c);
-    this.reflowQueue();
+    this.cust = c;
     sfx('door');
+    this.bump();
   }
 
-  private reflowQueue() {
-    this.queue.forEach((c, i) => {
-      const target = QUEUE_X[Math.min(1, i)];
-      if (Math.abs(c.toX - target) > 0.001) this.walk(c, target, 1.2);
-    });
+  /** speech of the current customer */
+  orderText(c: Customer) {
+    return c.greet ? tx(c.greet) : orderSpeech(c.order, mulberry(c.seed), c.kid);
   }
 
-  private walk(c: Customer, to: number, dur: number) {
-    c.fromX = c.x;
-    c.toX = to;
-    c.walkDur = dur;
-    c.st = 0;
+  private say(c: Customer, f: () => string) {
+    c.line = f;
+    c.lineAt = 0;
+    sfx('bubble');
+  }
+
+  /** characters of the current line already typed out */
+  shown(c: Customer) {
+    return c.line ? Math.floor(c.lineAt * 34) : 0;
+  }
+  lineDone(c: Customer) {
+    return !c.line || this.shown(c) >= c.line().length;
   }
 
   private setState(c: Customer, s: CState) {
@@ -485,234 +412,247 @@ export class Session {
 
   private tickCustomer(c: Customer, dt: number) {
     c.st += dt;
-    // walking
-    if (c.x !== c.toX) {
-      const k = Math.min(1, c.st / c.walkDur);
-      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-      c.x = c.fromX + (c.toX - c.fromX) * e;
-      if (k >= 1) c.x = c.toX;
-    }
+    c.lineAt += dt;
     switch (c.state) {
-      case 'queue': {
-        c.doorWait += dt;
-        const first = this.queue[0] === c;
-        const ringBlock = this.online.some((o) => o.status === 'ringing') && c.doorWait < 15;
-        if (first && !this.counter && !this.activeOnline && !ringBlock) {
-          this.counter = c;
-          this.walk(c, COUNTER_X, 2.2);
-          this.setState(c, 'enter');
-          this.reflowQueue();
-        } else if (c.doorWait > 75 && !c.special) {
-          this.ledger.walkouts++;
-          c.angryLeave = true;
-          c.mood = 'angry';
-          this.walk(c, DOOR_X - 0.1, 1.6);
-          this.setState(c, 'leave');
-          this.reflowQueue();
-        }
-        break;
-      }
-      case 'enter':
-        if (c.x === c.toX && c.st > 2.2) {
+      case 'arrive':
+        if (c.st > 1.6) {
           this.setState(c, 'order');
-          c.sayAt = 0;
-          sfx('bubble');
+          this.say(c, () => this.orderText(c));
         }
         break;
-      case 'order': {
-        c.sayAt += dt;
-        const len = c.say().length;
-        // typing speed ~32 chars/s, then the ticket drops
-        if (c.sayAt * 32 >= len + 10) {
+      case 'order':
+        if (this.lineDone(c) && c.lineAt * 34 > c.line!().length + 14) {
           this.setState(c, 'wait');
+          c.ask = 'order';
           sfx('ding');
-          if (this.tutorial) this.goStation(1);
         }
         break;
-      }
       case 'wait': {
         if (!this.tutorial) c.patience -= dt;
+        c.waited += dt;
         const f = c.patience / c.patienceMax;
-        c.mood = f > 0.6 ? 'neutral' : f > 0.3 ? 'worried' : 'angry';
-        if (c.patience <= 0) {
-          c.angryLeave = true;
-          c.mood = 'angry';
-          c.sat = 0;
-          this.ledger.walkouts++;
-          this.ledger.satN++;
-          this.counter = null;
-          this.walk(c, DOOR_X - 0.1, 2.4);
-          this.setState(c, 'leave');
-          sfx('angry');
-          this.addReview(c.nameIdx, c.female, 1, false);
-          this.toast(
-            getLang() === 'tr' ? 'Müşteri bekleyemedi, gitti!' : 'The customer gave up and left!',
-            'bad'
-          );
+        c.mood = f > 0.55 ? 'neutral' : f > 0.25 ? 'worried' : 'angry';
+        if (f < 0.32 && !c.hurried && !c.ask) {
+          c.hurried = true;
+          c.ask = 'hurry';
+          this.say(c, () => tx(HURRY_LINE));
+          this.bump();
         }
+        if (c.patience <= 0) this.walkOut(c);
         break;
       }
       case 'eat':
-        if (c.st > 2.6) this.finishEating(c);
+        if (c.st > 2.6) this.verdict(c);
+        break;
+      case 'verdict':
+        // an answer is optional; after a while they carry on
+        if (c.st > 10) this.answer('none');
         break;
       case 'react':
-        if (c.st > 2.2) this.startPay(c);
-        break;
-      case 'complain':
+        if (c.st > 2.4 && this.lineDone(c)) this.startPay(c);
         break;
       case 'pay':
         break;
-      case 'toTable':
-        if (c.x === c.toX && c.st >= c.walkDur) this.setState(c, 'table');
-        break;
-      case 'table':
-        if (c.st > c.eatLeft) {
-          this.tableUse[c.table] = null;
-          this.walk(c, DOOR_X - 0.1, 2.6);
-          this.setState(c, 'leave');
-        }
+      case 'bye':
+        if (c.st > 1.6) this.setState(c, 'leave');
         break;
       case 'leave':
-        if (c.x === c.toX) this.customers = this.customers.filter((x) => x !== c);
+        if (c.st > 1.4) {
+          this.cust = null;
+          this.served = null;
+          this.nextIn = 2 + this.rng() * 3;
+          this.bump();
+        }
         break;
+    }
+  }
+
+  private walkOut(c: Customer) {
+    c.walkout = true;
+    c.mood = 'angry';
+    c.ask = null;
+    this.ledger.walkouts++;
+    this.say(c, () =>
+      tx({ tr: 'Çok bekledim, gidiyorum!', en: 'I’ve waited too long, I’m leaving!' })
+    );
+    sfx('angry');
+    this.postReview(
+      c,
+      writeReview({
+        sat: 0,
+        reasons: ['slow'],
+        reply: 'none',
+        chatted: false,
+        fast: false,
+        walkout: true,
+        seed: c.seed,
+      }),
+      ['slow']
+    );
+    this.setState(c, 'bye');
+  }
+
+  // ---------- talking back ----------
+
+  choices(): Choice[] {
+    const c = this.cust;
+    if (!c || !c.ask) return [];
+    if (c.ask === 'order') {
+      const [q] = chatFor(c.seed);
+      return [...ORDER_REPLIES, { id: 'chat', label: q }];
+    }
+    if (c.ask === 'hurry') return HURRY_REPLIES;
+    if (c.ask === 'verdict') {
+      const good = !c.score?.complaint && c.sat >= 75;
+      const bad = !!c.score?.complaint || c.sat < 55;
+      return verdictReplies(good, bad);
+    }
+    return [];
+  }
+
+  answer(id: string) {
+    const c = this.cust;
+    if (!c) return;
+    sfx('tap');
+    if (c.ask === 'order') {
+      c.ask = null;
+      if (id === 'ok') this.say(c, () => tx({ tr: 'Süper, bekliyorum!', en: 'Great, I’ll wait!' }));
+      if (id === 'repeat') {
+        c.patience = Math.max(5, c.patience - 6);
+        this.say(c, () => this.orderText(c));
+      }
+      if (id === 'chat') {
+        c.chatted = true;
+        c.patience = Math.max(5, c.patience - 3);
+        this.say(c, () => tx(chatFor(c.seed)[1]));
+      }
+    } else if (c.ask === 'hurry') {
+      c.ask = null;
+      if (id === 'soon') {
+        c.patience = Math.min(c.patienceMax, c.patience + 14);
+        this.say(c, () =>
+          tx({ tr: 'Tamam, biraz daha beklerim.', en: 'Okay, I’ll wait a bit more.' })
+        );
+      } else
+        this.say(c, () => tx({ tr: 'Hmph. Umarım değer.', en: 'Hmph. I hope it’s worth it.' }));
+    } else if (c.state === 'verdict') {
+      c.ask = null;
+      c.reply = id as VerdictReply;
+      const good = !c.score?.complaint && c.sat >= 75;
+      if (id === 'free') c.free = true;
+      if (id === 'argue') {
+        c.mood = 'angry';
+        sfx('angry');
+      }
+      if (id === 'sorry' || id === 'free') c.mood = 'neutral';
+      this.say(c, () => tx(reactLine(c.reply, good)));
+      this.setState(c, 'react');
+    }
+    this.bump();
+  }
+
+  /** leaves the pending question unanswered (the player went to work) */
+  dismissAsk() {
+    const c = this.cust;
+    if (c && (c.ask === 'order' || c.ask === 'hurry')) {
+      c.ask = null;
+      c.line = null;
+      this.bump();
     }
   }
 
   // ---------- serving ----------
 
   canServe() {
-    const c = this.counter;
-    if (this.activeOnline) return this.plate.pieces.length > 0;
-    return !!c && c.state === 'wait' && this.plate.pieces.length > 0;
+    if (!this.plate.pieces.length) return false;
+    if (this.activeOnline) return true;
+    return this.cust?.state === 'wait';
   }
 
   serve() {
     if (!this.canServe()) {
-      if (!this.plate.pieces.length) this.toast(t2('plateEmpty'));
-      else this.toast(t2('noCustomer'));
+      this.toast(this.plate.pieces.length ? tt('noCustomer') : tt('plateEmpty'));
       return;
     }
     if (this.activeOnline) return this.pack();
-    const c = this.counter!;
-    this.hand = this.hand?.k === 'plate' ? null : this.hand;
+    const c = this.cust!;
+    c.ask = null;
+    c.line = null;
     c.score = scorePlate(c.order, this.plate.pieces, this.plate.id);
-    this.served = { plate: this.plate, cust: c, t: 0 };
+    this.served = { plate: this.plate, t: 0 };
     this.plate = { id: this.plate.id, pieces: [] };
+    this.hand = null;
+    this.board = { m: 'idle' };
     this.setState(c, 'eat');
-    this.goStation(0);
     sfx('place');
     buzz(12);
   }
 
-  private finishEating(c: Customer) {
+  private verdict(c: Customer) {
     const sc = c.score!;
     const pf = Math.max(0, c.patience / c.patienceMax);
-    const sat = this.tutorial ? sc.score : Math.round(sc.score - (1 - pf) * 12);
-    c.sat = Math.max(0, Math.min(100, sat));
+    let sat = sc.score - (this.tutorial ? 0 : (1 - pf) * 14) + (c.chatted ? 4 : 0);
+    if (c.hurried && pf < 0.2) sat -= 4;
+    c.sat = Math.max(0, Math.min(100, Math.round(sat)));
     c.mood =
-      c.sat >= 95
+      c.sat >= 92
         ? 'love'
-        : c.sat >= 78
+        : c.sat >= 75
           ? 'happy'
-          : c.sat >= 58
+          : c.sat >= 55
             ? 'neutral'
             : c.sat >= 38
               ? 'worried'
               : 'angry';
-    this.ledger.satSum += c.sat;
-    this.ledger.satN++;
     this.ledger.served++;
+    const reasons: Reason[] = [...sc.reasons];
+    if (!this.tutorial && pf < 0.25) reasons.push('slow');
+    sc.reasons = reasons;
     if (c.mood === 'love' || c.mood === 'happy') sfx('perfect');
-    else if (sc.complaint) sfx('fail');
+    else if (c.sat < 55) sfx('fail');
     for (let i = 0; i < (c.mood === 'love' ? 8 : 3); i++)
       this.addFx(
         c.mood === 'love' ? 'heart' : 'sparkle',
-        COUNTER_X + (this.rng() - 0.5) * 0.12,
-        0.42,
-        0
+        0.4 + (this.rng() - 0.5) * 0.12,
+        0.3,
+        'scene'
       );
-    if (sc.complaint) {
-      this.ledger.complaints++;
-      this.setState(c, 'complain');
-    } else this.setState(c, 'react');
-  }
-
-  apologize() {
-    const c = this.counter;
-    if (!c || c.state !== 'complain') return;
-    c.apologized = true;
-    sfx('tap');
-    this.setState(c, 'react');
+    this.say(c, () => tx(verdictLine(c.sat, reasons, c.seed, sc.complaint)));
+    c.ask = 'verdict';
+    this.setState(c, 'verdict');
   }
 
   private startPay(c: Customer) {
-    // the customer pays cash and says the change out loud
+    if (c.free) {
+      this.ledger.freebies += c.bill;
+      this.finishPay(c);
+      return;
+    }
     const notes = [5, 10, 20, 50, 100, 200];
     const i = notes.findIndex((x) => x >= c.bill);
-    const idx = Math.min(notes.length - 1, i + (this.rng() < 0.3 ? 1 : 0));
-    c.cash = notes[idx];
+    c.cash = notes[Math.min(notes.length - 1, i + (this.rng() < 0.35 ? 1 : 0))];
     if (c.cash < c.bill) c.cash = Math.ceil(c.bill / 10) * 10;
     const pf = Math.max(0, c.patience / c.patienceMax);
-    const speed = this.tutorial ? 1.2 : pf > 0.6 ? 1.4 : pf > 0.3 ? 1 : 0.7;
-    const base = c.bill * Math.pow((c.sat ?? 0) / 100, 2) * 0.22;
-    c.tip = c.apologized || c.score?.complaint ? 0 : Math.round(base * speed * (1 + this.tipBonus));
-    if (c.special && (c.sat ?? 0) >= 70 && !c.score?.complaint) {
-      this.ledger.bonus += c.bonus ?? 0;
-      this.toast(
-        (getLang() === 'tr' ? 'Özel misafir bonusu ' : 'Special guest bonus ') +
-          money(c.bonus ?? 0),
-        'good'
-      );
+    const speed = this.tutorial ? 1.2 : pf > 0.6 ? 1.4 : pf > 0.3 ? 1 : 0.6;
+    const good = !c.score?.complaint && c.reply !== 'argue' && c.reply !== 'sorry';
+    c.tip = good
+      ? Math.round(
+          c.bill * Math.pow(c.sat / 100, 2) * 0.22 * speed * (1 + this.tipBonus) +
+            (c.chatted ? 1 : 0)
+        )
+      : 0;
+    if (c.special && c.sat >= 70 && !c.score?.complaint) {
+      this.ledger.bonus += c.bonus;
+      this.toast(`${tt('bonus')} +${money(c.bonus)}`, 'good');
     }
     this.ledger.sales += c.bill;
     this.drawer = { open: c.cash > c.bill, given: [], warn: 0 };
+    // the customer only hands over the money; the change shows on the register box
+    this.say(c, () =>
+      tx({ tr: `Buyrun, ${money(c.cash)}.`, en: `Here you go, ${money(c.cash)}.` })
+    );
     this.setState(c, 'pay');
-    c.sayAt = 0;
-    if (c.cash === c.bill) setTimeout(() => this.finishPay(c), 1400);
-    else if (this.tutorial) this.goStation(0);
-  }
-
-  /** words while paying */
-  paySpeech(c: Customer): string {
-    const tr = getLang() === 'tr';
-    const change = c.cash - c.bill;
-    if (change === 0)
-      return tr
-        ? `Hesap ${money(c.bill)}, tam para. Buyur!`
-        : `That’s ${money(c.bill)}, exact change. Here!`;
-    return tr
-      ? `Hesap ${money(c.bill)}, buyur ${money(c.cash)}. ${money(change)} üstü.`
-      : `That’s ${money(c.bill)}, here’s ${money(c.cash)}. ${money(change)} change, please.`;
-  }
-
-  reactSpeech(c: Customer): string {
-    const tr = getLang() === 'tr';
-    if (c.state === 'complain') {
-      const r = c.score?.reasons[0] ?? 'missing';
-      return tx(REASON_TEXT[r]);
-    }
-    if (c.apologized) return tr ? 'Peki… ama bahşiş yok.' : 'Fine… but no tip.';
-    const m = c.mood;
-    const pool: Record<Mood, L[]> = {
-      love: [
-        { tr: 'Bu… muhteşem! Ağzımda eriyor!', en: 'This is… amazing! It melts in my mouth!' },
-        { tr: 'Hayatımın en güzel sushisi!', en: 'Best sushi of my life!' },
-      ],
-      happy: [
-        { tr: 'Çok lezzetli, eline sağlık!', en: 'Delicious, great job!' },
-        { tr: 'Mmm, tam istediğim gibi.', en: 'Mmm, just how I wanted it.' },
-      ],
-      neutral: [
-        { tr: 'Fena değil.', en: 'Not bad.' },
-        { tr: 'İdare eder.', en: 'It’s okay.' },
-      ],
-      worried: [
-        { tr: 'Hmm… daha iyisini beklerdim.', en: 'Hmm… I expected better.' },
-        { tr: 'Biraz bekledim ama…', en: 'I waited a while, but…' },
-      ],
-      angry: [{ tr: 'Hiç memnun kalmadım.', en: 'I’m not happy at all.' }],
-    };
-    return tx(pool[m][c.id % pool[m].length]);
+    if (c.cash === c.bill) setTimeout(() => this.finishPay(c), 1300);
   }
 
   addMoney(v: number) {
@@ -730,52 +670,81 @@ export class Session {
   }
 
   giveChange() {
-    const c = this.counter;
+    const c = this.cust;
     if (!c || c.state !== 'pay') return;
     const due = c.cash - c.bill;
     const g = this.givenTotal;
     if (g < due) {
       this.drawer.warn = 2.5;
+      this.say(c, () => tx({ tr: 'Hmm, bu eksik galiba?', en: 'Hmm, isn’t this short?' }));
       sfx('fail');
       this.bump();
       return;
     }
     if (g > due) {
       this.ledger.overpaid += g - due;
-      this.toast(
-        getLang() === 'tr' ? 'Sağ ol! (fazla verdin)' : 'Thanks! (you gave too much)',
-        'bad'
-      );
+      this.toast(tx({ tr: 'Fazla para üstü verdin', en: 'You gave too much change' }), 'bad');
     }
     this.finishPay(c);
   }
 
   private finishPay(c: Customer) {
-    if (c.state !== 'pay') return;
+    if (c.state !== 'pay' && c.state !== 'react') return;
     this.drawer = { open: false, given: [], warn: 0 };
     if (c.tip > 0) {
       this.ledger.tips += c.tip;
       this.dropCoins(Math.min(8, Math.ceil(c.tip / 2)));
       sfx('coins');
     }
-    const stars = c.sat! >= 90 ? 5 : c.sat! >= 75 ? 4 : c.sat! >= 55 ? 3 : c.sat! >= 35 ? 2 : 1;
-    if (!c.special) this.addReview(c.nameIdx, c.female, stars, false);
-    this.served = null;
-    this.counter = null;
-    const seat = this.tableUse.findIndex((x) => x === null);
-    if (seat >= 0) {
-      this.tableUse[seat] = c;
-      c.table = seat;
-      c.eatLeft = 18 + this.rng() * 18;
-      this.walk(c, TABLE_SEATS[seat], 2.4);
-      this.setState(c, 'toTable');
-    } else {
-      this.walk(c, DOOR_X - 0.1, 2.4);
-      this.setState(c, 'leave');
-    }
+    const draft = writeReview({
+      sat: c.sat,
+      reasons: c.score?.reasons ?? [],
+      reply: c.reply,
+      chatted: c.chatted,
+      fast: c.waited < c.patienceMax * 0.45,
+      seed: c.seed,
+      special: c.special,
+    });
+    this.postReview(c, draft, c.score?.reasons ?? []);
+    const happy = draft.stars >= 4;
+    this.say(c, () =>
+      tx(
+        happy
+          ? { tr: 'Görüşürüz! Nefis’e yazacağım!', en: 'See you! I’m posting on Yumm!' }
+          : draft.stars <= 2
+            ? { tr: 'Hoşça kal…', en: 'Bye…' }
+            : { tr: 'Görüşürüz.', en: 'See you.' }
+      )
+    );
+    this.setState(c, 'bye');
   }
 
-  // ---------- online orders (day 10+) ----------
+  private postReview(
+    c: { seed: number; species: Species; nameIdx: number; special?: Speaker },
+    d: { stars: number; text: L; good: L[] },
+    tags: Reason[],
+    online = false
+  ) {
+    const r: Review = {
+      id: `d${this.n}-${Date.now().toString(36)}-${reviewCounter++}`,
+      day: this.n,
+      species: c.species,
+      seed: c.seed,
+      nameIdx: c.special ? -1 : c.nameIdx,
+      stars: d.stars,
+      text: d.text,
+      tags: tags.slice(0, 3),
+      good: d.good,
+      online,
+      likes: Math.floor(this.rng() * 5),
+    };
+    if (c.special) r.special = c.special;
+    this.reviews.push(r);
+    this.lastReview = r;
+    this.bump();
+  }
+
+  // ---------- online orders (day 8+) ----------
 
   private tickOnline(dt: number) {
     if (!this.day.online) return;
@@ -783,33 +752,28 @@ export class Session {
     if (this.open) {
       this.onlineTimer -= dt;
       if (this.onlineTimer <= 0) {
-        this.onlineTimer = 80 + this.rng() * 50;
-        const order = makeOrder(this.day, this.rng, { online: true });
+        this.onlineTimer = 70 + this.rng() * 40;
         this.online.push({
           id: this.nextId++,
-          nameIdx: Math.floor(this.rng() * 12),
-          female: this.rng() < 0.5,
-          order,
+          nameIdx: Math.floor(this.rng() * 16),
+          species: CUSTOMER_SPECIES[Math.floor(this.rng() * CUSTOMER_SPECIES.length)],
+          seed: Math.floor(this.rng() * 1e9),
+          order: makeOrder(this.day, this.rng, { online: true }),
           status: 'waiting',
           age: 0,
-          summary: summaryOf(order),
         });
       }
     }
-    // a call only rings when the counter is free; nothing is ever dropped
-    const ringing = this.online.find((o) => o.status === 'ringing');
-    if (!ringing && !this.counter && !this.activeOnline) {
+    // it rings only when nobody is at the window; nothing is ever dropped
+    if (!this.cust && !this.activeOnline && !this.ringing) {
       const next = this.online.find((o) => o.status === 'waiting');
       if (next) {
         next.status = 'ringing';
         sfx('phone');
         this.bump();
       }
-    } else if (ringing && this.counter) {
-      ringing.status = 'waiting';
-      this.bump();
     }
-    if (ringing && Math.floor(this.t * 0.5) !== Math.floor((this.t - dt) * 0.5)) sfx('phone');
+    if (this.ringing && Math.floor(this.t * 0.6) !== Math.floor((this.t - dt) * 0.6)) sfx('phone');
   }
 
   get ringing() {
@@ -818,11 +782,10 @@ export class Session {
 
   acceptOnline() {
     const o = this.ringing;
-    if (!o || this.counter) return;
+    if (!o || this.cust) return;
     o.status = 'active';
     this.activeOnline = o;
     this.plate = { id: 'box', pieces: this.plate.pieces };
-    this.goStation(1);
     sfx('ding');
     this.bump();
   }
@@ -830,86 +793,51 @@ export class Session {
   private pack() {
     const o = this.activeOnline!;
     const sc = scorePlate(o.order, this.plate.pieces, 'box');
-    const lateness = Math.max(0, o.age - 150) / 120;
-    const s = Math.max(0, sc.score - lateness * 30);
-    o.stars = s >= 90 ? 5 : s >= 75 ? 4 : s >= 55 ? 3 : s >= 35 ? 2 : 1;
-    o.status = 'packed';
-    const bill = orderPrice(o.order);
-    this.ledger.sales += bill;
-    const tip = sc.complaint
-      ? 0
-      : Math.round(bill * Math.pow(s / 100, 2) * 0.15 * (1 + this.tipBonus));
-    this.ledger.tips += tip;
-    this.ledger.satSum += s;
-    this.ledger.satN++;
+    const late = Math.max(0, o.age - 120) / 100;
+    const sat = Math.max(0, sc.score - late * 25);
+    this.ledger.sales += orderPrice(o.order);
     this.ledger.served++;
-    if (sc.complaint) this.ledger.complaints++;
-    this.doorBox = o;
+    const d = writeReview({
+      sat,
+      reasons: sc.reasons,
+      reply: 'none',
+      chatted: false,
+      fast: o.age < 80,
+      online: true,
+      seed: o.seed,
+    });
+    o.stars = d.stars;
+    o.status = 'packed';
+    this.postReview(o, d, sc.reasons, true);
     this.activeOnline = null;
     this.plate = { id: 'geta', pieces: [] };
-    this.couriers.push({ t: 0, order: o });
-    this.goStation(0);
+    this.hand = null;
+    this.courier = { t: 0, order: o };
     sfx('scooter');
-    this.toast(t2('courier'));
+    this.toast(tt('courier'));
+    this.nextIn = 3;
     this.bump();
   }
 
   private deliver(o: OnlineOrder) {
     o.status = 'delivered';
-    this.addReview(o.nameIdx, o.female, o.stars ?? 3, true);
     this.bump();
   }
 
-  private addReview(nameIdx: number, female: boolean, stars: number, online: boolean) {
-    const pools: Record<number, L[]> = {
-      5: [
-        { tr: 'Limanın en iyisi! Pirinç sıcacık.', en: 'Best in the harbor! The rice is so warm.' },
-        { tr: 'Mükemmel, yine geleceğim.', en: 'Perfect, I’ll be back.' },
-        {
-          tr: 'Mürekkep bana el salladı, sushi de harikaydı!',
-          en: 'Inky waved at me, and the sushi was great!',
-        },
-      ],
-      4: [
-        { tr: 'Çok güzeldi, tavsiye ederim.', en: 'Really good, recommended.' },
-        { tr: 'Taze ve özenli.', en: 'Fresh and careful.' },
-      ],
-      3: [
-        { tr: 'Fena değil, biraz bekledim.', en: 'Not bad, waited a bit.' },
-        { tr: 'Ortalama bir tabak.', en: 'An average plate.' },
-      ],
-      2: [{ tr: 'Siparişim tam değildi.', en: 'My order wasn’t quite right.' }],
-      1: [{ tr: 'Çok bekledim, memnun kalmadım.', en: 'Waited too long, not happy.' }],
-    };
-    const p = pools[Math.max(1, Math.min(5, stars))];
-    this.reviews.push({
-      day: this.n,
-      nameIdx,
-      female,
-      stars,
-      text: p[Math.floor(this.rng() * p.length)],
-      online,
-    });
+  // ---------- the work table ----------
+
+  stock() {
+    return 0;
   }
 
-  // ---------- prep counter ----------
-
-  /** prepared stock for cooked ingredients */
-  stock(i: IngId) {
-    return this.prepared[i]?.length ?? 0;
-  }
-  private takeStock(i: IngId): Done | undefined {
-    return this.prepared[i]?.shift();
-  }
-
-  /** prep tubs visible right now (only unlocked, cooked ones only when stocked) */
-  prepTubs(): IngId[] {
+  /** trays on the table: only unlocked ones */
+  trays(): IngId[] {
     const order: IngId[] = [
       'rice',
       'salmon',
       'tuna',
       'tamago',
-      'unagi',
+      'ebi',
       'wasabi',
       'ginger',
       'soy',
@@ -917,32 +845,16 @@ export class Session {
       'tobiko',
       'scallion',
       'spicymayo',
-      'unagisauce',
       'noriband',
     ];
-    return order.filter((i) => {
-      if (!this.have.has(i)) return false;
-      // cooked things only get a tub while there is something in it
-      if (ING[i].cookedFrom) return this.stock(i) > 0;
-      if (i === 'noriband') return this.have.has('noriband');
-      return true;
-    });
+    return order.filter((i) => this.have.has(i));
   }
 
-  pickTub(i: IngId) {
-    if (i === 'rice') return; // rice is squeezed with a hold
-    if (ING[i].cookedFrom && this.stock(i) <= 0) {
-      this.toast(
-        getLang() === 'tr'
-          ? `Önce ${tx(ING[i].name).toLowerCase()} hazırla (Isıtma)`
-          : `Cook ${tx(ING[i].name).toLowerCase()} first (Heat)`,
-        'info'
-      );
-      return;
-    }
-    if (this.hand?.k === 'tub' && this.hand.ing === i) {
-      this.hand = null;
-    } else {
+  pickTray(i: IngId) {
+    if (i === 'rice') return;
+    this.dismissAsk();
+    if (this.hand?.k === 'tub' && this.hand.ing === i) this.hand = null;
+    else {
       this.dropHand();
       this.hand = { k: 'tub', ing: i };
     }
@@ -950,7 +862,20 @@ export class Session {
     this.bump();
   }
 
+  pickTorch() {
+    this.dismissAsk();
+    if (this.hand?.k === 'torch') this.hand = null;
+    else {
+      this.dropHand();
+      this.hand = { k: 'torch' };
+      this.toast(tt('torchHint'));
+    }
+    sfx('pick');
+    this.bump();
+  }
+
   squeezeStart() {
+    this.dismissAsk();
     this.dropHand();
     this.squeeze = { a: 0, on: true };
     this.bump();
@@ -959,10 +884,10 @@ export class Session {
     if (!this.squeeze.on) return;
     const a = this.squeeze.a;
     this.squeeze.on = false;
-    if (a < 0.18) {
+    if (a < 0.15) {
       this.squeeze.a = 0;
       this.toast(
-        tx({ tr: 'Pirinci sıkmak için basılı tut', en: 'Press and hold to shape the rice' })
+        tx({ tr: 'Pirinci şekillendirmek için basılı tut', en: 'Press and hold to shape the rice' })
       );
       return;
     }
@@ -970,19 +895,11 @@ export class Session {
     sfx('pick');
     this.bump();
   }
-  private tickSqueeze(dt: number) {
-    if (this.squeeze.on) this.squeeze.a = Math.min(RICE_MAX, this.squeeze.a + dt * 0.62);
-    else if (this.squeeze.a > 0 && this.hand?.k !== 'rice')
-      this.squeeze.a = Math.max(0, this.squeeze.a - dt * 2);
-  }
 
   dropHand() {
     const h = this.hand;
     if (!h) return;
-    if (h.k === 'batch' && h.pieces.length) {
-      // unused slices are thrown away
-      this.waste(h.pieces.reduce((a, p) => a + bodyCost(p), 0));
-    }
+    if (h.k === 'batch' && h.pieces.length) this.ledger.waste += h.pieces.length * 0.6;
     this.hand = null;
     this.bump();
   }
@@ -994,23 +911,15 @@ export class Session {
     this.bump();
   }
 
-  private waste(v: number) {
-    this.ledger.waste += v;
-  }
-  private spend(v: number) {
-    this.ledger.ing += v;
-  }
-
   trash() {
-    if (this.hand && this.hand.k !== 'plate') {
+    if (this.hand && this.hand.k !== 'plate' && this.hand.k !== 'torch') {
       this.dropHand();
       sfx('trash');
       return;
     }
     if (this.plate.pieces.length) {
-      this.waste(this.plate.pieces.reduce((a, p) => a + pieceCost(p, p.tops) + bodyCost(p), 0));
+      this.ledger.waste += this.plate.pieces.reduce((a, p) => a + pieceCost(p, p.tops) + 0.5, 0);
       this.plate.pieces = [];
-      this.hand = null;
       sfx('trash');
       this.bump();
     }
@@ -1021,7 +930,7 @@ export class Session {
     let bd = 1e9;
     for (const p of this.plate.pieces) {
       const d = Math.hypot(p.x - x, (p.y - y) * 1.1);
-      if (d < pieceRadius(p) * 1.5 && d < bd) {
+      if (d < pieceRadius(p) * 1.6 && d < bd) {
         bd = d;
         best = p;
       }
@@ -1031,26 +940,13 @@ export class Session {
 
   /** a tap on the plate in plate-local coordinates (x: -0.5..0.5, y: -0.3..0.3) */
   tapPlate(x: number, y: number) {
+    this.dismissAsk();
     const h = this.hand;
-    if (!h) {
-      if (this.plate.pieces.length && this.activeOrder) {
-        this.hand = { k: 'plate' };
-        sfx('pick');
-        this.bump();
-      }
-      return;
-    }
-    if (h.k === 'plate') {
-      this.hand = null;
-      this.bump();
-      return;
-    }
-    // edge taps are pulled inside the plate
-    const lim = this.plate.id === 'porcelain' ? { x: 0.42, y: 0.24 } : { x: 0.44, y: 0.25 };
-    x = Math.max(-lim.x, Math.min(lim.x, x));
-    y = Math.max(-lim.y, Math.min(lim.y, y));
-    if (this.plate.pieces.length >= 22) {
-      this.toast(t2('plateFull'));
+    if (!h || h.k === 'plate' || h.k === 'torch') return;
+    x = Math.max(-0.43, Math.min(0.43, x));
+    y = Math.max(-0.24, Math.min(0.24, y));
+    if (this.plate.pieces.length >= 24) {
+      this.toast(tt('plateFull'));
       return;
     }
     const add = (body: PieceBody, tops: IngId[] = []) => {
@@ -1059,30 +955,27 @@ export class Session {
         uid: newUid(),
         x,
         y,
-        rot: (this.rng() - 0.5) * 0.25,
+        rot: (this.rng() - 0.5) * 0.22,
         tops,
         born: this.t,
       } as Piece;
       this.plate.pieces.push(p);
-      this.spend(pieceCost(body, tops));
+      this.ledger.ing += pieceCost(body, tops);
       sfx('place');
       this.bump();
       return p;
     };
-
     if (h.k === 'rice') {
       add({ kind: 'nigiri', rice: h.q });
-      for (let i = 0; i < 4; i++) this.addFx('grain', x, y, 1);
+      for (let i = 0; i < 4; i++) this.addFx('grain', x, y, 'plate');
       return;
     }
     if (h.k === 'batch') {
-      const body = h.pieces.shift()!;
-      add(body);
+      add(h.pieces.shift()!);
       if (!h.pieces.length) this.hand = null;
       this.bump();
       return;
     }
-    // tub in hand
     const ing = h.ing;
     const roles = ING[ing].roles;
     if (roles.includes('side')) {
@@ -1092,31 +985,20 @@ export class Session {
     const target = this.pieceAt(x, y);
     if (roles.includes('neta') && ing !== 'noriband') {
       if (!target || target.kind !== 'nigiri' || target.neta) {
-        this.toast(t2('next1'));
+        this.toast(tt('next1'));
         sfx('fail');
         return;
       }
-      let done: Done | undefined;
-      if (ING[ing].cookedFrom) {
-        if (this.stock(ing) <= 0) {
-          this.toast(tx({ tr: 'Hazır stok bitti', en: 'Out of cooked stock' }));
-          this.hand = null;
-          this.bump();
-          return;
-        }
-        done = this.takeStock(ing);
-        if (this.stock(ing) <= 0) this.hand = null;
-      } else this.spend(ING[ing].cost * 0.5);
       target.neta = ing;
-      target.done = done;
       target.born = this.t;
+      this.ledger.ing += ING[ing].cost * 0.5;
       sfx('place');
       this.bump();
       return;
     }
     if (roles.includes('topping')) {
       if (!target || target.kind === 'side') {
-        this.toast(t2('onPiece'));
+        this.toast(tt('onPiece'));
         sfx('fail');
         return;
       }
@@ -1129,43 +1011,94 @@ export class Session {
         }
         target.band = true;
       } else if (!target.tops.includes(ing)) target.tops.push(ing);
-      this.spend(ING[ing].cost);
+      this.ledger.ing += ING[ing].cost;
       target.born = this.t;
       sfx('pop');
       this.bump();
     }
   }
 
-  // ---------- rolling board & cutting (station 2) ----------
+  // ---------- torch (aburi) ----------
 
-  boardStart(m: 'maki' | 'temaki') {
-    if (this.board.m !== 'idle') return;
-    if (m === 'maki') {
-      this.board = {
-        m: 'maki',
-        style: 'hoso',
-        stage: 'rice',
-        rice: 0,
-        fill: [],
-        prog: 0,
-        speed: 0,
-        n: 6,
-        cutT: 0,
-      };
-      this.spend(ING.nori.cost);
-    } else {
-      this.board = { m: 'temaki', stage: 'rice', rice: 0, fill: [], n: 1 };
-      this.spend(ING.nori.cost * 0.5);
+  searStart(x: number, y: number): boolean {
+    if (this.hand?.k !== 'torch') return false;
+    const p = this.pieceAt(x, y);
+    if (!p || p.kind !== 'nigiri' || !p.neta) {
+      this.toast(tt('torchHint'));
+      return false;
     }
-    sfx('place');
+    const prev = p.aburi ? { raw: 0.2, done: 0.55, over: 0.78, burnt: 0.95 }[p.aburi] : 0;
+    this.sear = { uid: p.uid, t: prev };
+    sfx('sizzle');
+    return true;
+  }
+  searEnd() {
+    const s = this.sear;
+    if (!s) return;
+    this.sear = null;
+    const p = this.plate.pieces.find((x) => x.uid === s.uid);
+    if (p && p.kind === 'nigiri' && s.t > 0.06) {
+      p.aburi = doneness(s.t);
+      if (p.aburi === 'done') this.toast(tt('perfectCut'), 'good');
+      if (p.aburi === 'burnt') this.toast(tx({ tr: 'Yandı!', en: 'Burnt!' }), 'bad');
+    }
     this.bump();
   }
 
-  boardFish(fish: IngId) {
+  // ---------- mini-games: maki mat and sashimi knife ----------
+
+  openMaki() {
     if (this.board.m !== 'idle') return;
+    this.dismissAsk();
+    this.dropHand();
+    this.board = {
+      m: 'maki',
+      style: 'hoso',
+      stage: 'rice',
+      rice: 0,
+      fill: [],
+      prog: 0,
+      n: 6,
+      cutT: 0,
+    };
+    this.ledger.ing += ING.nori.cost;
+    sfx('place');
+    this.bump();
+  }
+  openSashimi() {
+    if (this.board.m !== 'idle') return;
+    this.dismissAsk();
+    this.dropHand();
+    this.board = { m: 'pick' };
+    sfx('tap');
+    this.bump();
+  }
+  pickFish(fish: IngId) {
+    if (this.board.m !== 'pick') return;
     this.board = { m: 'sashimi', fish, n: 3, cutT: 0 };
     sfx('place');
     this.bump();
+  }
+  closeBoard() {
+    const b = this.board;
+    if (b.m === 'maki') this.ledger.waste += ING.nori.cost + (b.riceQ ? ING.rice.cost : 0);
+    this.board = { m: 'idle' };
+    this.riceHold = false;
+    this.rollDrag = null;
+    sfx('trash');
+    this.bump();
+  }
+
+  availableStyles(): MakiStyle[] {
+    return (['hoso', 'ura', 'futo'] as MakiStyle[]).filter((s) => this.n >= STYLE_DAY[s]);
+  }
+  fillChips(): IngId[] {
+    return (
+      ['cucumber', 'avocado', 'salmon', 'tuna', 'crab', 'creamcheese', 'tamago', 'ebi'] as IngId[]
+    ).filter((i) => this.have.has(i));
+  }
+  coatChips(): IngId[] {
+    return (['sesame', 'tobiko'] as IngId[]).filter((i) => this.have.has(i));
   }
 
   boardStyle(s: MakiStyle) {
@@ -1173,39 +1106,13 @@ export class Session {
     if (b.m !== 'maki' || b.stage === 'rolling' || b.stage === 'cut') return;
     b.style = s;
     if (s !== 'ura') b.coat = undefined;
-    if (s === 'hoso') b.n = 6;
-    else b.n = 8;
+    b.n = s === 'hoso' ? 6 : 8;
     sfx('tap');
     this.bump();
   }
-
-  availableStyles(): MakiStyle[] {
-    return (['hoso', 'ura', 'futo'] as MakiStyle[]).filter((s) => this.n >= STYLE_DAY[s]);
-  }
-
-  /** fillings shown as chips on the board */
-  fillChips(): IngId[] {
-    const all: IngId[] = [
-      'cucumber',
-      'avocado',
-      'salmon',
-      'tuna',
-      'crab',
-      'creamcheese',
-      'tamago',
-      'tempura',
-      'unagi',
-    ];
-    return all.filter((i) => this.have.has(i));
-  }
-  coatChips(): IngId[] {
-    return (['sesame', 'tobiko'] as IngId[]).filter((i) => this.have.has(i));
-  }
-
-  private riceHold = false;
   boardRiceStart() {
     const b = this.board;
-    if ((b.m === 'maki' || b.m === 'temaki') && b.stage === 'rice') {
+    if (b.m === 'maki' && b.stage === 'rice') {
       this.riceHold = true;
       this.bump();
     }
@@ -1214,16 +1121,14 @@ export class Session {
     const b = this.board;
     if (!this.riceHold) return;
     this.riceHold = false;
-    if ((b.m === 'maki' || b.m === 'temaki') && b.stage === 'rice') {
+    if (b.m === 'maki' && b.stage === 'rice') {
       if (b.rice < 0.15) {
-        this.toast(
-          tx({ tr: 'Pirinci yaymak için basılı tut', en: 'Press and hold to spread the rice' })
-        );
+        this.toast(tt('bRice'));
         return;
       }
       b.riceQ = riceQuality(b.rice);
       b.stage = 'fill';
-      this.spend(ING.rice.cost);
+      this.ledger.ing += ING.rice.cost;
       sfx('pour');
       this.bump();
     }
@@ -1231,29 +1136,14 @@ export class Session {
   get riceHolding() {
     return this.riceHold;
   }
-
   toggleFill(i: IngId) {
     const b = this.board;
-    if ((b.m !== 'maki' && b.m !== 'temaki') || b.stage !== 'fill') return;
-    if (b.fill.includes(i)) {
-      b.fill = b.fill.filter((x) => x !== i);
-      sfx('tap');
-    } else {
-      if (b.fill.length >= 4) return;
-      if (ING[i].cookedFrom && this.stock(i) <= 0) {
-        this.toast(
-          getLang() === 'tr'
-            ? `Önce ${tx(ING[i].name).toLowerCase()} pişir`
-            : `Cook ${tx(ING[i].name).toLowerCase()} first`
-        );
-        return;
-      }
-      b.fill.push(i);
-      sfx('place');
-    }
+    if (b.m !== 'maki' || b.stage !== 'fill') return;
+    if (b.fill.includes(i)) b.fill = b.fill.filter((x) => x !== i);
+    else if (b.fill.length < 4) b.fill.push(i);
+    sfx(b.fill.includes(i) ? 'place' : 'tap');
     this.bump();
   }
-
   setCoat(i: IngId) {
     const b = this.board;
     if (b.m !== 'maki' || b.style !== 'ura' || b.stage !== 'fill') return;
@@ -1261,78 +1151,49 @@ export class Session {
     sfx('pop');
     this.bump();
   }
-
   setCount(n: number) {
     const b = this.board;
     if (b.m === 'maki' && (n === 6 || n === 8)) b.n = n;
     if (b.m === 'sashimi' && (n === 3 || n === 5)) b.n = n;
-    if (b.m === 'temaki' && (n === 1 || n === 2)) b.n = n;
     sfx('tap');
     this.bump();
   }
 
-  private rollDrag: {
-    lastY: number;
-    lastT: number;
-    dist: number;
-    time: number;
-    hold: boolean;
-  } | null = null;
+  /** y in mat units (1 = full mat height) */
   rollStart(y: number, hold: boolean) {
     const b = this.board;
     if (b.m !== 'maki' || b.stage !== 'fill') return false;
     if (!b.fill.length) {
-      this.toast(tx({ tr: 'Önce iç malzeme koy', en: 'Add a filling first' }));
+      this.toast(tx({ tr: 'Önce iç malzeme seç', en: 'Pick a filling first' }));
       return false;
     }
     b.stage = 'rolling';
     b.prog = 0;
-    b.speed = 0;
-    this.rollDrag = { lastY: y, lastT: this.t, dist: 0, time: 0, hold };
-    // cooked fillings are taken from stock now
-    let worst: Done | undefined;
-    for (const f of b.fill) {
-      this.spend(ING[f].cookedFrom ? 0 : ING[f].cost);
-      if (ING[f].cookedFrom) {
-        const d = this.takeStock(f);
-        if (d === 'raw' || (d === 'over' && worst !== 'raw')) worst = d;
-        else if (!worst) worst = d;
-      }
-    }
-    b.done = worst;
-    if (b.coat) this.spend(ING[b.coat].cost);
+    this.rollDrag = { lastY: y, time: 0, hold };
+    for (const f of b.fill) this.ledger.ing += ING[f].cost;
+    if (b.coat) this.ledger.ing += ING[b.coat].cost;
     this.bump();
     return true;
   }
-  /** y in board-local units: 1 = full mat height; dragging up decreases y */
   rollMove(y: number) {
     const b = this.board;
     const d = this.rollDrag;
     if (b.m !== 'maki' || b.stage !== 'rolling' || !d) return;
     const dy = d.lastY - y;
     d.lastY = y;
-    if (Math.abs(dy) > 0.004) d.hold = false; // the finger is dragging now
-    if (dy > 0) {
-      b.prog = Math.min(1, b.prog + dy);
-      d.dist += dy;
-    }
+    if (Math.abs(dy) > 0.004) d.hold = false;
+    if (dy > 0) b.prog = Math.min(1, b.prog + dy);
     if (b.prog >= 1) this.rollFinish();
   }
   rollEnd() {
-    const b = this.board;
-    const d = this.rollDrag;
-    if (b.m !== 'maki' || b.stage !== 'rolling' || !d) return;
-    if (!d.hold) {
-      d.hold = true; // let go mid-roll: the mat keeps rolling slowly by itself
-    }
+    if (this.rollDrag) this.rollDrag.hold = true;
   }
   private rollFinish() {
     const b = this.board;
     const d = this.rollDrag;
     if (b.m !== 'maki' || !d) return;
-    const avg = d.time > 0 ? 1 / d.time : 1;
-    b.speed = avg;
-    b.roll = avg > 2.6 ? 'loose' : avg < 0.32 ? 'squashed' : 'tight';
+    const speed = d.time > 0 ? 1 / d.time : 1;
+    b.roll = speed > 2.6 ? 'loose' : speed < 0.32 ? 'squashed' : 'tight';
     b.stage = 'cut';
     b.cutT = 0;
     this.rollDrag = null;
@@ -1342,47 +1203,17 @@ export class Session {
         tx({ tr: 'Çok hızlı sardın, rulo gevşek!', en: 'Rolled too fast, it’s loose!' }),
         'bad'
       );
-    else if (b.roll === 'squashed')
+    if (b.roll === 'squashed')
       this.toast(
         tx({ tr: 'Çok yavaş, rulo ezildi', en: 'Too slow, the roll got squashed' }),
         'bad'
       );
     this.bump();
   }
-
-  /** live roll speed for the meter (progress per second) */
   get rollSpeed() {
     const d = this.rollDrag;
-    if (!d || d.time <= 0) return 0;
     const b = this.board;
-    return b.m === 'maki' ? b.prog / d.time : 0;
-  }
-
-  temakiMake() {
-    const b = this.board;
-    if (b.m !== 'temaki' || b.stage !== 'fill') return;
-    if (!b.fill.length) {
-      this.toast(tx({ tr: 'Önce iç malzeme koy', en: 'Add a filling first' }));
-      return;
-    }
-    if (this.hand && this.hand.k !== 'plate') this.dropHand();
-    const pieces: PieceBody[] = [];
-    for (let i = 0; i < b.n; i++) {
-      let done: Done | undefined;
-      for (const f of b.fill) {
-        if (ING[f].cookedFrom) {
-          const d = this.takeStock(f);
-          if (d && (!done || d === 'raw')) done = d;
-        } else this.spend(ING[f].cost * 0.5);
-      }
-      if (i > 0) this.spend(ING.nori.cost * 0.5 + ING.rice.cost * 0.5);
-      pieces.push({ kind: 'temaki', fill: [...b.fill], rice: b.riceQ ?? 'just', done });
-    }
-    this.hand = { k: 'batch', pieces, label: 'temaki' };
-    this.board = { m: 'idle' };
-    sfx('whoosh');
-    this.goStation(1);
-    this.bump();
+    return d && d.time > 0 && b.m === 'maki' ? b.prog / d.time : 0;
   }
 
   cutTap() {
@@ -1400,23 +1231,15 @@ export class Session {
           rice: b.riceQ ?? 'just',
           roll: b.roll ?? 'tight',
           cut,
-          done: b.done,
           idx: i,
         });
       this.giveBatch(pieces, 'maki', cut);
-      return;
-    }
-    if (b.m === 'sashimi') {
+    } else if (b.m === 'sashimi') {
       const pos = cutMarker(b.cutT, 1.9);
-      const z = SASHIMI_ZONES.find((z) => pos >= z.a && pos <= z.b)!;
-      let thick: Thick;
-      let cut: CutQ = 'clean';
-      if (z.q) thick = z.q;
-      else {
-        cut = 'crooked';
-        thick = pos < 0.34 ? 'thin' : pos < 0.66 ? 'normal' : 'thick';
-      }
-      this.spend(ING[b.fish].cost * 0.5 * b.n);
+      const z = SASHIMI_ZONES.find((q) => pos >= q.a && pos <= q.b)!;
+      const cut: CutQ = z.q ? 'clean' : 'crooked';
+      const thick: Thick = z.q ?? (pos < 0.34 ? 'thin' : pos < 0.66 ? 'normal' : 'thick');
+      this.ledger.ing += ING[b.fish].cost * 0.5 * b.n;
       const pieces: PieceBody[] = [];
       for (let i = 0; i < b.n; i++)
         pieces.push({ kind: 'sashimi', fish: b.fish, thick, cut, idx: i });
@@ -1425,34 +1248,23 @@ export class Session {
   }
 
   private giveBatch(pieces: PieceBody[], label: IngId | 'maki', cut: CutQ) {
-    if (this.hand && this.hand.k !== 'plate') this.dropHand();
     this.hand = { k: 'batch', pieces, label };
     this.board = { m: 'idle' };
     sfx(cut === 'clean' ? 'perfect' : 'fail');
     buzz(cut === 'clean' ? 10 : 30);
     this.toast(
-      cut === 'clean' ? t2('perfectCut') : t2('crooked'),
+      cut === 'clean' ? tt('perfectCut') : tt('crooked'),
       cut === 'clean' ? 'good' : 'bad'
     );
-    this.goStation(1);
     this.bump();
   }
 
-  boardReset() {
+  private tickPrep(dt: number) {
+    if (this.squeeze.on) this.squeeze.a = Math.min(RICE_MAX, this.squeeze.a + dt * 0.62);
+    else if (this.squeeze.a > 0 && this.hand?.k !== 'rice')
+      this.squeeze.a = Math.max(0, this.squeeze.a - dt * 2);
     const b = this.board;
-    if (b.m === 'idle') return;
-    let c = 0;
-    if (b.m === 'maki') c = ING.nori.cost + (b.riceQ ? ING.rice.cost : 0);
-    if (b.m === 'temaki') c = ING.nori.cost * 0.5;
-    this.waste(c);
-    this.board = { m: 'idle' };
-    sfx('trash');
-    this.bump();
-  }
-
-  private tickBoard(dt: number) {
-    const b = this.board;
-    if ((b.m === 'maki' || b.m === 'temaki') && b.stage === 'rice' && this.riceHold) {
+    if (b.m === 'maki' && b.stage === 'rice' && this.riceHold) {
       b.rice = Math.min(RICE_MAX, b.rice + dt * 0.6);
       if (Math.random() < dt * 6) sfx('pour');
     }
@@ -1465,78 +1277,31 @@ export class Session {
     }
     if (b.m === 'maki' && b.stage === 'cut') b.cutT += dt;
     if (b.m === 'sashimi') b.cutT += dt;
-  }
-
-  // ---------- heat station ----------
-
-  heatStart(dev: 'fryer' | 'grill') {
-    if (this.heat[dev]) return;
-    const ing: IngId = dev === 'fryer' ? 'shrimp' : 'eel';
-    if (!this.have.has(ing)) return;
-    this.heat[dev] = { ing, t: 0 };
-    this.spend(ING[ing].cost * 2);
-    sfx('sizzle');
-    this.bump();
-  }
-
-  heatTake(dev: 'fryer' | 'grill') {
-    const c = this.heat[dev];
-    if (!c) return;
-    const d = doneness(c.t);
-    const out: IngId = c.ing === 'shrimp' ? 'tempura' : 'unagi';
-    this.heat[dev] = null;
-    if (d === 'burnt') {
-      this.waste(ING[c.ing].cost * 2);
-      this.toast(tx({ tr: 'Yandı! Çöpe gitti.', en: 'Burnt! Into the bin.' }), 'bad');
-      sfx('trash');
-    } else {
-      const list = (this.prepared[out] ??= []);
-      for (let i = 0; i < 4; i++) list.push(d);
-      if (out === 'unagi' && d !== 'raw')
-        this.toast(
-          getLang() === 'tr'
-            ? 'Unagi tezgâhta ve tahtada hazır'
-            : 'Eel is ready on the counter and board',
-          'good'
-        );
-      if (d === 'raw')
-        this.toast(tx({ tr: 'Daha pişmemişti…', en: 'It wasn’t cooked yet…' }), 'bad');
-      else if (d === 'done') this.toast(t2('perfectCut'), 'good');
-      sfx(d === 'done' ? 'perfect' : 'pop');
-    }
-    this.bump();
-  }
-
-  private tickHeat(dt: number) {
-    for (const dev of ['fryer', 'grill'] as const) {
-      const c = this.heat[dev];
-      if (!c) continue;
-      const before = c.t;
-      c.t = Math.min(1.05, c.t + dt / 11);
-      if (before < DIAL.done && c.t >= DIAL.done) sfx('ding');
-      if (Math.random() < dt * (c.t > DIAL.burnt ? 10 : 3))
-        this.addFx(c.t > DIAL.burnt ? 'smoke' : 'steam', dev === 'fryer' ? 0.62 : 0.86, 0.5, 2);
+    if (this.sear) {
+      const before = this.sear.t;
+      this.sear.t = Math.min(1.02, this.sear.t + dt / 2.6);
+      if (before < DIAL.done && this.sear.t >= DIAL.done) sfx('ding');
+      const p = this.plate.pieces.find((x) => x.uid === this.sear!.uid);
+      if (p && Math.random() < dt * 14)
+        this.addFx(this.sear.t > DIAL.burnt ? 'smoke' : 'flame', p.x, p.y - 0.06, 'plate');
     }
   }
 
   // ---------- fx ----------
 
-  addFx(kind: Fx['kind'], x: number, y: number, station: number) {
-    if (this.fx.length > 120) return;
+  addFx(kind: Fx['kind'], x: number, y: number, space: Fx['space']) {
+    if (this.fx.length > 140) return;
     const r = Math.random;
     this.fx.push({
       kind,
       x,
       y,
-      vx: (r() - 0.5) * (kind === 'grain' ? 0.25 : 0.06),
-      vy:
-        kind === 'smoke' || kind === 'steam' || kind === 'heart'
-          ? -0.08 - r() * 0.05
-          : -0.2 - r() * 0.2,
+      vx: (r() - 0.5) * (kind === 'grain' ? 0.25 : 0.05),
+      vy: kind === 'grain' ? -0.2 - r() * 0.2 : -0.05 - r() * 0.06,
       t: 0,
-      life: kind === 'grain' ? 0.5 : kind === 'smoke' ? 2.2 : 1.4,
+      life: kind === 'grain' ? 0.5 : kind === 'flame' ? 0.45 : 1.4,
       s: 0.6 + r() * 0.6,
-      station,
+      space,
     });
   }
   private tickFx(dt: number) {
@@ -1548,7 +1313,6 @@ export class Session {
     }
     this.fx = this.fx.filter((f) => f.t < f.life);
   }
-
   private dropCoins(n: number) {
     for (let i = 0; i < n; i++)
       this.coins.push({
@@ -1557,12 +1321,10 @@ export class Session {
         vy: 0,
         rest: false,
         kind: Math.floor(Math.random() * 3),
-        rot: Math.random() * Math.PI,
       });
-    if (this.coins.length > 60) this.coins.splice(0, this.coins.length - 60);
+    if (this.coins.length > 50) this.coins.splice(0, this.coins.length - 50);
   }
   private tickCoins(dt: number) {
-    // coins fall into the jar and settle on the pile; settled coins never move again
     const rested = this.coins.filter((c) => c.rest);
     for (const c of this.coins) {
       if (c.rest) continue;
@@ -1582,68 +1344,58 @@ export class Session {
 
   get net() {
     const l = this.ledger;
-    return (
-      l.sales + l.tips + l.bonus - l.ing - l.waste - l.overpaid - this.day.rent - this.day.bills
-    );
+    return l.sales + l.tips + l.bonus - l.ing - l.waste - l.overpaid - this.day.rent;
   }
-  get avgSat() {
-    return this.ledger.satN ? Math.round(this.ledger.satSum / this.ledger.satN) : 0;
+  get dayRating() {
+    if (!this.reviews.length) return 0;
+    return this.reviews.reduce((a, r) => a + r.stars, 0) / this.reviews.length;
   }
   get stars() {
-    const a = this.avgSat;
-    const served = this.ledger.served;
-    if (!served) return 1;
-    if (a >= 82 && this.net > 0 && this.ledger.walkouts === 0) return 3;
-    if (a >= 60) return 2;
+    const r = this.dayRating;
+    if (!this.ledger.served) return 1;
+    if (r >= 4.4 && this.net > 0 && !this.ledger.walkouts) return 3;
+    if (r >= 3.4) return 2;
     return 1;
   }
 
-  // ---------- day-1 hints ----------
+  // ---------- day-1 hints from Pip ----------
 
   hint(): { text: L; target?: string } | null {
     if (!this.tutorial || this.over) return null;
-    const c = this.counter;
-    if (this.drawer.open && c?.state === 'pay')
+    const c = this.cust;
+    if (c?.state === 'pay' && this.drawer.open)
       return {
         text: {
-          tr: 'Çekmeceden para üstünü seç, sonra “Ver”e bas.',
-          en: 'Pick the change from the drawer, then tap “Give”.',
+          tr: 'Para üstü kasanın yanındaki kutuda yazıyor. Çekmeceden o kadar seç, “Ver”e bas.',
+          en: 'The change is shown in the box by the register. Pick that much from the drawer and tap “Give”.',
         },
         target: 'drawer',
       };
-    if (c?.state === 'complain')
+    if (c?.state === 'verdict' && c.ask)
       return {
         text: {
-          tr: 'Hata olmuş. “Özür dile”ye bas.',
-          en: 'Something went wrong. Tap “Apologize”.',
+          tr: 'Müşteriye cevap ver! Cevabın yorumu değiştirir.',
+          en: 'Answer the customer! Your reply changes the review.',
         },
-        target: 'apologize',
+        target: 'choices',
       };
-    if (!c || c.state === 'enter' || c.state === 'queue')
-      return { text: { tr: 'Müşteri geliyor…', en: 'A customer is coming…' } };
+    if (!c || c.state === 'arrive')
+      return { text: { tr: 'Biri geliyor…', en: 'Someone’s coming…' } };
     if (c.state === 'order')
       return {
         text: {
-          tr: 'Müşteriyi dinle. Sipariş fişe yazılıyor.',
-          en: 'Listen to the customer. The order goes on the ticket.',
+          tr: 'Dinle! Siparişi karta yazıyorum.',
+          en: 'Listen! I’m writing the order on the card.',
         },
       };
     if (c.state !== 'wait') return null;
-    if (this.station === 0 && this.hand?.k !== 'plate')
+    if (c.ask === 'order')
       return {
         text: {
-          tr: 'Tezgâha geç: sola kaydır ya da yukarıdaki düğmeye bas.',
-          en: 'Go to the counter: swipe or tap the button on top.',
+          tr: 'İstersen müşteriye bir cevap ver, sonra işe koyul.',
+          en: 'Say something back if you like, then get to work.',
         },
-        target: 'st1',
-      };
-    if (this.hand?.k === 'plate')
-      return {
-        text: {
-          tr: 'Tabağı müşterinin önüne bırak: “Servis et”.',
-          en: 'Put the plate in front of the customer: “Serve”.',
-        },
-        target: 'serve',
+        target: 'choices',
       };
     const o = c.order;
     const nig = this.plate.pieces.filter((p) => p.kind === 'nigiri');
@@ -1653,7 +1405,7 @@ export class Session {
         return {
           text: {
             tr: 'Tabakta istediğin yere dokun: her dokunuş bir pirinç topu.',
-            en: 'Tap the plate where you want it: each tap is one rice ball.',
+            en: 'Tap the plate where you want: each tap is one rice ball.',
           },
           target: 'plate',
         };
@@ -1662,24 +1414,21 @@ export class Session {
           tr: 'Pirinç kabını basılı tut, gösterge “tam”dayken bırak.',
           en: 'Hold the rice tub, let go when the gauge says “just right”.',
         },
-        target: 'tub:rice',
+        target: 'tray:rice',
       };
     }
     const bare = nig.filter((p) => !p.neta);
     if (bare.length) {
-      const fish = o.lines.find((l) => l.k === 'nigiri');
-      const f = fish && fish.k === 'nigiri' ? fish.fish : 'salmon';
+      const line = o.lines.find((l) => l.k === 'nigiri');
+      const f = line && line.k === 'nigiri' ? line.fish : 'salmon';
       if (this.hand?.k === 'tub' && this.hand.ing === f)
         return {
-          text: {
-            tr: 'Şimdi her pirinç topuna dokun, balık üstüne konsun.',
-            en: 'Now tap each rice ball to lay the fish on top.',
-          },
+          text: { tr: 'Şimdi her pirinç topuna dokun.', en: 'Now tap each rice ball.' },
           target: 'plate',
         };
       return {
-        text: { tr: 'Balık kabına bir kez dokun.', en: 'Tap the fish tub once.' },
-        target: 'tub:' + f,
+        text: { tr: 'Balık kabına bir kez dokun.', en: 'Tap the fish tray once.' },
+        target: 'tray:' + f,
       };
     }
     const sides = new Set(
@@ -1695,33 +1444,11 @@ export class Session {
       return {
         text: {
           tr: `Yan ürün: ${ING[miss].name.tr} kabına dokun.`,
-          en: `Side: tap the ${ING[miss].name.en.toLowerCase()} tub.`,
+          en: `Side: tap the ${ING[miss].name.en.toLowerCase()} tray.`,
         },
-        target: 'tub:' + miss,
+        target: 'tray:' + miss,
       };
     }
     return { text: { tr: 'Hazır! “Servis et”e bas.', en: 'Ready! Tap “Serve”.' }, target: 'serve' };
   }
-}
-
-function bodyCost(p: PieceBody): number {
-  switch (p.kind) {
-    case 'maki':
-      return 0.6;
-    case 'sashimi':
-      return ING[p.fish].cost * 0.5;
-    case 'temaki':
-      return 1.5;
-    default:
-      return 0;
-  }
-}
-
-function summaryOf(o: Order): L {
-  const tr = o.lines.map((l) => `${l.n}× ${l.k}`).join(', ');
-  return { tr, en: tr };
-}
-
-function t2(k: Parameters<typeof tt>[0]) {
-  return tt(k);
 }

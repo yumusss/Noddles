@@ -1,10 +1,10 @@
-// Day intro / outro dialogue with typewriter text.
+// Day intro / outro: the cast talks through the hut window, with typewriter text.
 
 import { useEffect, useState } from 'react';
-import { type Day, type Line, SPEAKERS, ACTS } from '../game/data';
+import { type Day, type DecorSlot, type Line, SPEAKERS } from '../game/data';
 import { t, tx } from '../game/i18n';
 import { sfx } from '../game/audio';
-import Portrait from './Portrait';
+import { Portrait } from './Avatar';
 import Backdrop from './Backdrop';
 import { useLang } from '../App';
 
@@ -12,11 +12,13 @@ export default function Story({
   day,
   lines,
   mode,
+  decor,
   onDone,
 }: {
   day: Day;
   lines: Line[];
   mode: 'intro' | 'outro';
+  decor: Record<DecorSlot, string>;
   onDone: () => void;
 }) {
   useLang();
@@ -25,8 +27,8 @@ export default function Story({
   const line = lines[i];
   const full = line ? tx(line.text) : '';
   useEffect(() => {
-    setN(0);
-  }, [i]);
+    if (!line) onDone();
+  }, [line, onDone]);
   useEffect(() => {
     if (n >= full.length) return;
     const id = setTimeout(() => {
@@ -35,35 +37,27 @@ export default function Story({
     }, 22);
     return () => clearTimeout(id);
   }, [n, full]);
-  useEffect(() => {
-    if (!line) onDone();
-  }, [line, onDone]);
   if (!line) return null;
   const next = () => {
     if (n < full.length) setN(full.length);
     else if (i + 1 < lines.length) {
       sfx('tap');
+      setN(0);
       setI(i + 1);
     } else onDone();
   };
   return (
-    <div className={'screen story ' + day.time + (day.rain ? ' rain' : '')} onClick={next}>
-      <Backdrop day={day} />
+    <div className="screen story" onClick={next}>
+      <Backdrop time={day.time} snow={day.snow} decor={decor} aurora={day.n === 10} />
       <div className="story-veil" />
       <div className="story-head">
-        {mode === 'intro' && (
-          <>
-            <small>
-              {t('act', { n: day.act })} · {tx(ACTS[day.act - 1])}
-            </small>
-            <h1>
-              {t('day', { n: day.n })} — {tx(day.title)}
-            </h1>
-          </>
-        )}
+        <small>{t('day', { n: day.n })}</small>
+        <h1>{tx(day.title)}</h1>
       </div>
       <div className="story-card">
-        <Portrait who={line.who} size={200} talking={n < full.length} />
+        <div className="story-portrait">
+          <Portrait who={line.who} size={220} talking={n < full.length} />
+        </div>
         <div className="story-text">
           <b>{tx(SPEAKERS[line.who])}</b>
           <p>{full.slice(0, n)}</p>

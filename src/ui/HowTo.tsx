@@ -1,159 +1,170 @@
-// Page-by-page "How to play" (opens on day 1 and from the pause menu).
+// How to play — only on day 1 (and from the pause menu).
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t, tx, type L } from '../game/i18n';
 import { sfx } from '../game/audio';
-import MiniArt, { type MiniKind } from './MiniArt';
+import { setPx } from '../art/common';
+import { drawPiece, drawIngredient } from '../art/food';
+import { CHAR_LOOKS, drawAvatar } from '../art/animals';
 import { useLang } from '../App';
 
-interface Page {
-  icon: MiniKind;
-  title: L;
-  points: L[];
-}
+type Pic = 'customer' | 'nigiri' | 'tap' | 'maki' | 'reply' | 'change' | 'yumm';
 
-const PAGES: Page[] = [
+const PAGES: { pic: Pic; title: L; points: L[] }[] = [
   {
-    icon: { k: 'face' },
-    title: { tr: 'Müşteriyi dinle', en: 'Listen to the customer' },
+    pic: 'customer',
+    title: { tr: 'Pencereye gelen müşteri', en: 'Customers at the window' },
     points: [
       {
-        tr: 'Müşteri tezgâha oturur ve siparişini söyler.',
-        en: 'A customer sits at the counter and says the order.',
+        tr: 'Her seferinde pencereye tek bir müşteri gelir ve siparişini söyler.',
+        en: 'One customer at a time comes to the window and says the order.',
       },
       {
-        tr: 'Sipariş üstteki askıya kâğıt fiş olarak asılır. Fişe dokunursan katlanır.',
-        en: 'The order hangs on the rail at the top as a paper ticket. Tap it to fold it.',
-      },
-      {
-        tr: 'Fişin altındaki çizgi sabırdır: yeşil → sarı → kırmızı.',
-        en: 'The bar under the ticket is patience: green → yellow → red.',
+        tr: 'Sipariş, pencerede asılı karta resimli olarak yazılır. Altındaki çizgi sabırdır.',
+        en: 'The order hangs on a card in the window, with pictures. The bar under it is patience.',
       },
     ],
   },
   {
-    icon: { k: 'plate' },
-    title: { tr: 'İstasyonlar', en: 'Stations' },
+    pic: 'nigiri',
+    title: { tr: 'Nigiri', en: 'Nigiri' },
     points: [
       {
-        tr: 'Salon · Tezgâh · Kesme/Isıtma yan yana durur.',
-        en: 'Dining · Counter · Cut/Heat sit side by side.',
+        tr: 'Pirinç kabını basılı tut, gösterge “tam”dayken bırak.',
+        en: 'Hold the rice tub, let go when the gauge says “just right”.',
       },
       {
-        tr: 'Parmağınla sağa-sola kaydır ya da üstteki düğmelere bas.',
-        en: 'Swipe left and right, or tap the buttons on top.',
+        tr: 'Tabakta her dokunuş bir pirinç topu koyar. Sonra balığa, sonra pirinç topuna dokun.',
+        en: 'Each tap on the plate places a rice ball. Then tap the fish, then the rice ball.',
       },
     ],
   },
   {
-    icon: { k: 'nigiri' },
-    title: { tr: 'Pirinç ve nigiri', en: 'Rice and nigiri' },
+    pic: 'tap',
+    title: { tr: 'Dokun ve koy', en: 'Tap to place' },
     points: [
       {
-        tr: 'Pirinç kabını basılı tut. Gösterge “tam”dayken bırak.',
-        en: 'Hold the rice tub. Let go when the gauge says “just right”.',
+        tr: 'Bir kaba bir kez dokun, sonra tabakta istediğin yere dokun. Sürükleme yok.',
+        en: 'Tap a tray once, then tap anywhere on the plate. No dragging.',
       },
       {
-        tr: 'Tabakta her dokunuş bir pirinç topu koyar.',
-        en: 'Each tap on the plate places one rice ball.',
-      },
-      {
-        tr: 'Balık kabına dokun, sonra pirinç topuna dokun: nigiri hazır!',
-        en: 'Tap a fish tub, then tap a rice ball: nigiri done!',
-      },
-    ],
-  },
-  {
-    icon: { k: 'maki' },
-    title: { tr: 'Sarma ve kesme', en: 'Rolling and cutting' },
-    points: [
-      {
-        tr: 'Kesme tahtasında nori koy, pirinci basılı tutarak yay.',
-        en: 'On the board, lay nori and hold to spread the rice.',
-      },
-      {
-        tr: 'İç malzemeleri seç, hasırı yukarı kaydırarak sar. Çok hızlı sararsan dağılır.',
-        en: 'Pick fillings, slide the mat up to roll. Too fast and it falls apart.',
-      },
-      {
-        tr: 'Çizgi yeşildeyken kes. Sashimide anı seçerek kalınlığı belirlersin.',
-        en: 'Cut while the line is green. For sashimi the moment sets the thickness.',
-      },
-    ],
-  },
-  {
-    icon: { k: 'ing', ing: 'wasabi' },
-    title: { tr: 'Dokunarak koy', en: 'Place by tapping' },
-    points: [
-      {
-        tr: 'Kaba bir kez dokun: seçilir ve tabağın yanında süzülür.',
-        en: 'Tap a tub once: it’s picked and floats by the plate.',
-      },
-      {
-        tr: 'Tabakta istediğin yere dokun: tam oraya bir parça konur.',
-        en: 'Tap anywhere on the plate: a piece goes exactly there.',
-      },
-      {
-        tr: 'Sos ve susam gibi şeyler bir parçanın üstüne konur. ✕ ile bırakırsın.',
+        tr: 'Sos ve susam bir parçanın üstüne konur. ✕ ile elindekini bırakırsın.',
         en: 'Sauces and sesame go on top of a piece. ✕ puts it back.',
       },
     ],
   },
   {
-    icon: { k: 'tempura' },
-    title: { tr: 'Isıtma', en: 'Heat' },
+    pic: 'maki',
+    title: { tr: 'Hasır, bıçak, pürmüz', en: 'Mat, knife, torch' },
     points: [
       {
-        tr: 'Fritöze karides, ızgaraya yılan balığı koy.',
-        en: 'Shrimp go in the fryer, eel on the grill.',
+        tr: 'Alttaki araçlar küçük oyunlar açar: hasırla maki sar, bıçakla sashimi kes.',
+        en: 'The tools below open little games: roll maki with the mat, slice sashimi with the knife.',
       },
       {
-        tr: 'Kadranı izle: çiğ → tam → fazla → yanık. Doğru anda “Al!”',
-        en: 'Watch the dial: raw → done → over → burnt. Tap “Take!” at the right moment.',
-      },
-      {
-        tr: 'Hazır olanlar tezgâhta ve tahtada kullanılır.',
-        en: 'Cooked pieces are used on the counter and the board.',
+        tr: 'Doğru anda dokun: çizgi yeşildeyken kes, kadran yeşildeyken bırak.',
+        en: 'Timing matters: cut when the line is green, let go when the dial is green.',
       },
     ],
   },
   {
-    icon: { k: 'coin' },
-    title: { tr: 'Servis, para üstü, bahşiş', en: 'Serve, change, tips' },
+    pic: 'reply',
+    title: { tr: 'Müşteriyle konuş', en: 'Talk to customers' },
     points: [
       {
-        tr: '“Servis et” ile tabağı müşterinin önüne bırak.',
-        en: 'Tap “Serve” to put the plate in front of the customer.',
+        tr: 'Müşterilere cevap verebilirsin. Sohbet etmek onları mutlu eder.',
+        en: 'You can answer customers. A little chat makes them happy.',
       },
       {
-        tr: 'Müşteri para üstünü söyler; çekmeceden doğru parayı seç.',
-        en: 'The customer says the change; pick the right money from the drawer.',
-      },
-      {
-        tr: 'Mutlu müşteri bahşiş bırakır. Hata olursa “Özür dile”.',
-        en: 'Happy customers tip. If something’s wrong, “Apologize”.',
+        tr: 'Beğenmezlerse dürüstçe söylerler. Özür dilemek ya da ikram etmek yorumu yumuşatır; tartışmak kötüleştirir.',
+        en: 'If they don’t like it, they’ll say so. Apologizing or treating them softens the review; arguing makes it worse.',
       },
     ],
   },
   {
-    icon: { k: 'tablet' },
-    title: { tr: 'Tablet ve yıldızlar', en: 'Tablet and stars' },
+    pic: 'change',
+    title: { tr: 'Para üstü', en: 'Change' },
     points: [
       {
-        tr: 'Tablette yorumlar, siparişler ve malzemeler var.',
-        en: 'The tablet has reviews, orders and ingredients.',
+        tr: 'Müşteri sadece parayı uzatır. Para üstü kasanın yanındaki küçük kutuda yazar.',
+        en: 'The customer just hands over the money. The change is shown in the little box by the register.',
       },
       {
-        tr: '10. günden itibaren online siparişler tabletten gelir.',
-        en: 'From day 10 online orders come in on the tablet.',
+        tr: 'Çekmeceden o kadarını seç ve “Ver”e bas.',
+        en: 'Pick that much from the drawer and tap “Give”.',
+      },
+    ],
+  },
+  {
+    pic: 'yumm',
+    title: { tr: 'Nefis puanı', en: 'Yumm rating' },
+    points: [
+      {
+        tr: 'Her müşteri Nefis uygulamasına yorum yazar. Üstteki puana dokunarak tableti aç.',
+        en: 'Every customer posts a review on Yumm. Tap the rating on top to open the tablet.',
       },
       {
-        tr: 'Gün sonunda defter: 1–3 yıldız ve dekor için para.',
-        en: 'At day’s end, the ledger: 1–3 stars and money for decor.',
+        tr: 'Kar Festivali’ne kadar puanı 4,2’ye çıkar! Her gün 5 dakika sürer.',
+        en: 'Get the rating to 4.2 by the Snow Festival! Each day lasts 5 minutes.',
       },
     ],
   },
 ];
+
+function PicCanvas({ pic }: { pic: Pic }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const cv = ref.current!;
+    const size = 140;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    cv.width = size * dpr;
+    cv.height = size * dpr;
+    const c = cv.getContext('2d')!;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    setPx(dpr);
+    c.clearRect(0, 0, size, size);
+    c.translate(size / 2, size / 2);
+    switch (pic) {
+      case 'customer':
+        drawAvatar(c, CHAR_LOOKS.bulut, 130, 'happy', '#d8ecf2');
+        break;
+      case 'nigiri':
+        drawPiece(c, 420, { kind: 'nigiri', rice: 'just', neta: 'salmon', tops: [] }, 2);
+        break;
+      case 'tap':
+        drawIngredient(c, 'wasabi', 110, 2);
+        break;
+      case 'maki':
+        drawPiece(
+          c,
+          380,
+          {
+            kind: 'maki',
+            style: 'ura',
+            fill: ['crab', 'avocado'],
+            coat: 'tobiko',
+            rice: 'just',
+            roll: 'tight',
+            cut: 'clean',
+            idx: 0,
+            tops: [],
+          },
+          3
+        );
+        break;
+      case 'reply':
+        drawAvatar(c, CHAR_LOOKS.hazel, 130, 'love', '#fde2d8');
+        break;
+      case 'change':
+        drawAvatar(c, CHAR_LOOKS.tusk, 130, 'happy', '#f2e6cf');
+        break;
+      case 'yumm':
+        drawAvatar(c, CHAR_LOOKS.pip, 130, 'happy', '#e6eefb');
+        break;
+    }
+  }, [pic]);
+  return <canvas ref={ref} style={{ width: 140, height: 140 }} />;
+}
 
 export default function HowTo({ onDone }: { onDone: () => void }) {
   useLang();
@@ -170,7 +181,7 @@ export default function HowTo({ onDone }: { onDone: () => void }) {
           </button>
         </div>
         <div className="howto-icon">
-          <MiniArt kind={p.icon} size={120} />
+          <PicCanvas pic={p.pic} />
         </div>
         <h3>{tx(p.title)}</h3>
         <ul>

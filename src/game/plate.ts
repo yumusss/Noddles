@@ -16,6 +16,8 @@ export interface NigiriP {
   /** for cooked neta (unagi) */
   done?: Done;
   band?: boolean;
+  /** seared with the torch (aburi) */
+  aburi?: Done;
 }
 export interface MakiP {
   kind: 'maki';
@@ -69,7 +71,8 @@ export type Hand =
   | { k: 'tub'; ing: IngId }
   | { k: 'rice'; q: RiceQ }
   | { k: 'batch'; pieces: PieceBody[]; label: IngId | 'maki' | 'temaki' }
-  | { k: 'plate' };
+  | { k: 'plate' }
+  | { k: 'torch' };
 
 let uidCounter = 1;
 export function newUid() {
