@@ -1732,33 +1732,130 @@ export function drawBowl(c: Ctx, b: BowlDraw) {
   for (const p of b.pieces) drawPiece(c, p);
 }
 
-// ---------- ingredient containers (round inserts, GPGP style) ----------
+// ---------- ingredient containers: square gastronorm pans, edge to edge ----------
 export const TRAY_W = 200;
 export const TRAY_H = 200;
 const TRAY_SS = 2;
 
-/** how a topping is heaped in its container: sprite size and ring counts */
-const TRAY_LAYOUT: Record<string, [number, number, number]> = {
-  // id: [size, inner ring count, outer ring count]
-  yumurta: [84, 5, 8],
-  chashu: [88, 5, 8],
-  yesil: [78, 5, 8],
-  nori: [86, 4, 7],
-  misir: [66, 6, 10],
-  mantar: [78, 5, 8],
-  aciyag: [84, 4, 7],
-  tofu: [68, 6, 9],
-  karides: [92, 5, 8],
-  naruto: [78, 5, 8],
-  bambu: [80, 5, 8],
-  susam: [96, 6, 9],
-  pakchoi: [90, 5, 8],
-  filiz: [86, 5, 7],
-  biber: [70, 6, 9],
-  kimchi: [82, 5, 8],
-  lime: [78, 5, 8],
-  citir: [76, 5, 8],
+/** how a topping is heaped in its pan: [piece size (px of 200), piece count] */
+const TRAY_LAYOUT: Record<string, [number, number]> = {
+  yumurta: [118, 5],
+  chashu: [122, 4],
+  yesil: [104, 9],
+  nori: [112, 4],
+  misir: [100, 9],
+  mantar: [112, 4],
+  aciyag: [112, 5],
+  tofu: [106, 5],
+  karides: [124, 4],
+  naruto: [108, 5],
+  bambu: [120, 5],
+  susam: [120, 9],
+  pakchoi: [124, 4],
+  filiz: [118, 9],
+  biber: [100, 9],
+  kimchi: [118, 4],
+  lime: [108, 5],
+  citir: [108, 9],
 };
+
+/** steel or ceramic square pan filling the canvas; returns the inner well path */
+function pan(c: Ctx, ceramic: boolean, accent: string) {
+  const W = TRAY_W;
+  const outer = rrect(0, 0, W, W, 12);
+  const LIP = 9;
+  const well = rrect(LIP, LIP, W - LIP * 2, W - LIP * 2, 6);
+  if (ceramic) {
+    c.fillStyle = linear(c, 0, 0, W, W, [
+      [0, '#fbf5ea'],
+      [0.5, '#efe5d2'],
+      [1, '#c9b899'],
+    ]);
+    c.fill(outer);
+    c.strokeStyle = accent;
+    c.lineWidth = 2.5;
+    c.stroke(rrect(LIP - 4, LIP - 4, W - LIP * 2 + 8, W - LIP * 2 + 8, 8));
+  } else {
+    c.fillStyle = linear(c, 0, 0, W, W, [
+      [0, '#f2f4f5'],
+      [0.35, '#cdd3d7'],
+      [0.7, '#aab2b8'],
+      [1, '#7f888f'],
+    ]);
+    c.fill(outer);
+    // brushed sheen band on the lip
+    c.fillStyle = linear(c, 0, 0, W, W * 0.6, [
+      [0.2, 'rgba(255,246,232,0)'],
+      [0.3, 'rgba(255,246,232,.35)'],
+      [0.36, 'rgba(255,246,232,0)'],
+    ]);
+    c.fill(outer);
+  }
+  // well
+  const wc = ceramic ? '#d7c7a9' : '#5f686f';
+  c.fillStyle = linear(c, LIP, LIP, W - LIP, W - LIP, [
+    [0, tint(wc, -0.25)],
+    [0.5, wc],
+    [1, tint(wc, 0.08)],
+  ]);
+  c.fill(well);
+  // lip edge: light bevel top-left, dark bevel bottom-right
+  c.save();
+  c.clip(well);
+  c.strokeStyle = sh(0.55);
+  c.lineWidth = 14;
+  c.shadowColor = sh(0.55);
+  c.shadowBlur = 14;
+  c.translate(5, 7);
+  c.stroke(well);
+  c.restore();
+  c.strokeStyle = ceramic ? 'rgba(120,95,60,.35)' : sh(0.35);
+  c.lineWidth = 1.2;
+  c.stroke(well);
+  c.strokeStyle = hi(0.6);
+  c.lineWidth = 1.5;
+  c.beginPath();
+  c.moveTo(LIP - 1, W - LIP + 2);
+  c.lineTo(LIP - 1, LIP - 1);
+  c.lineTo(W - LIP + 2, LIP - 1);
+  c.stroke();
+  return well;
+}
+
+/** wooden ladle resting diagonally on the pan, cup at lower-left, handle out top-right */
+function ladle(c: Ctx, col: string) {
+  c.save();
+  c.translate(84, 118);
+  c.rotate(-Math.PI / 4);
+  // shadow of the whole ladle
+  const handle = rrect(-9, -150, 18, 150, 9);
+  const cup = ell(0, 0, 36, 33);
+  drop(c, handle, 0.35, 6, 3, 5);
+  drop(c, cup, 0.35, 6, 3, 5);
+  // handle: warm wood with grain
+  paint(c, handle, '#b57a3c', 0, -75, 80, { light: 0.3, dark: 0.35, edge: 0.3, spread: 2.6 });
+  c.save();
+  c.clip(handle);
+  c.strokeStyle = 'rgba(110,60,20,.35)';
+  c.lineWidth = 1.4;
+  for (const x of [-4, 1, 5]) {
+    c.beginPath();
+    c.moveTo(x, -148);
+    c.lineTo(x + 1, 0);
+    c.stroke();
+  }
+  c.restore();
+  // steel band where handle meets cup
+  const band = rrect(-10, -46, 20, 12, 3);
+  paint(c, band, '#c9ced3', 0, -40, 14, { light: 0.3, dark: 0.35, edge: 0.3 });
+  // cup
+  paint(c, cup, '#d8dde1', 0, 0, 36, { light: 0.3, dark: 0.38, edge: 0.35 });
+  const inside = ell(0, 2, 28, 25);
+  pool(c, inside, col, 0, 2, 28);
+  spec(c, -12, -11, 8, 3.6, -0.6, 0.8, 1.2);
+  spec(c, -4, -120, 3, 40, 0, 0.25, 2);
+  c.restore();
+}
 
 const trays = new Map<string, HTMLCanvasElement>();
 export function trayImage(id: string, thick: Thick = 'orta'): HTMLCanvasElement {
@@ -1772,133 +1869,38 @@ export function trayImage(id: string, thick: Thick = 'orta'): HTMLCanvasElement 
   const ing = INGREDIENTS[id];
   const r = rng(hash(key));
   const liquid = ing.cat === 'broth' || ing.cat === 'sauce';
-  const cx = 100;
-  const cy = 102;
-  const RO = 93;
-  const RI = 80;
+  const well = pan(c, liquid, ing.cat === 'sauce' ? '#8a5a3a' : '#3b4a6b');
+  const cx = W / 2;
+  const cy = W / 2;
 
-  const outer = ell(cx, cy, RO, RO);
-  drop(c, outer, 0.32, 10, 2, 6);
-  if (liquid) {
-    // ceramic bowl
-    const glaze = ing.cat === 'sauce' ? '#f0e6d4' : '#f3ebdc';
-    c.fillStyle = radial(
-      c,
-      cx - 40,
-      cy - 46,
-      150,
-      [
-        [0, tint(glaze, 0.5)],
-        [0.5, glaze],
-        [1, tint(glaze, -0.28)],
-      ],
-      cx - 10,
-      cy - 10
-    );
-    c.fill(outer);
-    // lip line
-    c.strokeStyle = ing.cat === 'sauce' ? '#8a5a3a' : '#3b4a6b';
-    c.lineWidth = 2.2;
-    c.beginPath();
-    c.arc(cx, cy, RI + 6, 0, TAU);
-    c.stroke();
-  } else {
-    // stainless-steel insert: flange with a soft sheen
-    c.fillStyle = radial(
-      c,
-      cx - 50,
-      cy - 60,
-      170,
-      [
-        [0, '#f4f6f7'],
-        [0.45, '#cfd5d9'],
-        [0.8, '#a4adb4'],
-        [1, '#7e878e'],
-      ],
-      cx - 10,
-      cy - 10
-    );
-    c.fill(outer);
-    // brushed rings on the flange
-    c.strokeStyle = hi(0.18);
-    c.lineWidth = 1;
-    for (const rr of [RI + 4, RI + 8, RI + 11]) {
-      c.beginPath();
-      c.arc(cx, cy, rr, 0, TAU);
-      c.stroke();
-    }
-  }
-  // flange specular
-  c.save();
-  c.strokeStyle = hi(0.75);
-  c.shadowColor = hi(0.7);
-  c.shadowBlur = 3;
-  c.lineWidth = 3;
-  c.lineCap = 'round';
-  c.beginPath();
-  c.arc(cx, cy, RO - 5, Math.PI * 1.1, Math.PI * 1.38);
-  c.stroke();
-  c.restore();
-
-  // the well
-  const well = ell(cx, cy, RI, RI);
-  const wellCol = liquid ? (ing.cat === 'sauce' ? '#d8c9ae' : '#dccdb2') : '#6c757c';
-  c.fillStyle = radial(c, cx + 10, cy + 12, RI * 1.2, [
-    [0, tint(wellCol, 0.1)],
-    [0.7, wellCol],
-    [1, tint(wellCol, -0.4)],
-  ]);
-  c.fill(well);
   c.save();
   c.clip(well);
-  // inner wall shadow (top-left)
-  c.strokeStyle = sh(0.45);
-  c.lineWidth = 16;
-  c.shadowColor = sh(0.45);
-  c.shadowBlur = 14;
-  c.save();
-  c.translate(6, 8);
-  c.stroke(well);
-  c.restore();
-  c.shadowBlur = 0;
-
   if (liquid) {
     const col = ing.color;
-    const p = ell(cx, cy, RI - 3, RI - 3);
-    pool(c, p, col, cx, cy, RI - 3);
-    fatRings(c, r, cx, cy, RI - 10, col);
+    const p = rrect(11, 11, W - 22, W - 22, 5);
+    pool(c, p, col, cx, cy, 92);
+    fatRings(c, r, cx, cy, 80, col);
+    // surface sheen
     c.save();
     c.strokeStyle = hi(0.4);
     c.shadowColor = hi(0.4);
-    c.shadowBlur = 5;
-    c.lineWidth = 4;
+    c.shadowBlur = 6;
+    c.lineWidth = 5;
     c.lineCap = 'round';
     c.beginPath();
-    c.arc(cx, cy, RI - 14, Math.PI * 1.12, Math.PI * 1.36);
+    c.moveTo(30, 60);
+    c.quadraticCurveTo(34, 34, 62, 28);
     c.stroke();
     c.restore();
-    // ladle resting in the pool
-    c.save();
-    c.translate(cx + 8, cy + 10);
-    c.rotate(-0.55);
-    const handle = rrect(-6, -118, 12, 118, 6);
-    drop(c, handle, 0.3, 5, 2, 3);
-    paint(c, handle, '#c9ced3', 0, -60, 60, { light: 0.3, dark: 0.35, edge: 0.3, spread: 2.5 });
-    const cup = ell(0, 0, 27, 25);
-    drop(c, cup, 0.3, 5, 2, 3);
-    paint(c, cup, '#d6dbdf', 0, 0, 27, { light: 0.3, dark: 0.35, edge: 0.3 });
-    const inside = ell(0, 1, 21, 19);
-    pool(c, inside, col, 0, 1, 21);
-    spec(c, -9, -9, 6, 2.8, -0.6, 0.8, 1);
     c.restore();
+    // ladle sits on the rim, outside the clip so the handle crosses the lip
+    ladle(c, col);
   } else if (ing.cat === 'noodle') {
-    // coiled bundles heaped in the insert
     const spots: [number, number, number][] = [
-      [-30, -28, 36],
-      [34, -24, 36],
-      [-34, 30, 36],
-      [32, 32, 36],
-      [0, 2, 40],
+      [-42, -40, 56],
+      [46, -30, 54],
+      [-30, 48, 54],
+      [40, 50, 50],
     ];
     spots.forEach(([dx, dy, R], i) => {
       c.save();
@@ -1906,33 +1908,67 @@ export function trayImage(id: string, thick: Thick = 'orta'): HTMLCanvasElement 
       coil(c, id, thick, R, hash(key) + i * 7);
       c.restore();
     });
+    c.save();
+    c.translate(cx + 2, cy + 4);
+    coil(c, id, thick, 60, hash(key) + 99);
+    c.restore();
+    c.restore();
   } else {
-    // toppings: heaped rings of overlapping pieces, outer first, centre on top
-    const [size, nIn, nOut] = TRAY_LAYOUT[id] ?? [80, 5, 8];
-    let k = 0;
-    const place = (x: number, y: number, s: number) => {
+    // large overlapping pieces heaped to the edges; last ones on top in the middle
+    const [size, n] = TRAY_LAYOUT[id] ?? [110, 4];
+    const grid: [number, number][] = [];
+    if (n === 9)
+      for (let gy = -1; gy <= 1; gy++)
+        for (let gx = -1; gx <= 1; gx++) if (gx || gy) grid.push([gx * 60, gy * 60]);
+    if (n === 9) grid.push([0, 0]);
+    const spots: [number, number][] =
+      n === 9
+        ? grid
+        : n === 3
+          ? [
+              [-44, -40],
+              [46, 30],
+              [-30, 46],
+            ]
+          : n === 4
+            ? [
+                [-48, -46],
+                [50, -42],
+                [-46, 50],
+                [48, 48],
+              ]
+            : [
+                [-50, -48],
+                [52, -44],
+                [-48, 52],
+                [50, 50],
+                [2, 4],
+              ];
+    // corners first so the upper pieces overlap the lower ones
+    spots.forEach(([dx, dy], i) => {
       c.save();
-      c.translate(x, y);
-      c.rotate(r() * TAU);
-      c.shadowColor = sh(0.32);
-      c.shadowBlur = 5;
-      c.shadowOffsetY = 3;
-      c.drawImage(sprite(id, k++), (-size * s) / 2, (-size * s) / 2, size * s, size * s);
+      c.translate(cx + dx + (r() - 0.5) * 8, cy + dy + (r() - 0.5) * 8);
+      c.rotate((r() - 0.5) * 1.2);
+      c.shadowColor = sh(0.35);
+      c.shadowBlur = 7;
+      c.shadowOffsetY = 4;
+      const s = i === spots.length - 1 && n !== 4 ? 1.04 : 0.98;
+      c.drawImage(sprite(id, i), (-size * s) / 2, (-size * s) / 2, size * s, size * s);
       c.restore();
-    };
-    const a0 = r() * TAU;
-    for (let i = 0; i < nOut; i++) {
-      const a = a0 + (i / nOut) * TAU;
-      place(cx + Math.cos(a) * 62, cy + Math.sin(a) * 62, 0.9);
+    });
+    if (n === 4) {
+      // a fifth piece in the middle, on top, slightly smaller so corners stay readable
+      c.save();
+      c.translate(cx + 2, cy + 2);
+      c.rotate((r() - 0.5) * 1.2);
+      c.shadowColor = sh(0.4);
+      c.shadowBlur = 8;
+      c.shadowOffsetY = 5;
+      c.drawImage(sprite(id, 1), -size * 0.46, -size * 0.46, size * 0.92, size * 0.92);
+      c.restore();
     }
-    const a1 = r() * TAU;
-    for (let i = 0; i < nIn; i++) {
-      const a = a1 + (i / nIn) * TAU;
-      place(cx + Math.cos(a) * 32, cy + Math.sin(a) * 32 - 2, 0.95);
-    }
-    place(cx, cy - 4, 1);
+    c.restore();
   }
-  c.restore();
   trays.set(key, cv);
   return cv;
 }

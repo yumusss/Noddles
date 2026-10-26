@@ -189,7 +189,7 @@ const GUEST_SEEDS = [4821, 90133, 27719, 61207];
 
 function StreetScene() {
   return (
-    <svg viewBox="0 0 120 160" preserveAspectRatio="xMidYMax slice" className="rw-scene">
+    <svg viewBox="0 0 120 160" preserveAspectRatio="xMidYMid slice" className="rw-scene">
       <rect width="120" height="160" className="rw-sky" />
       <rect y="64" width="120" height="76" className="rw-sky2" />
       <g className="rw-clouds">
@@ -1413,8 +1413,8 @@ export function Floor({ kind }: { kind: string }) {
 function LightCones() {
   return (
     <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="rest-light">
-      <polygon points="35,22 18,100 52,100" fill="#ffd9a0" />
-      <polygon points="64,22 47,100 81,100" fill="#ffd9a0" />
+      <polygon points="38,22 21,100 55,100" fill="#ffd9a0" />
+      <polygon points="61,22 44,100 78,100" fill="#ffd9a0" />
       <polygon points="86,36 70,100 102,100" fill="#ffd9a0" />
     </svg>
   );

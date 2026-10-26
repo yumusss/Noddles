@@ -8,7 +8,7 @@
 .kitchen {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: 22% minmax(0, 1fr) auto;
+  grid-template-rows: 20% minmax(0, 1fr) auto;
   grid-template-areas:
     'pot'
     'prep'
@@ -47,7 +47,7 @@
 }
 .prep-area .prep-board {
   flex: 1;
-  margin: 6px 10px 8px;
+  margin: 4px 8px 6px;
   border-radius: 22px;
   min-height: 0;
   overflow: hidden;

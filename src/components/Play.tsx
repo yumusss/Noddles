@@ -177,7 +177,7 @@ export default function Play({
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const r = el.getBoundingClientRect();
-      setBowlSize(Math.max(180, Math.min(r.width - 28, r.height - 92, 360)));
+      setBowlSize(Math.max(150, Math.min(r.width - 20, r.height - 64, 380)));
     });
     ro.observe(el);
     return () => ro.disconnect();

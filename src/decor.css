@@ -253,10 +253,10 @@
 /* ---------- street window (left) ---------- */
 .rest-window {
   position: absolute;
-  top: 15%;
+  top: 24%;
   left: 3%;
-  width: 23%;
-  height: 46%;
+  width: min(26%, 44cqh);
+  height: min(44%, 40cqw);
   border-radius: 3px;
   overflow: hidden;
   z-index: 1;
@@ -389,8 +389,8 @@
 /* ---------- kamidana shrine + clock (upper centre-left / right) ---------- */
 .rest-shrine {
   position: absolute;
-  left: 28.5%;
-  top: 52%;
+  left: calc(4.5% + min(26%, 44cqh));
+  top: 40%;
   width: 9%;
   height: 22%;
   z-index: 1;
@@ -403,8 +403,8 @@
 }
 .rest-clock {
   position: absolute;
-  left: 47%;
-  top: 54%;
+  left: 62%;
+  top: 48%;
   width: 6.5%;
   aspect-ratio: 1;
   z-index: 1;
@@ -467,9 +467,9 @@
 .rest-pass {
   position: absolute;
   right: 3%;
-  top: 13%;
+  bottom: 4%;
   width: 27%;
-  height: 83%;
+  height: min(76%, 56cqw);
   z-index: 1;
 }
 /* hanging menu strips above the opening */
@@ -593,8 +593,8 @@
 /* stools at the foot of the pass */
 .rest-stools {
   position: absolute;
-  right: 5%;
-  width: 24%;
+  right: 4%;
+  width: 22%;
   bottom: 34%;
   height: 12%;
   z-index: 1;
@@ -607,10 +607,10 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 28%;
+  height: 36%;
   display: flex;
   justify-content: space-between;
-  padding: 0 32% 0 29%;
+  padding: 0 37% 0 36%;
   pointer-events: none;
   z-index: 2;
 }
@@ -635,7 +635,7 @@
   height: 100%;
   overflow: visible;
 }
-.rest-lamps.red .rlamp {
+.rest-lamps.red .rlamp:first-child {
   transform-origin: top center;
   animation: sway 4.2s ease-in-out infinite;
 }
@@ -723,7 +723,7 @@
 }
 .rest-counter.counter-flowers {
   left: auto;
-  right: 2%;
+  right: 5%;
   bottom: calc(30% + 6px);
   width: clamp(44px, 14cqw, 76px);
 }
@@ -732,7 +732,7 @@
   animation: paw 1.4s ease-in-out infinite;
 }
 .shrine-svg .maneki-paw {
-  transform-origin: 62px 66px;
+  animation: none;
 }
 @keyframes paw {
   0%,
@@ -747,10 +747,10 @@
 /* ---------- specials (back wall, right of centre, under the clock) ---------- */
 .rest-special {
   position: absolute;
-  left: 55.5%;
+  left: 54%;
   bottom: 44.5%;
-  width: 12%;
-  height: 15%;
+  width: 11%;
+  height: 14%;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -834,10 +834,10 @@
   z-index: 1;
 }
 .rest-table.far.l {
-  left: 30%;
+  left: 27%;
 }
 .rest-table.far.r {
-  right: 34%;
+  right: 22%;
 }
 .rt-table {
   position: relative;
@@ -944,7 +944,7 @@
 .register {
   position: absolute;
   z-index: 6;
-  left: 1.5%;
+  left: 5%;
   bottom: calc(30% - 4px);
   width: var(--reg-w);
   --reg-w: clamp(156px, 40%, 212px);
@@ -981,7 +981,7 @@
 .tipjar {
   position: absolute;
   z-index: 6;
-  left: calc(1.5% + clamp(156px, 40%, 212px) + 6px);
+  left: calc(5% + clamp(156px, 40%, 212px) + 6px);
   bottom: calc(30% - 2px);
   width: clamp(48px, 13%, 66px);
   display: flex;
@@ -2219,13 +2219,14 @@
     width: 15%;
   }
   .rest-table.far.l {
-    left: 29%;
+    left: 26%;
   }
   .rest-table.far.r {
-    right: 34%;
+    right: 24%;
   }
   .rest-lamps {
-    padding: 0 33% 0 30%;
+    height: 30%;
+    padding: 0 33% 0 41%;
   }
   .rest-clock {
     width: 7.5%;
@@ -2240,5 +2241,20 @@
   .rest-special {
     left: 56%;
     width: 12%;
+  }
+  .rest-pass {
+    width: 30%;
+    height: min(76%, 64cqw);
+  }
+  .rest-clock {
+    left: 52%;
+    top: 54%;
+  }
+  .rest-shrine {
+    left: 25%;
+    top: 46%;
+  }
+  .rest-stools {
+    width: 27%;
   }
 }
