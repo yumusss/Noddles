@@ -347,3 +347,76 @@
   top: 104px;
   max-width: calc(100% - 24px);
 }
+
+/* level-1 hint: a quiet line under the order slip, never over text */
+.hint3 {
+  margin: 4px 12px 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: #fff6e8;
+  opacity: 0.9;
+  text-align: center;
+}
+
+/* containers as inset steel pans in a wooden counter */
+.panel {
+  gap: 4px;
+  padding: 6px 8px max(8px, env(safe-area-inset-bottom));
+  background:
+    var(--wood-tex), repeating-linear-gradient(90deg, #a9794d 0 46px, #9b6d43 46px 48px), #a9794d;
+  background-blend-mode: multiply, normal, normal;
+  border-top: 4px solid #5a3b22;
+  box-shadow: inset 0 6px 12px rgb(43 36 32 / 0.35);
+}
+.panel .rail-h {
+  display: none;
+}
+.tubs {
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: #5e636b;
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.45),
+    0 1px 0 #ffffff33;
+}
+.tubs.base {
+  grid-template-columns: repeat(7, 1fr);
+}
+.tubs.tops {
+  grid-template-columns: repeat(6, 1fr);
+}
+.panel .bin {
+  border-radius: 8px;
+  background: #3b3f45;
+  overflow: hidden;
+}
+.panel .bin .tray-cv {
+  border-radius: 8px;
+}
+.panel .bin.sel {
+  outline: 3px solid var(--gold2);
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+.panel-top {
+  gap: 4px;
+}
+.panel .bowl-opt canvas {
+  width: 32px !important;
+  height: 32px !important;
+}
+.panel .thick {
+  background: #2b2420aa;
+}
+.panel .thick.on {
+  background: var(--gold2);
+}
+@media (min-width: 760px) and (orientation: landscape) {
+  .tubs.base {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .tubs.tops {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}

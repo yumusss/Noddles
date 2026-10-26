@@ -577,10 +577,8 @@ export default function Play({
 
   function tutorial(): string | null {
     if (levelId > 1 || !started) return null;
-    if (phase === 'talk') return '👂 Müşteriyi dinle, sonra “Siparişi al”a bas.';
     if (phase === 'pay') return '💵 Verilen paradan hesabı çıkar, para üstünü çekmeceden seç.';
     if (phase !== 'waiting') return null;
-    if (station === 0) return '👉 “Mutfak” düğmesine bas.';
     if (station === 1) {
       if (stage === 'pot') return 'Kadran “Tam”a gelince Çıkar!';
       if (stage === 'ready') return 'Kaseyi tut, servis penceresine bırak.';
@@ -833,6 +831,7 @@ export default function Play({
                   <div className="slip-text">{c.text}</div>
                 </div>
               )}
+              {hint && station === 1 && <div className="hint3">{hint}</div>}
               <div className="prep-board" ref={boardRef}>
                 {stage === 'prep' ? (
                   <>
@@ -984,7 +983,6 @@ export default function Play({
           document.body
         )}
 
-      {hint && <div className="hint2">{hint}</div>}
       {nudge && <div className="nudge2">{nudge}</div>}
 
       {/* front ⇄ kitchen */}
