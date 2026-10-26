@@ -36,9 +36,9 @@ const TAU = Math.PI * 2;
 
 export const PIECE_SIZE: Record<string, number> = {
   yesil: 40,
-  yumurta: 64,
-  chashu: 70,
-  nori: 70,
+  yumurta: 68,
+  chashu: 74,
+  nori: 74,
   pakchoi: 56,
   filiz: 46,
   misir: 36,
@@ -78,9 +78,9 @@ export const PIECE_VARIANTS: Record<string, number> = {
 
 /** Footprint (w,h) of the solid pieces, for the contact shadow. Scatters draw their own. */
 const PIECE_WH: Record<string, [number, number]> = {
-  yumurta: [64, 50],
-  chashu: [68, 62],
-  nori: [70, 44],
+  yumurta: [68, 53],
+  chashu: [72, 66],
+  nori: [74, 47],
   pakchoi: [50, 56],
   mantar: [48, 46],
   tofu: [40, 40],
@@ -369,6 +369,8 @@ const PIECES: Record<string, PieceDrawer> = {
     ellipse(c, yx, yy - 1, yr + 2.5, yry + 2.5);
     c.stroke();
     c.restore();
+    // rim light on the cut edge of the white
+    rimLight(c, path, 1.4, 'rgba(255,255,255,0.8)');
     // specular on the jammy surface
     spec(c, yx - 7, yy - 6, 6.5, 4, 0.9, -0.5);
     c.fillStyle = 'rgba(255,255,255,0.85)';
@@ -542,6 +544,14 @@ const PIECES: Record<string, PieceDrawer> = {
     }
     c.restore();
     edgeAO(c, path, 2, 'rgba(60,25,10,0.35)', 3);
+    rimLight(c, path, 1.2, 'rgba(255,225,200,0.55)');
+    // wet glaze pooling: a couple of sharp specular beads
+    c.fillStyle = 'rgba(255,250,240,0.8)';
+    ellipse(c, -rx * 0.42, -ry * 0.38, 3.2, 1.7);
+    c.fill();
+    c.fillStyle = 'rgba(255,250,240,0.5)';
+    ellipse(c, rx * 0.15, -ry * 0.6, 2, 1);
+    c.fill();
   },
 
   // --- nori sheet ---
@@ -618,6 +628,32 @@ const PIECES: Record<string, PieceDrawer> = {
     c.strokeStyle = 'rgba(110,160,100,0.2)';
     sheet();
     c.stroke();
+    // crinkles: soft diagonal folds, each a dark crease with a lit ridge
+    c.lineCap = 'round';
+    for (let i = 0; i < 4 + v; i++) {
+      const fx = x + w * (0.12 + rand() * 0.7);
+      const fy = y + h * (0.1 + rand() * 0.8);
+      const L = h * (0.4 + rand() * 0.7);
+      const a = -0.9 + (rand() - 0.5) * 0.8;
+      const ex = fx + Math.cos(a) * L;
+      const ey = fy + Math.sin(a) * L;
+      c.save();
+      c.shadowColor = 'rgba(0,8,4,0.5)';
+      c.shadowBlur = 3;
+      c.lineWidth = 1.6;
+      c.strokeStyle = 'rgba(0,8,4,0.22)';
+      c.beginPath();
+      c.moveTo(fx, fy);
+      c.quadraticCurveTo((fx + ex) / 2 + 4, (fy + ey) / 2 - 3, ex, ey);
+      c.stroke();
+      c.restore();
+      c.lineWidth = 1.1;
+      c.strokeStyle = 'rgba(150,190,150,0.14)';
+      c.beginPath();
+      c.moveTo(fx - 1.2, fy + 1.2);
+      c.quadraticCurveTo((fx + ex) / 2 + 3, (fy + ey) / 2 - 2, ex - 1.2, ey + 1.2);
+      c.stroke();
+    }
     // sheen band
     c.fillStyle = linear(c, x, y + h, x + w * 0.7, y, [
       [0, 'rgba(255,255,255,0)'],
@@ -997,6 +1033,7 @@ const PIECES: Record<string, PieceDrawer> = {
     spec(c, -8, -9, 11, 8, 0.28, -0.6);
     c.restore();
     edgeAO(c, path, 2.2, 'rgba(30,14,6,0.45)', 3);
+    rimLight(c, path, 1.1, 'rgba(230,200,170,0.45)');
   },
 
   // --- chilli oil pool ---
@@ -1351,17 +1388,35 @@ const PIECES: Record<string, PieceDrawer> = {
       }
       c.restore();
     };
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 70; i++) {
       const t = 0.14 + rand() * 0.86;
       const p = bez(t, P0, P1, P2, P3);
-      const off = (rand() - 0.5) * 20;
-      const r = 2 + rand() * 3.4;
-      clump(p[0] + off * 0.45 + (rand() - 0.5) * 2, p[1] + off * 0.7, r);
+      const q = bez(Math.min(1, t + 0.02), P0, P1, P2, P3);
+      const nl = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const nx = -(q[1] - p[1]) / nl;
+      const ny = (q[0] - p[0]) / nl;
+      const off = (rand() - 0.5) * 17;
+      const r = 1.8 + rand() * 3.4;
+      clump(p[0] + nx * off + (rand() - 0.5) * 2, p[1] + ny * off + (rand() - 0.5) * 2, r);
     }
     // head end clump
     for (let i = 0; i < 10; i++) {
       const a = rand() * TAU;
       clump(30 + Math.cos(a) * 5, 3 + Math.sin(a) * 7, 2 + rand() * 3);
+    }
+    // crevices between the clumps: small dark pockets
+    for (let i = 0; i < 26; i++) {
+      const t = 0.15 + rand() * 0.85;
+      const p = bez(t, P0, P1, P2, P3);
+      const px = p[0] + (rand() - 0.5) * 12;
+      const py = p[1] + (rand() - 0.5) * 12;
+      const rr = 0.8 + rand() * 1.4;
+      c.fillStyle = radial(c, px, py, 0, rr, [
+        [0, 'rgba(90,45,10,0.55)'],
+        [1, 'rgba(90,45,10,0)'],
+      ]);
+      circle(c, px, py, rr);
+      c.fill();
     }
     // loose crumbs around
     for (let i = 0; i < 14; i++) {
@@ -1434,7 +1489,7 @@ const PIECES: Record<string, PieceDrawer> = {
       for (let i = 0; i <= 90; i++) {
         const t = i / 90;
         const a = t * TAU * 1.95;
-        const rr = 1.5 + t * 14.5;
+        const rr = 1.5 + t * 14.5 + Math.sin(t * 19 + v * 2) * 0.9 + Math.sin(t * 7) * 0.6;
         const x = Math.cos(a) * rr;
         const y = Math.sin(a) * rr;
         if (i === 0) c.moveTo(x, y);
@@ -1444,11 +1499,16 @@ const PIECES: Record<string, PieceDrawer> = {
     };
     spiral(6.5, 'rgba(240,150,172,0.35)');
     spiral(4.6, '#ee92aa');
-    spiral(2.2, '#f4a9bc');
+    spiral(2.4, '#f4a9bc');
     spiral(0.9, 'rgba(255,220,228,0.7)');
-    spec(c, -7, -8, 10, 7, 0.35, -0.6);
+    // the rubbery surface: broad soft sheen + one crisp bead
+    spec(c, -7, -8, 10, 7, 0.4, -0.6);
+    c.fillStyle = 'rgba(255,255,255,0.7)';
+    ellipse(c, -9, -10, 2.6, 1.4);
+    c.fill();
     c.restore();
     edgeAO(c, wheel, 1.6, 'rgba(150,90,100,0.3)', 2);
+    rimLight(c, wheel, 1.1, 'rgba(255,255,255,0.7)');
   },
 
   // --- lime wedge / slice ---
@@ -1748,6 +1808,27 @@ function bez(
 }
 
 const PIECE_PAD = 1.6;
+/** Drawers were authored at these sizes; pieces grown since are scaled up. */
+const PIECE_AUTHORED: Record<string, number> = { yumurta: 64, chashu: 70, nori: 70 };
+
+/**
+ * Rim light: a thin bright crescent along the edge facing the light (top-left).
+ * Clip to the shape and stroke it shifted down-right, so only the top-left
+ * band of the stroke stays visible.
+ */
+function rimLight(c: Ctx, path: () => void, w: number, col: string, dx = 1.1, dy = 1.3) {
+  c.save();
+  path();
+  c.clip();
+  c.translate(dx * w, dy * w);
+  path();
+  c.lineWidth = w * 2;
+  c.strokeStyle = col;
+  c.shadowColor = col;
+  c.shadowBlur = w * 1.5;
+  c.stroke();
+  c.restore();
+}
 
 function pieceSprite(id: string, variant: number): HTMLCanvasElement {
   const size = PIECE_SIZE[id] ?? 30;
@@ -1769,6 +1850,8 @@ function pieceSprite(id: string, variant: number): HTMLCanvasElement {
         softShadow(c, 1, 2.5, wh[0] * 0.5, wh[1] * 0.46, 0.24);
       }
       const draw = PIECES[id];
+      const au = PIECE_AUTHORED[id];
+      if (au) c.scale(size / au, size / au);
       if (draw) draw(c, v, rng(id.length * 131 + v * 977 + 17));
       else {
         circle(c, 0, 0, size / 2);
@@ -1793,99 +1876,112 @@ export function drawPiece(c: Ctx, id: string, variant: number, scale: number, ro
 // ---------------------------------------------------------------------------
 // Noodles
 // ---------------------------------------------------------------------------
+// Each strand is a lit cylinder: contact shadow (down-right), dark side, body,
+// mid-tone (up-left), thin specular. Strands are depth-sorted: back strands
+// are cooler/darker, the front ones at the top of the mound bright and wet.
 
 interface NoodleCfg {
   density: number; // strands at r=112, orta
   width: number; // base strand width at orta
   wave: number; // wobble amplitude in widths
   wavelen: number; // wobble wavelength in widths
-  rhoMin: number; // arc radius range (fraction of r)
-  rhoMax: number;
+  sweep: number; // share of long sinuous strands (vs loops)
   len: [number, number]; // strand length range (fraction of r)
   col: Record<CookState, string>;
-  dark: string; // shade colour for the strand's shadow side / back strands
-  hi: number; // highlight strength multiplier
-  alpha: number; // body alpha (pirinc translucent)
+  dark: string; // shadow-side colour
+  cool: string; // back-strand tint
+  light: string; // mid-tone colour
+  spec: number; // specular strength
+  shadow: number; // contact shadow strength
+  alpha: number; // body alpha (translucent noodles)
   flecks?: boolean; // soba: buckwheat flecks
 }
 
 const NOODLES: Record<string, NoodleCfg> = {
   ramen: {
-    density: 110,
-    width: 3.3,
-    wave: 0.9,
-    wavelen: 5.0,
-    rhoMin: 0.3,
-    rhoMax: 0.8,
-    len: [1.3, 2.6],
+    density: 96,
+    width: 4.6,
+    wave: 0.55,
+    wavelen: 5.6,
+    sweep: 0.5,
+    len: [1.4, 2.8],
     col: {
-      raw: '#efe6cc',
-      dente: '#f6dd90',
-      perfect: '#f5d46c',
-      soft: '#f2dc9c',
-      burnt: '#d8d1b2',
+      raw: '#ece2c6',
+      dente: '#f5d478',
+      perfect: '#f4cc5c',
+      soft: '#f4df9e',
+      burnt: '#d9d0ae',
     },
-    dark: '#a8742c',
-    hi: 1,
-    alpha: 1,
+    dark: '#a06a1e',
+    cool: '#b3903f',
+    light: '#fff3bc',
+    spec: 1,
+    shadow: 1,
+    alpha: 0.94,
   },
   udon: {
-    density: 36,
-    width: 8.2,
-    wave: 0.22,
-    wavelen: 6,
-    rhoMin: 0.3,
-    rhoMax: 0.8,
-    len: [1.4, 2.6],
+    density: 40,
+    width: 8.8,
+    wave: 0.14,
+    wavelen: 8,
+    sweep: 0.6,
+    len: [1.5, 2.8],
     col: {
-      raw: '#e9e2d5',
-      dente: '#f8f4ec',
-      perfect: '#fbf8f1',
-      soft: '#f5f1e8',
-      burnt: '#e1dbce',
+      raw: '#e6dfd2',
+      dente: '#f6f1e8',
+      perfect: '#faf6ee',
+      soft: '#f3eee4',
+      burnt: '#ddd6c8',
     },
-    dark: '#8f7a5e',
-    hi: 1.1,
+    dark: '#8c7a63',
+    cool: '#b3a894',
+    light: '#ffffff',
+    spec: 0.9,
+    shadow: 1.25,
     alpha: 1,
   },
   soba: {
-    density: 140,
-    width: 2.8,
-    wave: 0.15,
-    wavelen: 8,
-    rhoMin: 0.6,
-    rhoMax: 1.0,
-    len: [1.0, 1.9],
+    density: 120,
+    width: 3.2,
+    wave: 0.12,
+    wavelen: 9,
+    sweep: 0.6,
+    len: [1.1, 2.2],
     col: {
-      raw: '#c4b29d',
-      dente: '#a98a6c',
-      perfect: '#a28064',
-      soft: '#af8f74',
-      burnt: '#a4998c',
+      raw: '#c7b6a1',
+      dente: '#a88a6d',
+      perfect: '#9f7e62',
+      soft: '#ac8d72',
+      burnt: '#a69a8c',
     },
-    dark: '#4a2e1c',
-    hi: 0.7,
+    dark: '#4a2f1d',
+    cool: '#6d5443',
+    light: '#c9ae92',
+    spec: 0.3,
+    shadow: 0.9,
     alpha: 1,
     flecks: true,
   },
   pirinc: {
-    density: 160,
-    width: 2.0,
-    wave: 0.5,
+    density: 120,
+    width: 2.4,
+    wave: 0.45,
     wavelen: 6,
-    rhoMin: 0.35,
-    rhoMax: 0.85,
-    len: [1.2, 2.4],
+    sweep: 0.5,
+    len: [1.3, 2.6],
     col: {
-      raw: '#f2ede2',
-      dente: '#faf7f0',
-      perfect: '#fcfaf5',
-      soft: '#f6f3ec',
-      burnt: '#e5e0d7',
+      raw: '#f1ece2',
+      dente: '#f9f6ef',
+      perfect: '#fbf9f4',
+      soft: '#f5f2eb',
+      burnt: '#e3ded5',
     },
-    dark: '#a6957a',
-    hi: 0.9,
-    alpha: 0.82,
+    dark: '#a08f74',
+    cool: '#c2b8a6',
+    light: '#ffffff',
+    spec: 1.1,
+    shadow: 0.7,
+    alpha: 0.8,
   },
 };
 
@@ -1899,10 +1995,10 @@ const COOK_W: Record<CookState, number> = {
 };
 const COOK_GLOSS: Record<CookState, number> = {
   raw: 0.0,
-  dente: 0.5,
-  perfect: 0.8,
-  soft: 0.4,
-  burnt: 0.12,
+  dente: 0.6,
+  perfect: 0.9,
+  soft: 0.45,
+  burnt: 0.1,
 };
 
 interface SauceOpt {
@@ -1935,6 +2031,18 @@ function noodleSprite(
   );
 }
 
+type Pt = [number, number];
+
+function mixRgb(a: [number, number, number], b: [number, number, number], t: number) {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t] as [
+    number,
+    number,
+    number,
+  ];
+}
+const css = (c: [number, number, number], a = 1) =>
+  `rgba(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])},${a})`;
+
 function renderNoodles(
   c: Ctx,
   noodle: string,
@@ -1948,92 +2056,159 @@ function renderNoodles(
   const w = cfg.width * THICK_MUL[thick] * COOK_W[cook] * clamp(r / 112, 0.6, 1.6);
   const n = Math.round(
     cfg.density *
-      clamp(Math.pow(r / 112, 1.3), 0.25, 1.6) *
+      clamp(Math.pow(r / 112, 1.25), 0.25, 1.6) *
       (thick === 'kalin' ? 0.72 : thick === 'ince' ? 1.3 : 1)
   );
-  const body = cfg.col[cook];
-  const glossA = COOK_GLOSS[cook] * cfg.hi;
+  const glossA = COOK_GLOSS[cook] * cfg.spec;
   const sharp = cook === 'raw';
   const limp = cook === 'soft' || cook === 'burnt';
   c.lineCap = 'round';
   c.lineJoin = 'round';
 
-  // nest shadow on the bowl floor
-  c.fillStyle = radial(c, 0, 3, r * 0.25, r * 1.0, [
-    [0, 'rgba(60,35,20,0.2)'],
-    [0.7, 'rgba(60,35,20,0.1)'],
-    [1, 'rgba(60,35,20,0)'],
+  // nest shadow on the bowl floor: the mound sits in the liquid
+  c.fillStyle = radial(c, 2, 4, r * 0.2, r * 1.02, [
+    [0, 'rgba(50,30,15,0.26)'],
+    [0.6, 'rgba(50,30,15,0.14)'],
+    [1, 'rgba(50,30,15,0)'],
   ]);
-  circle(c, 0, 3, r);
+  circle(c, 2, 4, r * 1.02);
   c.fill();
 
   interface Strand {
-    pts: [number, number][];
+    pts: Pt[];
     depth: number; // 0 back .. 1 front
+    rim: boolean; // curling out at the edge
   }
   const strands: Strand[] = [];
-  const amp = cfg.wave * w * (sharp ? 1.1 : limp ? 0.6 : 1);
-  const wl = cfg.wavelen * w * (sharp ? 1.1 : 1);
+  const amp = cfg.wave * w * (sharp ? 1.15 : limp ? 0.55 : 1);
+  const wl = cfg.wavelen * w * (sharp ? 1.1 : limp ? 1.3 : 1);
+  const margin = amp + w * 0.8;
   const spin = rand() < 0.5 ? 1 : -1;
-  for (let i = 0; i < n; i++) {
-    let rho = r * lerp(cfg.rhoMin, cfg.rhoMax, rand());
-    const margin = amp + w * 0.9;
+  const inside = (x: number, y: number, k = 1) => Math.hypot(x, y) <= (r - margin) * k;
+
+  const wobble = (ph0: number, arc: number) => {
+    let wob =
+      Math.sin(ph0 + (arc / wl) * TAU) * 0.8 + Math.sin(ph0 * 1.7 + (arc / wl) * 2.3) * 0.35;
+    if (sharp) wob = Math.sign(wob) * Math.pow(Math.abs(wob), 0.5);
+    return amp * wob;
+  };
+
+  // loop strands: arcs around a random centre (the folded nest)
+  const makeLoop = (): Pt[] => {
+    let rho = r * lerp(0.28, 0.78, rand());
     let maxC = r - rho - margin;
     if (maxC < 0) {
       rho = r - margin;
       maxC = 0;
     }
     const ca = rand() * TAU;
-    // irregular nest outline: the usable radius varies with angle
-    const edgeK = 1 + 0.07 * Math.sin(ca * 3 + seed) + 0.05 * Math.sin(ca * 5 + 1.3);
+    const edgeK = 1 + 0.08 * Math.sin(ca * 3 + seed) + 0.05 * Math.sin(ca * 5 + 1.3);
     const cd = Math.sqrt(rand()) * Math.max(0, maxC - r * (1 - edgeK));
     const cx = Math.cos(ca) * cd;
     const cy = Math.sin(ca) * cd;
     const side = rand() < 0.8 ? spin : -spin;
     const th0 = rand() * TAU;
     const L = r * lerp(cfg.len[0], cfg.len[1], rand());
-    const span = Math.min(L / rho, TAU * 0.9) * side;
-    const steps = Math.max(8, Math.ceil(L / (sharp ? 6 : 3)));
+    const span = Math.min(L / rho, TAU * 0.85) * side;
+    const steps = Math.max(10, Math.ceil(L / (sharp ? 5 : 2.5)));
     const ph0 = rand() * TAU;
-    const pts: [number, number][] = [];
+    const pts: Pt[] = [];
     for (let s = 0; s <= steps; s++) {
       const t = s / steps;
       const th = th0 + span * t;
-      const arc = t * L;
-      let wob = Math.sin(ph0 + (arc / wl) * TAU);
-      if (sharp) wob = Math.sign(wob) * Math.pow(Math.abs(wob), 0.5);
-      const rr = rho + amp * wob + (rand() - 0.5) * w * 0.3;
+      const rr = rho + wobble(ph0, t * L) + (rand() - 0.5) * w * 0.25;
       pts.push([cx + Math.cos(th) * rr, cy + Math.sin(th) * rr]);
     }
-    strands.push({ pts, depth: i / n });
+    return pts;
+  };
+  // sweep strands: long sinuous lines crossing the mound. When one reaches the
+  // edge of the nest it bends back along the rim instead of ending there.
+  const makeSweep = (): Pt[] => {
+    const sa = rand() * TAU;
+    const sd = Math.sqrt(rand()) * r * 0.7;
+    let x = Math.cos(sa) * sd;
+    let y = Math.sin(sa) * sd;
+    let b = sa + Math.PI + (rand() - 0.5) * 1.8;
+    const L = r * lerp(cfg.len[0], cfg.len[1], rand()) * 0.85;
+    const step = sharp ? 5 : 2.5;
+    const steps = Math.max(10, Math.ceil(L / step));
+    const turn = ((rand() - 0.5) * 2.4) / steps;
+    const curlSide = rand() < 0.5 ? 1 : -1;
+    const ph0 = rand() * TAU;
+    const pts: Pt[] = [];
+    const lim = r - margin;
+    for (let s = 0; s <= steps; s++) {
+      const dd = Math.hypot(x, y);
+      if (dd > lim * 0.78) {
+        // steer toward the tangent (and gently inward) as the strand nears the rim
+        const outA = Math.atan2(y, x);
+        let dA = b - outA;
+        while (dA > Math.PI) dA -= TAU;
+        while (dA < -Math.PI) dA += TAU;
+        const k = clamp((dd - lim * 0.78) / (lim * 0.22), 0, 1);
+        const tgt = outA + (curlSide * Math.PI) / 2 + curlSide * 0.35 * k;
+        let want = tgt - b;
+        while (want > Math.PI) want -= TAU;
+        while (want < -Math.PI) want += TAU;
+        b += want * 0.18 * (0.3 + k) * (Math.abs(dA) > 0.2 ? 1 : 0.3);
+      }
+      b += turn;
+      const off = wobble(ph0, L * (s / steps));
+      pts.push([x - Math.sin(b) * off, y + Math.cos(b) * off]);
+      x += Math.cos(b) * step;
+      y += Math.sin(b) * step;
+      if (Math.hypot(x, y) > lim * 1.02) break;
+    }
+    return pts;
+  };
+
+  for (let i = 0; i < n; i++) {
+    let pts = rand() < cfg.sweep ? makeSweep() : makeLoop();
+    if (pts.length < 6) pts = makeLoop();
+    // soft/burnt: some strands broken short
+    if (cook === 'soft' && rand() < 0.3) pts = pts.slice(0, Math.max(6, (pts.length * 0.5) | 0));
+    let cx = 0;
+    let cy = 0;
+    for (const p of pts) {
+      cx += p[0];
+      cy += p[1];
+    }
+    cx /= pts.length;
+    cy /= pts.length;
+    // mound: strands near the centre are on top (front), the edges are the base
+    const d = Math.hypot(cx, cy) / r;
+    const depth = clamp(1 - d * 1.15 + (rand() - 0.5) * 0.5, 0, 1);
+    strands.push({ pts, depth, rim: false });
   }
-  // a few strands lift out of the nest: short, bright, drawn last
-  const risers: Strand[] = [];
+  // rim strands: a few curl out of the broth at the edge of the nest, drawn in front
   if (!limp) {
-    const nr = Math.round(3 + r / 40);
+    const nr = Math.round(2 + r / 45);
     for (let i = 0; i < nr; i++) {
       const a = rand() * TAU;
-      const d = rand() * r * 0.55;
-      const x0 = Math.cos(a) * d;
-      const y0 = Math.sin(a) * d;
-      const b = rand() * TAU;
-      const L = r * (0.35 + rand() * 0.4);
-      const bend = (rand() - 0.5) * L * 0.8;
-      const pts: [number, number][] = [];
-      for (let s = 0; s <= 10; s++) {
-        const t = s / 10;
-        const x = x0 + Math.cos(b) * L * t - Math.sin(b) * bend * Math.sin(t * Math.PI);
-        const y = y0 + Math.sin(b) * L * t + Math.cos(b) * bend * Math.sin(t * Math.PI);
+      const d0 = r * (0.5 + rand() * 0.25);
+      const L = r * (0.5 + rand() * 0.45);
+      const b = a + (rand() < 0.5 ? 1 : -1) * (0.9 + rand() * 0.6);
+      const bend = (rand() - 0.5) * L * 0.9;
+      const ph0 = rand() * TAU;
+      const pts: Pt[] = [];
+      const steps = 16;
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const off = bend * Math.sin(t * Math.PI) + wobble(ph0, L * t) * 0.8;
+        const x = Math.cos(a) * d0 + Math.cos(b) * L * t - Math.sin(b) * off;
+        const y = Math.sin(a) * d0 + Math.sin(b) * L * t + Math.cos(b) * off;
+        if (!inside(x, y, 1.03)) break;
         pts.push([x, y]);
       }
-      risers.push({ pts, depth: 1 });
+      if (pts.length >= 6) strands.push({ pts, depth: 1, rim: true });
     }
   }
+  strands.sort((p, q) => p.depth - q.depth);
 
-  const path = (pts: [number, number][], smooth: boolean) => {
+  const path = (pts: Pt[]) => {
     c.beginPath();
     c.moveTo(pts[0][0], pts[0][1]);
-    if (!smooth) {
+    if (sharp) {
       for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]);
       return;
     }
@@ -2045,95 +2220,100 @@ function renderNoodles(
     c.lineTo(l[0], l[1]);
   };
 
-  const [br, bg, bb] = hexToRgb(body);
-  const [dr, dg, db] = hexToRgb(cfg.dark);
-  const tone = (depth: number, alpha = 1) => {
-    // back strands: darker and desaturated; front: bright
-    const k = 0.3 * (1 - depth);
-    const m = (b: number, d: number) => Math.round(b + (d - b) * k);
-    return `rgba(${m(br, dr)},${m(bg, dg)},${m(bb, db)},${alpha})`;
-  };
-  const shadeCol = cook === 'burnt' ? 'rgba(90,80,60,0.4)' : rgba(cfg.dark, 0.38);
+  const base = hexToRgb(cfg.col[cook]);
+  const cool = hexToRgb(cfg.cool);
+  const dark = hexToRgb(cfg.dark);
+  const light = hexToRgb(cfg.light);
+  const bodyA = cfg.alpha;
+  const shA = (cook === 'burnt' ? 0.5 : 1) * cfg.shadow;
+  const matte = glossA <= 0.05;
 
-  c.globalAlpha = cfg.alpha;
-  const all = strands.concat(risers);
-  for (const st of all) {
+  for (const st of strands) {
     const pts = st.pts;
-    const isRiser = st.depth >= 1 && risers.includes(st);
-    path(pts, !sharp);
-    // contact shadow under the strand (offset down-right), stronger for front strands
+    const d = st.depth;
+    const body = mixRgb(base, cool, (1 - d) * 0.5);
+    const edge = mixRgb(body, dark, 0.55 + 0.15 * (1 - d));
+    const ww = w * (st.rim ? 0.95 : 1);
+    // 1. contact shadow (down-right): wide soft + tighter core, stronger for front strands
     c.save();
-    c.translate(w * 0.12, w * 0.3);
-    c.lineWidth = w + 1.2;
-    c.strokeStyle = shadeCol;
+    c.translate(ww * 0.32 + d * ww * 0.2, ww * 0.55 + d * ww * 0.3);
+    path(pts);
+    c.lineWidth = ww * 1.5;
+    c.strokeStyle = `rgba(45,28,12,${(0.07 + 0.07 * d) * shA})`;
+    c.stroke();
+    c.lineWidth = ww * 1.05;
+    c.strokeStyle = `rgba(45,28,12,${(0.12 + 0.12 * d) * shA})`;
     c.stroke();
     c.restore();
-    // body
-    path(pts, !sharp);
-    c.lineWidth = w;
-    c.strokeStyle = isRiser ? tone(1) : tone(st.depth);
-    c.stroke();
-    // shadow side: thin dark line along the lower-right edge
+    // 2. shadow side: the full-width stroke in the dark colour, nudged down-right
     c.save();
-    c.translate(w * 0.18, w * 0.2);
-    path(pts, !sharp);
-    c.lineWidth = Math.max(0.6, w * 0.22);
-    c.strokeStyle = rgba(cfg.dark, 0.18 + 0.1 * (1 - st.depth));
+    c.translate(ww * 0.2, ww * 0.26);
+    path(pts);
+    c.lineWidth = ww;
+    c.strokeStyle = css(edge, bodyA);
     c.stroke();
     c.restore();
-    if (glossA > 0) {
-      // gloss: a soft wide highlight then a thin bright core, offset up-left
-      const g = glossA * (0.45 + 0.55 * st.depth);
-      c.save();
-      c.translate(-w * 0.16, -w * 0.24);
-      path(pts, !sharp);
-      c.lineWidth = Math.max(0.8, w * 0.34);
-      c.strokeStyle = `rgba(255,255,255,${g * 0.5})`;
+    // 3. body
+    path(pts);
+    c.lineWidth = ww * 0.86;
+    c.strokeStyle = css(body, bodyA);
+    c.stroke();
+    // 4. mid-tone toward the light (up-left)
+    c.save();
+    c.translate(-ww * 0.12, -ww * 0.18);
+    path(pts);
+    c.lineWidth = ww * 0.46;
+    c.strokeStyle = css(light, (matte ? 0.22 : 0.32) + 0.38 * d);
+    c.stroke();
+    // 5. specular: thin broken bright core (wet) or a faint matte centre line (raw)
+    c.translate(-ww * 0.08, -ww * 0.12);
+    path(pts);
+    if (!matte) {
+      c.setLineDash([ww * 2.2, ww * 1.1]);
+      c.lineDashOffset = d * 9;
+      c.lineWidth = Math.max(0.5, ww * 0.17);
+      c.strokeStyle = `rgba(255,255,255,${glossA * (0.35 + 0.65 * d)})`;
       c.stroke();
-      c.lineWidth = Math.max(0.45, w * 0.13);
-      c.strokeStyle = `rgba(255,255,255,${g * 0.9})`;
-      c.stroke();
-      c.restore();
+      c.setLineDash([]);
     } else {
-      // raw: matte, a paler centre line only
-      c.save();
-      c.translate(-w * 0.1, -w * 0.15);
-      path(pts, !sharp);
-      c.lineWidth = Math.max(0.6, w * 0.3);
-      c.strokeStyle = 'rgba(255,255,255,0.22)';
+      c.lineWidth = Math.max(0.5, ww * 0.24);
+      c.strokeStyle = `rgba(255,255,255,${0.16 + 0.12 * d})`;
       c.stroke();
-      c.restore();
     }
+    c.restore();
   }
-  c.globalAlpha = 1;
 
+  // volume: the mound is lit from the top-left and falls into shadow at its base
+  c.save();
+  c.globalCompositeOperation = 'source-atop';
+  c.fillStyle = radial(c, -r * 0.15, -r * 0.2, r * 0.1, r * 1.05, [
+    [0, 'rgba(255,248,225,0.12)'],
+    [0.45, 'rgba(255,248,225,0)'],
+    [0.8, 'rgba(70,45,15,0.1)'],
+    [1, 'rgba(70,45,15,0.32)'],
+  ]);
+  c.fillRect(-r - 8, -r - 8, r * 2 + 16, r * 2 + 16);
   if (cfg.flecks) {
     // buckwheat flecks on the strands
-    c.save();
-    c.globalCompositeOperation = 'source-atop';
-    speckle(c, -r, -r, r * 2, r * 2, seed + 9, Math.round(r * 2.5), 'rgba(50,30,15,0.45)');
+    speckle(c, -r, -r, r * 2, r * 2, seed + 9, Math.round(r * 2.5), 'rgba(50,30,15,0.5)');
     speckle(c, -r, -r, r * 2, r * 2, seed + 10, Math.round(r * 1.2), 'rgba(230,215,190,0.35)');
-    c.restore();
   }
   if (cook === 'raw') {
     // matte wash + flour dusting
-    c.save();
-    circle(c, 0, 0, r);
-    c.clip();
-    c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = 'rgba(245,240,228,0.3)';
+    c.fillStyle = 'rgba(245,240,228,0.28)';
     c.fillRect(-r, -r, r * 2, r * 2);
-    c.globalCompositeOperation = 'source-over';
-    speckle(c, -r, -r, r * 2, r * 2, seed + 3, Math.round(r * 3), 'rgba(255,255,255,0.7)');
-    c.restore();
+    speckle(c, -r, -r, r * 2, r * 2, seed + 3, Math.round(r * 3.5), 'rgba(255,255,255,0.75)');
   }
+  c.restore();
+
   if (cook === 'burnt') {
     // mushy: strands merge into a pale blob
+    const body = cfg.col[cook];
     c.save();
     blobPath(c, 0, 0, r * 0.9, r * 0.85, rand, 0.1, 11);
     c.fillStyle = radial(c, 0, 0, r * 0.2, r * 0.95, [
-      [0, shade(body, 0.1, 0.72)],
-      [0.7, shade(body, 0.0, 0.5)],
+      [0, shade(body, 0.1, 0.75)],
+      [0.7, shade(body, 0.0, 0.55)],
       [1, shade(body, -0.1, 0.1)],
     ]);
     c.fill();
@@ -2161,7 +2341,10 @@ function renderNoodles(
   }
 }
 
-/** Noodles faded toward the edge: the part of the nest that floats above the broth surface. */
+/**
+ * The part of the nest above the broth surface. The centre of the mound is
+ * fully visible; toward the rim the strands sink under the liquid.
+ */
 function noodleFloatSprite(
   noodle: string,
   thick: Thick,
@@ -2180,14 +2363,36 @@ function noodleFloatSprite(
       c.translate(box / 2, box / 2);
       const base = noodleSprite(noodle, thick, cook, r, seed);
       c.drawImage(base, -box / 2, -box / 2, box, box);
-      c.globalCompositeOperation = 'destination-in';
-      c.fillStyle = radial(c, 0, 0, 0, R, [
-        [0, 'rgba(0,0,0,1)'],
-        [0.6, 'rgba(0,0,0,0.95)'],
-        [0.85, 'rgba(0,0,0,0.5)'],
-        [1, 'rgba(0,0,0,0)'],
+      // surface strands: warm, bright and wet (the submerged ones under the
+      // broth disc stay cooler and dimmer)
+      c.globalCompositeOperation = 'source-atop';
+      c.fillStyle = radial(c, -R * 0.25, -R * 0.3, 0, R * 0.95, [
+        [0, 'rgba(255,238,190,0.3)'],
+        [0.6, 'rgba(255,232,180,0.14)'],
+        [1, 'rgba(255,232,180,0)'],
       ]);
       c.fillRect(-box / 2, -box / 2, box, box);
+      c.globalCompositeOperation = 'destination-in';
+      const irr = (a: number) => 1 + 0.06 * Math.sin(a * 3 + seed) + 0.04 * Math.sin(a * 7 + 2);
+      // irregular waterline: an angular wobble on the fade radius
+      c.fillStyle = radial(c, 0, 0, 0, R, [
+        [0, 'rgba(0,0,0,1)'],
+        [0.62, 'rgba(0,0,0,1)'],
+        [0.8, 'rgba(0,0,0,0.6)'],
+        [0.93, 'rgba(0,0,0,0.15)'],
+        [1, 'rgba(0,0,0,0)'],
+      ]);
+      c.beginPath();
+      for (let i = 0; i <= 72; i++) {
+        const a = (i / 72) * TAU;
+        const rr = R * irr(a) * 1.05;
+        const x = Math.cos(a) * rr;
+        const y = Math.sin(a) * rr;
+        if (i === 0) c.moveTo(x, y);
+        else c.lineTo(x, y);
+      }
+      c.closePath();
+      c.fill();
     },
     2
   );
@@ -2275,12 +2480,12 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
   circle(c, 0, 0, R);
   // clear broths: deeper (darker) in the middle, thinner at the wall.
   // creamy broths: nearly flat, slightly brighter in the middle.
-  const deep = 0.2 * (1 - cfg.creamy);
-  c.fillStyle = radial(c, 0, 0, R * 0.1, R, [
-    [0, shade(base, -deep + cfg.creamy * 0.05, a)],
-    [0.6, shade(base, -0.02, a)],
-    [0.9, shade(base, 0.06 * (1 - cfg.creamy), a)],
-    [1, shade(base, -0.12, a)],
+  const deep = 0.16 * (1 - cfg.creamy);
+  c.fillStyle = radial(c, -R * 0.1, -R * 0.1, R * 0.1, R * 1.05, [
+    [0, shade(base, -deep + cfg.creamy * 0.08, a)],
+    [0.5, shade(base, 0.0, a)],
+    [0.8, shade(base, -0.06, a)],
+    [1, shade(base, -0.26, a)],
   ]);
   c.fill();
   c.save();
@@ -2303,8 +2508,9 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
   }
   if (cfg.particles) {
     // miso: fine suspended particles
-    speckle(c, -R, -R, R * 2, R * 2, R + 1, Math.round(R * 9), rgba(cfg.particles, 0.22));
-    speckle(c, -R, -R, R * 2, R * 2, R + 2, Math.round(R * 4), 'rgba(255,240,210,0.18)');
+    speckle(c, -R, -R, R * 2, R * 2, R + 1, Math.round(R * 14), rgba(cfg.particles, 0.2));
+    speckle(c, -R, -R, R * 2, R * 2, R + 3, Math.round(R * 5), rgba(cfg.particles, 0.4));
+    speckle(c, -R, -R, R * 2, R * 2, R + 2, Math.round(R * 6), 'rgba(255,240,210,0.2)');
   }
   if (cfg.thick) {
     // curry: slow thick surface, soft ridges
@@ -2356,31 +2562,41 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
     }
   }
   if (cfg.oil) {
-    // fat: rings (clear broths) and small blobs; a thin sheen for creamy
+    // fat: flat translucent rings (clear broths) with a bright meniscus, a few
+    // merged pairs; creamy broths get only a thin sheen and small beads
     const nOil = cfg.oilN ?? 10;
+    const clear = cfg.creamy < 0.5;
     for (let i = 0; i < nOil; i++) {
       const ang = rand() * TAU;
       const d = Math.sqrt(rand()) * R * 0.92;
-      const rr = R * (0.012 + rand() * 0.03);
+      const rr = R * (clear ? 0.015 + rand() * 0.045 : 0.01 + rand() * 0.022);
       const x = Math.cos(ang) * d;
       const y = Math.sin(ang) * d;
-      circle(c, x, y, rr);
-      c.fillStyle = radial(c, x - rr * 0.3, y - rr * 0.3, 0, rr, [
-        [0, rgba(cfg.oil, 0.9)],
-        [0.6, rgba(cfg.oil, 0.55)],
-        [0.9, rgba(cfg.oil, 0.25)],
-        [1, rgba(cfg.oil, 0.05)],
+      const sq = 0.85 + rand() * 0.3;
+      c.save();
+      c.translate(x, y);
+      c.scale(sq, 1 / sq);
+      circle(c, 0, 0, rr);
+      // a fat ring is mostly see-through: the broth shows, the edge is bright
+      c.fillStyle = radial(c, -rr * 0.25, -rr * 0.3, 0, rr, [
+        [0, rgba(cfg.oil, clear ? 0.35 : 0.8)],
+        [0.7, rgba(cfg.oil, clear ? 0.3 : 0.55)],
+        [0.92, rgba(cfg.oil, clear ? 0.75 : 0.4)],
+        [1, rgba(cfg.oil, 0.15)],
       ]);
       c.fill();
-      // bright meniscus ring
-      c.strokeStyle = 'rgba(255,255,255,0.45)';
-      c.lineWidth = Math.max(0.5, rr * 0.18);
-      circle(c, x, y, rr * 0.92);
+      c.strokeStyle = 'rgba(255,255,255,0.5)';
+      c.lineWidth = Math.max(0.5, rr * 0.14);
+      circle(c, 0, 0, rr * 0.9);
       c.stroke();
-      // tiny specular
-      c.fillStyle = 'rgba(255,255,255,0.7)';
-      circle(c, x - rr * 0.35, y - rr * 0.35, rr * 0.2);
+      c.strokeStyle = 'rgba(80,40,10,0.18)';
+      c.lineWidth = Math.max(0.4, rr * 0.1);
+      circle(c, rr * 0.08, rr * 0.1, rr);
+      c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.75)';
+      ellipse(c, -rr * 0.35, -rr * 0.4, rr * 0.22, rr * 0.13);
       c.fill();
+      c.restore();
     }
     if (cfg.creamy > 0.8) {
       // thin fat sheen on the creamy surface
@@ -2412,10 +2628,11 @@ function renderLiquid(c: Ctx, broth: string, R: number, alphaMul: number) {
   circle(c, 0, 0, R - c.lineWidth / 2);
   c.stroke();
   // wall shadow: the bowl wall casts a soft shadow onto the liquid near the edge (top-left stronger)
-  c.fillStyle = radial(c, R * 0.1, R * 0.12, R * 0.6, R * 1.02, [
+  c.fillStyle = radial(c, R * 0.12, R * 0.14, R * 0.55, R * 1.02, [
     [0, 'rgba(40,20,10,0)'],
-    [0.75, 'rgba(40,20,10,0.1)'],
-    [1, 'rgba(40,20,10,0.42)'],
+    [0.7, 'rgba(40,20,10,0.1)'],
+    [0.9, 'rgba(40,20,10,0.28)'],
+    [1, 'rgba(40,20,10,0.5)'],
   ]);
   circle(c, 0, 0, R);
   c.fill();
@@ -2602,13 +2819,26 @@ function bowlBaseSprite(styleId: string, S: number): HTMLCanvasElement {
       c.fill();
       // concave shading: deeper centre darker, cast shadow under the top-left rim
       circle(c, 0, 0, inner);
-      c.fillStyle = radial(c, inner * 0.12, inner * 0.14, 0, inner * 1.05, [
-        [0, 'rgba(60,35,20,0.12)'],
-        [0.55, 'rgba(60,35,20,0.03)'],
-        [0.82, 'rgba(60,35,20,0.1)'],
-        [1, 'rgba(60,35,20,0.32)'],
+      c.fillStyle = radial(c, inner * 0.14, inner * 0.16, 0, inner * 1.05, [
+        [0, 'rgba(60,35,20,0.14)'],
+        [0.5, 'rgba(60,35,20,0.04)'],
+        [0.8, 'rgba(60,35,20,0.14)'],
+        [0.93, 'rgba(60,35,20,0.32)'],
+        [1, 'rgba(60,35,20,0.5)'],
       ]);
       c.fill();
+      // cast shadow of the near (top-left) rim onto the inside wall
+      c.save();
+      circle(c, 0, 0, inner);
+      c.clip();
+      c.fillStyle = 'rgba(40,22,10,0.28)';
+      c.shadowColor = 'rgba(40,22,10,0.5)';
+      c.shadowBlur = S * 0.035;
+      c.beginPath();
+      c.arc(0, 0, inner + S * 0.02, 0, TAU);
+      c.arc(inner * 0.07, inner * 0.08, inner * 0.98, 0, TAU, true);
+      c.fill();
+      c.restore();
       // reflected light on the bottom-right wall
       circle(c, 0, 0, inner);
       c.fillStyle = radial(c, inner * 0.5, inner * 0.55, inner * 0.2, inner * 0.9, [
@@ -2825,17 +3055,27 @@ export function drawBowlTop(
     c.restore();
   }
 
-  // 5. rim highlight
+  // 5. rim specular: a crisp glaze reflection on the lip, soft broad + sharp core
   c.lineCap = 'round';
-  c.lineWidth = S * 0.035;
-  c.strokeStyle = 'rgba(255,255,255,0.35)';
+  c.lineWidth = S * 0.04;
+  c.strokeStyle = 'rgba(255,255,255,0.28)';
   c.beginPath();
-  c.arc(0, 0, R - S * 0.045, Math.PI * 1.05, Math.PI * 1.45);
+  c.arc(0, 0, R - S * 0.045, Math.PI * 1.0, Math.PI * 1.5);
+  c.stroke();
+  c.lineWidth = S * 0.012;
+  c.strokeStyle = 'rgba(255,255,255,0.85)';
+  c.beginPath();
+  c.arc(0, 0, R - S * 0.035, Math.PI * 1.08, Math.PI * 1.42);
   c.stroke();
   c.lineWidth = S * 0.018;
   c.strokeStyle = 'rgba(255,255,255,0.22)';
   c.beginPath();
   c.arc(0, 0, R - S * 0.045, Math.PI * 0.12, Math.PI * 0.35);
+  c.stroke();
+  c.lineWidth = S * 0.007;
+  c.strokeStyle = 'rgba(255,255,255,0.5)';
+  c.beginPath();
+  c.arc(0, 0, R - S * 0.035, Math.PI * 0.16, Math.PI * 0.3);
   c.stroke();
 
   // 6. steam
@@ -2848,16 +3088,34 @@ export function drawBowlTop(
 // ---------------------------------------------------------------------------
 
 function stonewareBody(c: Ctx, w: number, h: number, r: number, seed: number) {
-  // soft shadow
-  softShadow(c, w / 2, h * 0.56, w * 0.56, h * 0.5, 0.22);
+  // soft shadow, a little heavier under the near edge
+  softShadow(c, w / 2, h * 0.6, w * 0.6, h * 0.52, 0.26);
   roundRect(c, 0, 0, w, h, r);
-  c.fillStyle = c.createLinearGradient(0, 0, w * 0.3, h);
-  (c.fillStyle as CanvasGradient).addColorStop(0, '#f6efe3');
-  (c.fillStyle as CanvasGradient).addColorStop(1, '#e4d7c3');
+  c.fillStyle = linear(c, 0, 0, w * 0.35, h, [
+    [0, '#f8f2e8'],
+    [0.5, '#ede3d2'],
+    [1, '#d9cbb4'],
+  ]);
   c.fill();
   c.save();
   c.clip();
-  speckle(c, 0, 0, w, h, seed, Math.round(w * h * 0.02), 'rgba(110,80,50,0.16)');
+  // speckled stoneware: iron flecks in two sizes plus a few pale ones
+  speckle(c, 0, 0, w, h, seed, Math.round(w * h * 0.035), 'rgba(110,80,50,0.14)');
+  speckle(c, 0, 0, w, h, seed + 1, Math.round(w * h * 0.006), 'rgba(80,55,35,0.3)');
+  speckle(c, 0, 0, w, h, seed + 2, Math.round(w * h * 0.01), 'rgba(255,255,255,0.4)');
+  // glaze: a soft diagonal sheen across the top-left
+  c.fillStyle = linear(c, 0, 0, w * 0.6, h * 0.6, [
+    [0, 'rgba(255,255,255,0.35)'],
+    [0.35, 'rgba(255,255,255,0.08)'],
+    [1, 'rgba(255,255,255,0)'],
+  ]);
+  c.fillRect(0, 0, w, h);
+  // underside: slightly darker toward the bottom edge
+  c.fillStyle = linear(c, 0, h * 0.7, 0, h, [
+    [0, 'rgba(90,60,35,0)'],
+    [1, 'rgba(90,60,35,0.14)'],
+  ]);
+  c.fillRect(0, 0, w, h);
   c.restore();
   c.lineWidth = 1.2;
   c.strokeStyle = OUT;
@@ -2868,15 +3126,19 @@ function tubCavity(c: Ctx, x: number, y: number, w: number, h: number, r: number
   roundRect(c, x, y, w, h, r);
   c.fillStyle = floor;
   c.fill();
-  // inner wall shadow: dark at top-left, lit at bottom-right
+  // inner wall shadow: dark at the top-left wall, lit at the bottom-right
   roundRect(c, x, y, w, h, r);
-  c.fillStyle = c.createLinearGradient(x, y, x + w * 0.6, y + h);
-  (c.fillStyle as CanvasGradient).addColorStop(0, 'rgba(60,35,20,0.32)');
-  (c.fillStyle as CanvasGradient).addColorStop(0.35, 'rgba(60,35,20,0.08)');
-  (c.fillStyle as CanvasGradient).addColorStop(1, 'rgba(60,35,20,0.0)');
+  c.fillStyle = linear(c, x, y, x + w * 0.55, y + h, [
+    [0, 'rgba(60,35,20,0.42)'],
+    [0.3, 'rgba(60,35,20,0.12)'],
+    [1, 'rgba(60,35,20,0.0)'],
+  ]);
   c.fill();
+  // ambient occlusion all round the inner wall
+  edgeAO(c, () => roundRect(c, x, y, w, h, r), Math.min(w, h) * 0.07, 'rgba(60,35,20,0.3)', 4);
   c.lineWidth = 1;
-  c.strokeStyle = 'rgba(60,35,20,0.3)';
+  c.strokeStyle = 'rgba(60,35,20,0.35)';
+  roundRect(c, x, y, w, h, r);
   c.stroke();
 }
 
@@ -2889,51 +3151,91 @@ export function drawTub(c: Ctx, id: string, w: number, h: number): void {
       cc.translate(4, 3);
       const r = Math.min(w, h) * 0.16;
       stonewareBody(cc, w, h, r, id.length * 7);
-      const inset = Math.min(w, h) * 0.1;
+      const inset = Math.min(w, h) * 0.085;
       const iw = w - inset * 2;
       const ih = h - inset * 2;
-      tubCavity(cc, inset, inset, iw, ih, r * 0.7, '#e7dccb');
-      // the pile
+      const cr = r * 0.7;
+      tubCavity(cc, inset, inset, iw, ih, cr, '#e3d6c2');
+      // the heap: a real mound. Pieces are scaled so the biggest ones span
+      // ~55% of the cavity, scattered densely with the centre on top.
       const ps = PIECE_SIZE[id] ?? 30;
-      const scale = clamp((Math.min(iw, ih) * 0.46) / ps, 0.45, 1.25);
-      const n = clamp(Math.round(16 * Math.pow(30 / ps, 0.7) * (Math.min(iw, ih) / 70)), 8, 20);
+      const minSide = Math.min(iw, ih);
+      const scale = clamp((minSide * 0.6) / ps, 0.5, 1.5);
+      const footprint = ps * scale;
+      const n = clamp(Math.round(((iw * ih) / (footprint * footprint)) * 3.2), 7, 26);
       const rand = rng(id.length * 97 + 3);
       const nv = PIECE_VARIANTS[id] ?? 1;
-      const pts: { x: number; y: number; v: number; rot: number; s: number }[] = [];
+      const pts: { x: number; y: number; v: number; rot: number; s: number; d: number }[] = [];
       for (let i = 0; i < n; i++) {
         const a = rand() * TAU;
-        const d = Math.pow(rand(), 0.6);
+        const d = Math.pow(rand(), 0.55);
         pts.push({
-          x: inset + iw / 2 + Math.cos(a) * d * iw * 0.36,
-          y: inset + ih / 2 + Math.sin(a) * d * ih * 0.34,
+          x: inset + iw / 2 + Math.cos(a) * d * iw * 0.42,
+          y: inset + ih / 2 + Math.sin(a) * d * ih * 0.4,
           v: Math.floor(rand() * nv),
           rot: rand() * TAU,
-          s: scale * (0.85 + rand() * 0.3),
+          s: scale * (0.82 + rand() * 0.32),
+          d,
         });
       }
-      pts.sort((p, q) => p.y - q.y);
+      // edges first (base of the mound), centre last (top)
+      pts.sort((p, q) => q.d - p.d || p.y - q.y);
       cc.save();
-      roundRect(cc, inset, inset, iw, ih, r * 0.7);
+      roundRect(cc, inset, inset, iw, ih, cr);
       cc.clip();
+      // mound shadow on the tub floor
+      cc.fillStyle = radial(cc, inset + iw / 2, inset + ih * 0.58, 0, minSide * 0.6, [
+        [0, 'rgba(50,30,15,0.4)'],
+        [0.7, 'rgba(50,30,15,0.18)'],
+        [1, 'rgba(50,30,15,0)'],
+      ]);
+      cc.fillRect(inset, inset, iw, ih);
       for (const p of pts) {
         cc.save();
         cc.translate(p.x, p.y);
         drawPiece(cc, id, p.v, p.s, p.rot);
         cc.restore();
       }
-      // wall shadow over the pile at the top edge
-      roundRect(cc, inset, inset, iw, ih, r * 0.7);
-      cc.fillStyle = cc.createLinearGradient(0, inset, 0, inset + ih * 0.35);
-      (cc.fillStyle as CanvasGradient).addColorStop(0, 'rgba(60,35,20,0.22)');
-      (cc.fillStyle as CanvasGradient).addColorStop(1, 'rgba(60,35,20,0)');
+      // the wall shadows the heap along the top-left
+      roundRect(cc, inset, inset, iw, ih, cr);
+      cc.fillStyle = linear(cc, inset, inset, inset + iw * 0.4, inset + ih * 0.55, [
+        [0, 'rgba(50,30,15,0.34)'],
+        [0.5, 'rgba(50,30,15,0.08)'],
+        [1, 'rgba(50,30,15,0)'],
+      ]);
       cc.fill();
+      // light catching the top of the mound
+      cc.fillStyle = radial(cc, inset + iw * 0.42, inset + ih * 0.4, 0, minSide * 0.45, [
+        [0, 'rgba(255,245,225,0.16)'],
+        [1, 'rgba(255,245,225,0)'],
+      ]);
+      cc.fillRect(inset, inset, iw, ih);
       cc.restore();
-      // tub top-edge highlight
-      cc.lineWidth = 1.5;
-      cc.strokeStyle = 'rgba(255,255,255,0.6)';
+      // bright glazed rim: a pale band between the wall and the cavity
+      cc.lineWidth = Math.max(1.4, inset * 0.32);
+      cc.strokeStyle = 'rgba(255,252,245,0.75)';
+      roundRect(
+        cc,
+        inset - cc.lineWidth * 0.7,
+        inset - cc.lineWidth * 0.7,
+        iw + cc.lineWidth * 1.4,
+        ih + cc.lineWidth * 1.4,
+        cr + 1
+      );
+      cc.stroke();
+      // tub top-edge specular
+      cc.lineCap = 'round';
+      cc.lineWidth = 1.6;
+      cc.strokeStyle = 'rgba(255,255,255,0.7)';
       cc.beginPath();
-      cc.moveTo(r, 1.2);
-      cc.lineTo(w - r, 1.2);
+      cc.moveTo(r, 1.3);
+      cc.lineTo(w - r, 1.3);
+      cc.stroke();
+      cc.lineWidth = 1.1;
+      cc.strokeStyle = 'rgba(255,255,255,0.45)';
+      cc.beginPath();
+      cc.moveTo(1.3, r);
+      cc.lineTo(1.3, h - r);
       cc.stroke();
     },
     2
