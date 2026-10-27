@@ -160,7 +160,7 @@ export interface UiSnapshot {
   dayEnd: boolean;
   intro: boolean;
   /** the counter customer finished ordering and waits for the chef's answer */
-  reply: boolean;
+  reply: [string, string, string] | null;
   /** happiness meters (0..1) of open orders, the counter customer first */
   moods: { id: number; who: string; v: number; free: boolean; phone: boolean }[];
 }
@@ -405,7 +405,7 @@ export class DaySession {
       clockText: `${mm}:${String(ss).padStart(2, '0')}`,
       dayEnd: this.phase === 'dayEnd',
       intro: this.intro > 0,
-      reply: this.awaitReply,
+      reply: this.awaitReply ? this.replyLabels : null,
       moods: this.open.map((o) => ({
         id: o.id,
         who: o.cu.members[o.mi].name,
@@ -559,7 +559,9 @@ export class DaySession {
     this.awaitReply = false;
     sfx('tap');
     if (kind === 'again') {
-      this.startOrder(); // they repeat the order
+      // asking again costs a bit of their happiness
+      this.repeats++;
+      this.startOrder(T('g.repeatPre'));
       return;
     }
     const m = this.counter.members[this.mi];
@@ -567,14 +569,19 @@ export class DaySession {
       m.name,
       kind === 'soon' ? T('g.replyYay') : T('g.replyThanks'),
       'counter',
-      'good'
+      'neutral'
     );
     this.phase = 'replied';
     this.phaseT = 0;
     this.notify();
   }
 
-  private startOrder() {
+  /** how many times the chef asked this customer to repeat the order */
+  private repeats = 0;
+  /** the chef's three answer buttons (re-worded every time) */
+  private replyLabels: [string, string, string] = ['', '', ''];
+
+  private startOrder(prefix = '') {
     const cu = this.counter!;
     const m = cu.members[this.mi];
     this.phase = 'order';
@@ -582,12 +589,14 @@ export class DaySession {
     const n = cu.members.length;
     const pre =
       n > 1 ? (this.mi === 0 ? T('g.first') : this.mi === n - 1 ? T('g.last') : T('g.mine')) : '';
-    this.setBubble(m.name, pre + m.text, 'counter');
+    this.setBubble(m.name, prefix + pre + m.text, 'counter');
   }
 
   private placeOrder(cu: Customer, mi: number) {
     const m = cu.members[mi];
-    this.open.push({ id: this.slotId++, cu, mi, waitT: 0, lines: orderLines(m.order) });
+    // every "say that again?" starts their happiness meter a little lower
+    const waitT = cu.patience * Math.min(0.45, 0.15 * this.repeats);
+    this.open.push({ id: this.slotId++, cu, mi, waitT, lines: orderLines(m.order) });
     if (!this.groups.has(cu.id))
       this.groups.set(cu.id, {
         pay: 0,
@@ -798,7 +807,13 @@ export class DaySession {
         phase: this.counter ? 'pickup' : 'served',
         t: 0,
         score: v.score,
-        notes: complaint ? v.notes : v.notes.concat(v.praise),
+        notes: complaint
+          ? v.notes
+          : v.notes.length
+            ? v.notes
+            : v.score >= 95
+              ? v.praise.slice(0, 1)
+              : [],
         complaint,
         tone,
         bowl: served,
@@ -1696,6 +1711,7 @@ export class DaySession {
           this.phaseT > 0.8
         ) {
           this.counter = this.queue.shift()!;
+          this.repeats = 0;
           this.mi = 0;
           this.counterY = 0;
           this.phase = 'enter';
@@ -1730,6 +1746,7 @@ export class DaySession {
         ) {
           // the customer looks at the chef and waits for an answer
           this.awaitReply = true;
+          this.replyLabels = [T('g.replyOk'), T('g.replySoon'), T('g.replyAgain')];
           this.notify();
         }
         break;
@@ -1791,7 +1808,8 @@ export class DaySession {
           } else {
             this.setBubble(
               m.name,
-              reactionLine(pk.cu, sc) + (notes ? `  (${notes})` : ''),
+              // one honest remark at most, said like a person would
+              reactionLine(pk.cu, sc) + (pk.notes.length ? ' ' + L(pk.notes[0]) : ''),
               'pickup',
               pk.tone
             );

@@ -12,7 +12,7 @@ import {
 } from './data';
 import { BOWL_C, cookOf, type BowlState, type CookState, COOK_LABEL } from './bowl';
 import { isFeminine, randomLook, type Look } from '../art/avatar';
-import { L, getLang } from './i18n';
+import { L, T, getLang } from './i18n';
 
 const en = () => getLang() === 'en';
 
@@ -925,8 +925,11 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
   else score += 15;
   if (b.broth) {
     const sauce = INGREDIENTS[b.broth].cat === 'sauce';
-    if (b.fill >= 0.72 && b.fill <= 1.03) score += 10;
-    else if (b.fill > 1.03) {
+    if (b.fill >= 0.85 && b.fill <= 1.03) score += 10;
+    else if (b.fill >= 0.72 && b.fill < 0.85) {
+      score += 5;
+      notes.push(L(sauce ? 'Sos biraz az' : 'Biraz daha çorba olabilirdi'));
+    } else if (b.fill > 1.03) {
       score += 3;
       notes.push(L(sauce ? 'Sos çok fazla' : 'Çorba taşmış'));
     } else if (b.fill >= 0.45) {
@@ -1041,15 +1044,25 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
     const cx = tp.reduce((s, p) => s + p.x, 0) / tp.length;
     const cy = tp.reduce((s, p) => s + p.y, 0) / tp.length;
     const off = Math.hypot(cx - BOWL_C, cy - BOWL_C);
-    if (off > 55) {
-      score -= 5;
+    if (off > 45) {
+      score -= 6;
       notes.push(L('Malzemeler bir kenara yığılmış'));
-    } else if (off < 25) praise.push(L('Malzemeler çok güzel dağılmış'));
+    } else if (off < 22) praise.push(L('Malzemeler çok güzel dağılmış'));
+    // pieces dumped on top of each other look careless
+    let close = 0;
+    for (let i = 0; i < tp.length; i++)
+      for (let j = i + 1; j < tp.length; j++)
+        if (Math.hypot(tp[i].x - tp[j].x, tp[i].y - tp[j].y) < 14) close++;
+    if (close / tp.length > 0.5) {
+      score -= 5;
+      notes.push(L('Malzemeler üst üste yığılmış'));
+    }
   }
-  if (waitFrac > 0.55) {
-    score -= Math.min(18, Math.round((waitFrac - 0.55) * 40));
-    notes.push(L(waitFrac > 0.85 ? 'Çok bekledim!' : 'Biraz uzun sürdü'));
-  } else if (waitFrac < 0.3) praise.push(L('Çok hızlıydı!'));
+  // speed matters: only a quick bowl can be a perfect one
+  if (waitFrac > 0.25) {
+    score -= Math.min(25, Math.round((waitFrac - 0.25) * 45));
+    if (waitFrac > 0.45) notes.push(L(waitFrac > 0.75 ? 'Çok bekledim!' : 'Biraz uzun sürdü'));
+  } else if (waitFrac < 0.15) praise.push(L('Çok hızlıydı!'));
   score = Math.round(Math.max(0, Math.min(100, score)));
   if (score >= 95 && !praise.length) praise.push(L('Kusursuz!'));
   return { score, notes, praise, strong };
@@ -1058,21 +1071,18 @@ export function judge(o: Order, b: BowlState, waitFrac: number): Verdict {
 export function reactionLine(c: Customer, score: number): string {
   if (c.reactions)
     return score >= 92 ? c.reactions.great : score >= 70 ? c.reactions.ok : c.reactions.bad;
-  // customers are hard to impress: only a near-perfect bowl gets real delight
-  if (score >= 97)
-    return L(
-      pick([
-        'Bu hayatımda yediğim en iyi noodle!',
-        'Aşık oldum! Her gün geleceğim!',
-        'Mükemmel! Ellerine sağlık şef!',
-      ])
-    );
-  if (score >= 90)
-    return L(pick(['Çok lezzetli, teşekkürler!', 'Harika olmuş!', 'Tam aradığım tat!']));
-  if (score >= 75) return L(pick(['Fena değil.', 'Güzel ama…', 'İyi, ama daha iyisini yemiştim.']));
-  if (score >= 55) return L(pick(['İdare eder.', 'Pek beğenmedim.', 'Hmm… olmamış biraz.']));
-  if (score >= 30) return L(pick(['Hmm… ben bunu istememiştim.', 'Bu biraz farklı olmuş.']));
-  return L(pick(['Bu ne böyle?!', 'Bir daha gelmem!', 'Ciddi misin şef?']));
+  // ordinary customers: plain, human reactions; real delight only for a near-perfect bowl
+  return T(
+    score >= 95
+      ? 'g.react5'
+      : score >= 85
+        ? 'g.react4'
+        : score >= 70
+          ? 'g.react3'
+          : score >= 45
+            ? 'g.react2'
+            : 'g.react1'
+  );
 }
 
 export function starsFor(avg: number) {

@@ -90,18 +90,7 @@ interface F {
   special?: Special;
 }
 
-const FEM_HAIR: Hair[] = [
-  'bob',
-  'long',
-  'wavy',
-  'bun',
-  'pony',
-  'braids',
-  'hijab',
-  'curly',
-  'short',
-  'side',
-];
+const FEM_HAIR: Hair[] = ['bob', 'long', 'wavy', 'bun', 'pony', 'braids', 'curly', 'short', 'side'];
 const MASC_HAIR: Hair[] = [
   'short',
   'side',

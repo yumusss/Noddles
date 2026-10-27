@@ -1004,6 +1004,9 @@ export const DATA_EN: Record<string, string> = {
   'Malzemeler çok güzel dağılmış': 'The toppings are beautifully arranged',
   'Çok bekledim!': 'I waited so long!',
   'Biraz uzun sürdü': 'That took a while',
+  'Biraz daha çorba olabilirdi': 'Could use a bit more broth',
+  'Sos biraz az': 'A bit light on sauce',
+  'Malzemeler üst üste yığılmış': 'The toppings are all piled on top of each other',
   'Çok hızlıydı!': 'That was fast!',
   'Kusursuz!': 'Flawless!',
 };

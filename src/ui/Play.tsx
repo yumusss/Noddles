@@ -239,13 +239,13 @@ function Overlays({
       {ui.reply && (
         <div className="reply-row">
           <button className="reply-chip" onClick={() => s.reply('ok')}>
-            {T('g.replyOk')}
+            {ui.reply[0]}
           </button>
           <button className="reply-chip" onClick={() => s.reply('soon')}>
-            {T('g.replySoon')}
+            {ui.reply[1]}
           </button>
           <button className="reply-chip ghost" onClick={() => s.reply('again')}>
-            {T('g.replyAgain')}
+            {ui.reply[2]}
           </button>
         </div>
       )}

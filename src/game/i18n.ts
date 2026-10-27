@@ -39,8 +39,10 @@ export function L(s: string): string {
 
 /** UI string by key, with {vars}. */
 export function T(key: keyof typeof UI, vars?: Record<string, string | number>): string {
-  const e = UI[key];
-  let s: string = lang === 'tr' ? e[0] : e[1];
+  // an entry may hold several variants per language: one is picked at random each time
+  const e = UI[key] as readonly (string | readonly string[])[];
+  const v = lang === 'tr' ? e[0] : e[1];
+  let s: string = typeof v === 'string' ? v : v[Math.floor(Math.random() * v.length)];
   if (vars)
     for (const [k, v] of Object.entries(vars)) {
       s = s.replace(new RegExp(`\\$\\{${k}\\}`, 'g'), fmt(Number(v))); // ${x} = money
@@ -183,21 +185,61 @@ export const UI = {
   'tab.bowls': ['Kaseler', 'Bowls'],
   // in-game lines
   'g.phoneGreet': ['Paket siparişi!', 'Delivery order!'],
-  'g.waited': ['Çok bekledim, gidiyorum!', 'I waited too long, I’m leaving!'],
+  'g.waited': [
+    [
+      'Ben gidiyorum, çok bekledim.',
+      'Kusura bakma, daha fazla bekleyemem.',
+      'Off… Başka zaman artık.',
+    ],
+    [
+      'I’m going, I’ve waited too long.',
+      'Sorry, I can’t wait any longer.',
+      'Ugh… maybe another time.',
+    ],
+  ],
   'g.waitedPhone': [
     'Çok bekledim, siparişi iptal ediyorum!',
     'I waited too long, cancelling the order!',
   ],
   'g.app': ['Uygulama', 'App'],
   'g.onTheWay': ['Paket yolda! ', 'Delivery on its way! '],
-  'g.lessChange': ['Hmm, para üstü eksik geldi…', 'Hmm, the change is short…'],
-  'g.moreChange': ['Fazla verdin ama… teşekkürler!', 'You gave too much but… thanks!'],
-  'g.tipBig': [
-    'Bahşiş kavanozuna ${n} bıraktım. Harikaydı!',
-    'I left ${n} in the tip jar. That was wonderful!',
+  'g.lessChange': [
+    [
+      'Bir saniye… para üstü eksik galiba.',
+      'Hmm, bu eksik sanki.',
+      'Tekrar sayar mısın? Eksik geldi.',
+    ],
+    [
+      'Hang on… I think the change is short.',
+      'Hmm, this looks short.',
+      'Could you count again? It’s short.',
+    ],
   ],
-  'g.tipSmall': ['Bahşiş: ${n}. Teşekkürler şef!', 'Tip: ${n}. Thanks, chef!'],
-  'g.noTip': ['Bahşiş yok bu sefer.', 'No tip this time.'],
+  'g.moreChange': [
+    ['Bu biraz fazla oldu ama… peki, sağ ol.', 'Fazla verdin galiba. Neyse, teşekkürler.'],
+    ['That’s a bit much, but… okay, thanks.', 'I think you gave me extra. Well, thanks.'],
+  ],
+  'g.tipBig': [
+    [
+      'Üstü kalsın. Gerçekten güzeldi.',
+      'Şunu da kavanoza atayım. Eline sağlık.',
+      'Kalsın, hak ettin.',
+    ],
+    [
+      'Keep the change. That was really good.',
+      'Let me drop this in the jar. Well done.',
+      'Keep it, you earned it.',
+    ],
+  ],
+
+  'g.tipSmall': [
+    ['Bozukluklar kavanoza.', 'Şu da bahşiş olsun.', 'Küçük bir şey bırakayım.'],
+    ['The coins go in the jar.', 'Here’s a little tip.', 'I’ll leave a little something.'],
+  ],
+  'g.noTip': [
+    ['Neyse, kolay gelsin.', 'Hadi iyi günler.', 'Bu sefer bahşiş yok, kusura bakma.'],
+    ['Anyway, take care.', 'Have a good day.', 'No tip this time, sorry.'],
+  ],
   'g.bill': ['{who}Hesap ${p}. Buyur ${g}{rest}.', '{who}The bill is ${p}. Here’s ${g}{rest}.'],
   'g.billDiscount': [
     '{who}Biraz eksikti, ${off} indirim yap. Hesap ${p}, buyur ${g}.',
@@ -215,11 +257,75 @@ export const UI = {
     'Bu kadar bekledikten sonra ödemiyorum. Paramı geri alıyorum!',
     'After that wait, I’m not paying. I’m keeping my money!',
   ],
-  'g.replyOk': ['👍 Tamam!', '👍 Okay!'],
-  'g.replySoon': ['⏱️ Hemen geliyor!', '⏱️ Coming right up!'],
-  'g.replyAgain': ['🔁 Tekrar söyler misin?', '🔁 Say that again?'],
-  'g.replyThanks': ['Teşekkürler!', 'Thanks!'],
-  'g.replyYay': ['Harika, bekliyorum!', 'Great, I’ll wait!'],
+  'g.replyOk': [
+    ['👍 Tamam!', '👍 Anlaşıldı!', '👍 Olur!', '👍 Not aldım.', '👍 Hemen hallediyorum.'],
+    ['👍 Okay!', '👍 Got it!', '👍 Sure!', '👍 Noted.', '👍 On it.'],
+  ],
+  'g.replySoon': [
+    ['⏱️ Hemen geliyor!', '⏱️ Birkaç dakikaya hazır.', '⏱️ Hemen başlıyorum!', '⏱️ Çok bekletmem.'],
+    [
+      '⏱️ Coming right up!',
+      '⏱️ Ready in a few minutes.',
+      '⏱️ Starting right now!',
+      '⏱️ Won’t keep you long.',
+    ],
+  ],
+  'g.replyAgain': [
+    [
+      '🔁 Tekrar söyler misin?',
+      '🔁 Pardon, bir daha?',
+      '🔁 Kaçırdım, tekrar alabilir miyim?',
+      '🔁 Bir daha söyler misiniz?',
+    ],
+    [
+      '🔁 Say that again?',
+      '🔁 Sorry, once more?',
+      '🔁 I missed that, again please?',
+      '🔁 Could you repeat that?',
+    ],
+  ],
+  'g.replyThanks': [
+    ['Sağ ol.', 'Tamamdır.', 'Peki, bekliyorum.', 'Teşekkürler.', 'Tamam.'],
+    ['Thanks.', 'Alright.', 'Okay, I’ll wait.', 'Thank you.', 'Okay.'],
+  ],
+  'g.replyYay': [
+    ['İyi, çok acıktım.', 'Süper, bekliyorum.', 'Acelem yok ama iyi olur.', 'Tamam, sağ ol.'],
+    ['Good, I’m starving.', 'Great, I’ll wait.', 'No rush, but that’d be nice.', 'Okay, thanks.'],
+  ],
+  'g.repeatPre': [
+    ['Peki, bir daha: ', 'Hmm, tamam. ', 'Dikkatli dinle o zaman: ', 'Az önce söyledim ama… '],
+    ['Okay, once more: ', 'Hmm, fine. ', 'Listen carefully then: ', 'I just said it, but… '],
+  ],
+  'g.react5': [
+    [
+      'Çok iyiydi, gerçekten.',
+      'Bunu yine yerim.',
+      'Ellerine sağlık, tam istediğim gibi.',
+      'Vay, beklediğimden iyi.',
+    ],
+    [
+      'That was really good.',
+      'I’d eat this again.',
+      'Well done, just how I wanted it.',
+      'Wow, better than I expected.',
+    ],
+  ],
+  'g.react4': [
+    ['Güzel olmuş.', 'Lezzetli, sağ ol.', 'İyiydi.', 'Beğendim.'],
+    ['That’s nice.', 'Tasty, thanks.', 'It was good.', 'I liked it.'],
+  ],
+  'g.react3': [
+    ['Fena değil.', 'İdare eder.', 'Eh, olmuş sayılır.', 'Normal.'],
+    ['Not bad.', 'It’ll do.', 'Eh, close enough.', 'It’s okay.'],
+  ],
+  'g.react2': [
+    ['Pek beğenmedim.', 'Hmm… olmamış biraz.', 'Ben bunu böyle istememiştim.'],
+    ['I didn’t really like it.', 'Hmm… not quite right.', 'That’s not how I asked for it.'],
+  ],
+  'g.react1': [
+    ['Bu ne şimdi?', 'Bunu yiyemem.', 'Hiç olmamış, kusura bakma.'],
+    ['What is this?', 'I can’t eat this.', 'This is all wrong, sorry.'],
+  ],
   'cash.discount': ['indirim', 'discount'],
   'play.dayShort': ['GÜN', 'DAY'],
   'play.happy': ['Mutluluk', 'Happiness'],
@@ -227,14 +333,37 @@ export const UI = {
   'g.billAll': ['Hepsi benden. ', 'It’s all on me. '],
   'g.changeWillBe': [', para üstü ${n} olacak', ', change will be ${n}'],
   'g.exactMoney': [', tam para', ', exact amount'],
-  'g.complain': ['Hmm, bu doğru değil: {notes}', 'Hmm, that’s not right: {notes}'],
+  'g.complain': [
+    ['Şey… {notes}', 'Pardon ama {notes}', 'Hmm. {notes}', 'Bu pek olmamış: {notes}'],
+    ['Um… {notes}', 'Excuse me, but {notes}', 'Hmm. {notes}', 'This isn’t quite right: {notes}'],
+  ],
   'g.you': ['Sen', 'You'],
   'g.counterBusy': ['Tezgâh dolu, bir saniye…', 'The counter is busy, one second…'],
   'g.sorry': [
-    'Özür dilerim, bir dahakine daha dikkatli olacağım.',
-    'I’m sorry, I’ll be more careful next time.',
+    [
+      'Çok özür dilerim, hemen not alıyorum.',
+      'Haklısınız, kusura bakmayın.',
+      'Özür dilerim, bir daha olmayacak.',
+    ],
+    [
+      'I’m so sorry, I’ll remember that.',
+      'You’re right, I apologise.',
+      'Sorry, it won’t happen again.',
+    ],
   ],
-  'g.sorryReply': ['Peki… ama bahşiş yok.', 'Fine… but no tip.'],
+
+  'g.sorryReply': [
+    [
+      'Olur öyle şeyler. Ama bu sefer bahşiş yok.',
+      'Peki… bir dahakine dikkat et.',
+      'Tamam, sorun değil. Ama bahşişi unut.',
+    ],
+    [
+      'These things happen. But no tip this time.',
+      'Okay… be careful next time.',
+      'Fine, no problem. But forget the tip.',
+    ],
+  ],
   'g.first': ['Önce ben: ', 'Me first: '],
   'g.last': ['Son olarak ben: ', 'And lastly me: '],
   'g.mine': ['Sıra bende: ', 'My turn: '],
