@@ -429,6 +429,7 @@ export class Session {
         break;
       case 'wait': {
         if (!this.tutorial) c.patience -= dt;
+        else if (!this.open) c.patience = Math.min(c.patience, 60) - dt;
         c.waited += dt;
         const f = c.patience / c.patienceMax;
         c.mood = f > 0.55 ? 'neutral' : f > 0.25 ? 'worried' : 'angry';
@@ -449,9 +450,10 @@ export class Session {
         if (c.st > 10) this.answer('none');
         break;
       case 'react':
-        if (c.st > 2.4 && this.lineDone(c)) this.startPay(c);
+        if ((c.st > 2.4 && this.lineDone(c)) || c.st > 6) this.startPay(c);
         break;
       case 'pay':
+        if (c.st > 1.3) this.finishPay(c);
         break;
       case 'bye':
         if (c.st > 1.6) this.setState(c, 'leave');
@@ -646,13 +648,14 @@ export class Session {
       this.toast(`${tt('bonus')} +${money(c.bonus)}`, 'good');
     }
     this.ledger.sales += c.bill;
-    this.drawer = { open: c.cash > c.bill, given: [], warn: 0 };
-    // the customer only hands over the money; the change shows on the register box
+    // the customer pays and the money goes into the register by itself — no change to count
+    c.cash = c.bill;
+    this.drawer = { open: false, given: [], warn: 0 };
     this.say(c, () =>
-      tx({ tr: `Buyrun, ${money(c.cash)}.`, en: `Here you go, ${money(c.cash)}.` })
+      tx({ tr: `Buyrun, ${money(c.bill)}.`, en: `Here you go, ${money(c.bill)}.` })
     );
+    sfx('coins');
     this.setState(c, 'pay');
-    if (c.cash === c.bill) setTimeout(() => this.finishPay(c), 1300);
   }
 
   addMoney(v: number) {
@@ -851,8 +854,17 @@ export class Session {
   }
 
   pickTray(i: IngId) {
-    if (i === 'rice') return;
     this.dismissAsk();
+    if (i === 'rice') {
+      if (this.hand?.k === 'rice') this.hand = null;
+      else {
+        this.dropHand();
+        this.hand = { k: 'rice', q: 'just' };
+      }
+      sfx('pick');
+      this.bump();
+      return;
+    }
     if (this.hand?.k === 'tub' && this.hand.ing === i) this.hand = null;
     else {
       this.dropHand();
@@ -1363,14 +1375,6 @@ export class Session {
   hint(): { text: L; target?: string } | null {
     if (!this.tutorial || this.over) return null;
     const c = this.cust;
-    if (c?.state === 'pay' && this.drawer.open)
-      return {
-        text: {
-          tr: 'Para üstü kasanın yanındaki kutuda yazıyor. Çekmeceden o kadar seç, “Ver”e bas.',
-          en: 'The change is shown in the box by the register. Pick that much from the drawer and tap “Give”.',
-        },
-        target: 'drawer',
-      };
     if (c?.state === 'verdict' && c.ask)
       return {
         text: {
@@ -1410,10 +1414,7 @@ export class Session {
           target: 'plate',
         };
       return {
-        text: {
-          tr: 'Pirinç kabını basılı tut, gösterge “tam”dayken bırak.',
-          en: 'Hold the rice tub, let go when the gauge says “just right”.',
-        },
+        text: { tr: 'Pirinç kabına dokun.', en: 'Tap the rice tub.' },
         target: 'tray:rice',
       };
     }

@@ -34,7 +34,7 @@ export function drawTable(c: Ctx, L: Layout) {
     0,
     0,
     (cc) => {
-      woodGrain(cc, 0, 0, L.W, L.work.h, '#8a5a3c', 81, { planks: 5, strength: 1.1 });
+      woodGrain(cc, 0, 0, L.W, L.work.h, '#b98656', 81, { planks: 5, strength: 1 });
       cc.fillStyle = lin(cc, 0, 0, 0, L.work.h, [
         [0, 'rgba(30,15,5,0.25)'],
         [0.15, 'rgba(30,15,5,0)'],

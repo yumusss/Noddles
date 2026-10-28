@@ -62,7 +62,6 @@ export default function Play({
   const [paused, setPaused] = useState(false);
   const [tablet, setTablet] = useState(false);
   const [opening, setOpening] = useState(true);
-  const [overShown, setOverShown] = useState(false);
   const [pop, setPop] = useState<string | null>(null);
   const [, setTick] = useState(0);
   const decor = save.equipped as Record<DecorSlot, string>;
@@ -106,13 +105,16 @@ export default function Play({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
 
+  // the day is over: show the banner, then go to the ledger (once)
+  const doneRef = useRef(onDone);
+  doneRef.current = onDone;
+  const over = session.over;
   useEffect(() => {
-    if (session.over && !overShown) {
-      setOverShown(true);
-      const id = setTimeout(() => onDone(session), 1800);
-      return () => clearTimeout(id);
-    }
-  }, [session.over, overShown, onDone, session]);
+    if (!over) return;
+    // no cleanup on re-render: the timer must survive the banner's own state change
+    const id = window.setTimeout(() => doneRef.current(session), 1800);
+    return () => window.clearTimeout(id);
+  }, [over, session]);
 
   // little "new review" pop when a review is posted
   const lastId = session.lastReview?.id;
@@ -139,7 +141,7 @@ export default function Play({
       const L = anchors.layout;
       const right = L ? L.pip.x * sc : 0;
       p.style.right = `${Math.max(8, v.cssW - right - 30)}px`;
-      p.style.top = `${anchors.pip.y * sc - p.offsetHeight - 6}px`;
+      p.style.top = `${((anchors.layout?.sillY ?? 0) + (anchors.layout?.sillH ?? 0) + 8) * sc}px`;
     }
     const ptr = pointerRef.current;
     if (ptr) {
@@ -186,10 +188,7 @@ export default function Play({
     (e.target as Element).setPointerCapture?.(e.pointerId);
     const hot = hitTest(w.x, w.y);
     let hold: 'rice' | 'boardRice' | 'roll' | 'sear' | null = null;
-    if (hot?.id === 'tray:rice' && session.board.m === 'idle') {
-      session.squeezeStart();
-      hold = 'rice';
-    } else if (hot?.id === 'mini:mat') {
+    if (hot?.id === 'mini:mat') {
       const b = session.board;
       if (b.m === 'maki' && b.stage === 'rice') {
         session.boardRiceStart();
@@ -384,33 +383,6 @@ export default function Play({
           <button className="btn coral small" onClick={() => session.acceptOnline()}>
             {t('accept')}
           </button>
-        </div>
-      )}
-
-      {/* cash drawer */}
-      {cu?.state === 'pay' && session.drawer.open && (
-        <div className="drawer" id="hint-drawer">
-          <div className="drawer-sum">
-            {t('youGive')}: <b>{money(session.givenTotal)}</b>
-          </div>
-          <div className="drawer-money">
-            {[1, 5, 10, 20, 50, 100].map((v) => (
-              <button
-                key={v}
-                className={'cash ' + (v < 5 ? 'coin' : 'note n' + v)}
-                onClick={() => session.addMoney(v)}>
-                {money(v)}
-              </button>
-            ))}
-          </div>
-          <div className="drawer-act">
-            <button className="btn ghost" onClick={() => session.clearMoney()}>
-              {t('clear')}
-            </button>
-            <button className="btn green" onClick={() => session.giveChange()}>
-              {t('give')}
-            </button>
-          </div>
         </div>
       )}
 

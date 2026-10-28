@@ -9,7 +9,7 @@ import { lookOf, drawBust, drawPaws } from './animals';
 import { drawCard } from './card';
 import { type Ctx, ease, ellipse, rr, setPx, text } from './common';
 import { hs, hsBegin, hsEnd } from './hs';
-import { drawChangeBox, drawHutFrame, drawJar, drawPip, drawRegister } from './hut';
+import { drawHutFrame, drawJar, drawPip, drawRegister } from './hut';
 import { computeLayout, type Layout } from './layout';
 import { drawMini } from './mini';
 import { outsideLife, paintOutside, skyFor } from './outside';
@@ -17,7 +17,6 @@ import {
   drawFloating,
   drawPlateWithPieces,
   drawSearDial,
-  drawSqueezeGauge,
   drawTable,
   drawTools,
   drawTrays,
@@ -141,21 +140,8 @@ export function renderWorld(
   // register, change box, tip jar, Pip
   const RG = L.register;
   const paying = cu?.state === 'pay';
-  drawRegister(c, RG.x, RG.y, RG.w, paying ? money(cu!.bill) : money(0), s.drawer.open ? 1 : 0, t);
+  drawRegister(c, RG.x, RG.y, RG.w, paying ? money(cu!.bill) : money(0), paying ? 1 : 0, t);
   hs('register', RG.x - RG.w / 2, RG.y - RG.w * 0.8, RG.w, RG.w * 0.9);
-  if (paying && cu && cu.cash > cu.bill) {
-    const bx = L.portrait ? L.W * 0.56 : RG.x + RG.w * 0.55;
-    const by = L.portrait ? L.win.y + 30 : L.sillY - 120;
-    drawChangeBox(
-      c,
-      bx,
-      by,
-      money(cu.bill),
-      money(cu.cash),
-      money(cu.cash - cu.bill),
-      s.drawer.warn > 0
-    );
-  }
   drawJar(c, L.jar.x, L.jar.y, L.jar.w, s.coins);
   const pipTalk = !!s.hint();
   drawPip(
@@ -200,8 +186,6 @@ export function renderWorld(
     if (p) drawSearDial(c, P.x + p.x * P.u, P.y + p.y * P.u - 70, s.sear.t);
   }
   drawTools(c, s, L, t, lang);
-  if (s.squeeze.on || (s.squeeze.a > 0 && s.hand?.k !== 'rice'))
-    drawSqueezeGauge(c, P.x, Math.min(L.H - 130, P.y + P.u * 0.3 + 40), s.squeeze.a);
   drawFloating(c, s, L.float.x, L.float.y, P.u, t);
   drawFx(c, s, L);
 

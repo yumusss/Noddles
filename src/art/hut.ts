@@ -56,35 +56,55 @@ export function drawHutFrame(
 
 function paintFrame(c: Ctx, L: Layout, decor: Record<string, string>) {
   const { W, win } = L;
-  // plank walls left/right and above
-  const wall = '#a9764e';
+  // cream plaster walls with dark timber framing (like an old Hokkaido fishing hut)
   c.save();
   c.beginPath();
   c.rect(0, 0, W, L.sillY);
   c.rect(win.x + win.w, win.y, -win.w, win.h);
   c.clip('evenodd');
-  woodGrain(c, 0, 0, W, L.sillY, wall, 21, {
-    planks: Math.round(W / 46),
-    vertical: true,
-    strength: 1,
-  });
   c.fillStyle = lin(c, 0, 0, 0, L.sillY, [
-    [0, 'rgba(40,20,10,0.25)'],
-    [1, 'rgba(40,20,10,0.05)'],
+    [0, '#efe3cc'],
+    [1, '#f6ecdb'],
+  ]);
+  c.fillRect(0, 0, W, L.sillY);
+  speckle(c, 0, 0, W, L.sillY, '#b89a72', Math.floor(W * 2.5), 7, 0.1);
+  const beam = (x: number, y: number, w: number, h: number) => {
+    woodGrain(c, x, y, w, h, '#5a3b2a', Math.floor(x + y), { vertical: h > w, strength: 1.2 });
+    c.fillStyle = 'rgba(0,0,0,0.12)';
+    if (h > w) c.fillRect(x + w - 3, y, 3, h);
+    else c.fillRect(x, y + h - 3, w, 3);
+  };
+  // posts and a mid beam on each side wall
+  const lw0 = win.x - 22;
+  const rx0 = win.x + win.w + 22;
+  beam(0, L.sillY * 0.5, lw0, 14);
+  beam(rx0, L.sillY * 0.5, W - rx0, 14);
+  for (const x of [8, lw0 - 18]) if (x > 0 && lw0 > 60) beam(x, 0, 18, L.sillY);
+  for (const x of [rx0, W - 26]) if (W - rx0 > 60) beam(x, 0, 18, L.sillY);
+  c.fillStyle = lin(c, 0, 0, 0, L.sillY, [
+    [0, 'rgba(60,30,10,0.18)'],
+    [1, 'rgba(60,30,10,0)'],
   ]);
   c.fillRect(0, 0, W, L.sillY);
   c.restore();
-  // window frame posts
-  const fw = 14;
-  c.fillStyle = '#6e4630';
-  c.fillRect(win.x - fw, win.y - 4, fw, win.h + 4);
-  c.fillRect(win.x + win.w, win.y - 4, fw, win.h + 4);
-  c.fillStyle = lin(c, win.x - fw, 0, win.x, 0, [
-    [0, '#5a3826'],
-    [1, '#8a5a3c'],
-  ]);
-  c.fillRect(win.x - fw + 2, win.y, fw - 4, win.h);
-  c.fillRect(win.x + win.w + 2, win.y, fw - 4, win.h);
+  // vermilion lacquer window frame with brass caps
+  const fw = 20;
+  for (const x of [win.x - fw, win.x + win.w]) {
+    c.fillStyle = lin(c, x, 0, x + fw, 0, [
+      [0, '#9a3424'],
+      [0.45, '#d4553a'],
+      [1, '#a33a28'],
+    ]);
+    c.fillRect(x, win.y - 6, fw, win.h + 6);
+    c.fillStyle = 'rgba(255,255,255,0.18)';
+    c.fillRect(x + 5, win.y, 3, win.h);
+    c.fillStyle = lin(c, 0, L.sillY - 22, 0, L.sillY, [
+      [0, '#e8c36a'],
+      [1, '#a8812e'],
+    ]);
+    rr(c, x - 2, L.sillY - 22, fw + 4, 22, 3);
+    c.fill();
+  }
   // inner shadow along the frame so the outside sits "behind"
   c.fillStyle = lin(c, win.x, 0, win.x + 18, 0, [
     [0, 'rgba(30,20,20,0.25)'],
@@ -145,8 +165,11 @@ function paintFrame(c: Ctx, L: Layout, decor: Record<string, string>) {
   });
   for (const s of [-1, 1])
     snowflake(c, midX + s * pw * 1.2, ay + ah * 0.48, ah * 0.22, 'rgba(255,250,240,0.85)');
-  c.fillStyle = '#5a3826';
-  rr(c, win.x - 20, ay - 8, win.w + 40, 10, 4);
+  c.fillStyle = lin(c, 0, ay - 10, 0, ay + 4, [
+    [0, '#d4553a'],
+    [1, '#9a3424'],
+  ]);
+  rr(c, win.x - 26, ay - 10, win.w + 52, 14, 4);
   c.fill();
 
   // side walls: a menu board (left) and shelves (right)
@@ -183,29 +206,45 @@ function paintFrame(c: Ctx, L: Layout, decor: Record<string, string>) {
       c.fill();
     });
   }
-  const rw = W - (win.x + win.w + 14);
-  if (rw > 90) {
-    const sx = win.x + win.w + 14 + rw / 2;
-    for (let k = 0; k < 2; k++) {
-      const y = win.y + 70 + k * 80;
-      woodGrain(c, sx - rw * 0.4, y, rw * 0.8, 9, '#7a4e32', 40 + k);
-      contactShadow(c, sx, y + 12, rw * 0.4, 4, 0.3);
-      // jars and a sake bottle
-      const jr = srand(30 + k);
-      let x = sx - rw * 0.34;
-      while (x < sx + rw * 0.3) {
-        const jw = 20 + jr() * 10;
-        const col = ['#e9dcc4', '#7d8fae', '#c9a77a', '#9fc39a'][Math.floor(jr() * 4)];
-        rr(c, x, y - jw * 1.1, jw, jw * 1.1, 6);
-        c.fillStyle = lin(c, x, 0, x + jw, 0, [
-          [0, darken(col, 0.1)],
-          [0.4, lighten(col, 0.15)],
-          [1, darken(col, 0.15)],
-        ]);
-        c.fill();
-        x += jw + 6;
-      }
-    }
+  const rw = W - (win.x + win.w + 22);
+  if (rw > 70) {
+    const sx = win.x + win.w + 22 + rw / 2;
+    const sw = Math.min(58, rw * 0.5);
+    const sy = win.y + 34;
+    const sh = Math.min(200, L.sillY - sy - 40);
+    // cords
+    c.strokeStyle = '#3a2a22';
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(sx - sw * 0.3, sy);
+    c.lineTo(sx, sy - 22);
+    c.lineTo(sx + sw * 0.3, sy);
+    c.stroke();
+    contactShadow(c, sx + 4, sy + sh / 2, sw * 0.7, sh * 0.55, 0.18);
+    rr(c, sx - sw / 2, sy, sw, sh, 6);
+    c.save();
+    c.clip();
+    woodGrain(c, sx - sw / 2, sy, sw, sh, '#4a3226', 77, { vertical: true, strength: 1.2 });
+    c.restore();
+    rr(c, sx - sw / 2 + 4, sy + 4, sw - 8, sh - 8, 4);
+    c.strokeStyle = 'rgba(232,195,106,0.8)';
+    c.lineWidth = 1.5;
+    c.stroke();
+    const chars = ['ゆ', 'き', '寿', '司'];
+    chars.forEach((ch, k) =>
+      text(
+        c,
+        ch,
+        sx,
+        sy + 26 + ((k * (sh - 40)) / (chars.length - 1)) * 0.92,
+        sw * 0.52,
+        '#fbf3e6',
+        {
+          font: 'brush',
+          weight: 700,
+        }
+      )
+    );
   }
   // the sill counter where plates are served
   const sy = L.sillY;
@@ -218,8 +257,11 @@ function paintFrame(c: Ctx, L: Layout, decor: Record<string, string>) {
     [1, 'rgba(90,50,20,0.15)'],
   ]);
   c.fillRect(0, sy, W, L.sillH);
-  c.fillStyle = '#8a5a3c';
-  c.fillRect(0, sy + L.sillH - 4, W, 6);
+  c.fillStyle = lin(c, 0, sy + L.sillH - 7, 0, sy + L.sillH + 2, [
+    [0, '#d4553a'],
+    [1, '#8f3020'],
+  ]);
+  c.fillRect(0, sy + L.sillH - 7, W, 9);
   c.fillStyle = 'rgba(40,20,10,0.35)';
   c.fillRect(0, sy + L.sillH + 2, W, 6);
 
@@ -298,8 +340,8 @@ function drawLanterns(c: Ctx, L: Layout, style: string, glow: number, t: number)
     }
     ellipse(c, x + sway, y, 20, 26);
     c.fillStyle = rad(c, x + sway - 5, y - 5, 2, 28, [
-      [0, lighten('#f6e7c8', 0.3 + glow * 0.3)],
-      [1, darken('#e9c98a', 0.1 - glow * 0.1)],
+      [0, lighten('#f07a5a', 0.15 + glow * 0.35)],
+      [1, darken('#c23a2e', 0.05 - glow * 0.05)],
     ]);
     c.fill();
     c.strokeStyle = 'rgba(120,80,40,0.45)';
@@ -316,7 +358,7 @@ function drawLanterns(c: Ctx, L: Layout, style: string, glow: number, t: number)
     c.fill();
     rr(c, x + sway - 9, y + 23, 18, 5, 2);
     c.fill();
-    text(c, '雪', x + sway, y + 1, 13, rgba('#d9573f', 0.85), { font: 'brush', weight: 700 });
+    text(c, '雪', x + sway, y + 1, 13, 'rgba(255,248,235,0.92)', { font: 'brush', weight: 700 });
   }
 }
 

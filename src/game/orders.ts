@@ -148,7 +148,7 @@ function makeLine(
       let tops: IngId[] = [];
       if (fish === 'tamago') tops = ['noriband'];
       else if (tier >= 3 && p.topPool.length && chance(r, 0.35)) tops = [pick(r, p.topPool)];
-      return { k: 'nigiri', fish, n, less: tier >= 2 && chance(r, 0.15), tops, aburi };
+      return { k: 'nigiri', fish, n, less: false, tops, aburi };
     }
     case 'maki': {
       const styles = (['hoso', 'ura', 'futo'] as MakiStyle[]).filter((s) => day >= STYLE_DAY[s]);

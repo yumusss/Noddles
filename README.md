@@ -14,10 +14,10 @@ Her şey tek ekranda: üstte pencere ve müşteri, altta senin tezgâhın. Her g
 
 - **Sipariş:** müşteri pencereye gelir ve siparişini söyler. Sipariş, pencerede ip ile asılı resimli bir karta yazılır; altındaki çizgi sabırdır.
 - **Konuş:** müşterilere cevap verebilirsin (“Hemen geliyor!”, “Tekrar söyler misin?”, sohbet). Sohbet etmek memnuniyeti artırır.
-- **Nigiri:** pirinç kabını basılı tut, “tam”da bırak; tabakta istediğin yere dokun. Balığa dokun, sonra pirinç topuna dokun.
+- **Nigiri:** pirinç kabına dokun, tabakta istediğin yere dokun. Balığa dokun, sonra pirinç topuna dokun.
 - **Araçlar:** Hasır (maki: pirinç yay, iç malzeme seç, hasırı kaydırarak sar, yeşilde kes), Sashimi (balık seç, doğru anda kes: ince/normal/kalın), Pürmüz (aburi somon: basılı tut, kadran yeşilde bırak).
 - **Dürüst müşteriler:** beğenmezlerse açıkça söylerler (“Açıkçası beğenmedim. Pirinç çok fazla…”). Cevabını seçersin: özür dile, ücretsiz ikram et ya da tartış. Hepsi yorumu değiştirir.
-- **Para üstü:** müşteri sadece parayı verir. Para üstü kasanın yanındaki küçük kutuda yazar; çekmeceden sen seçersin.
+- **Ödeme:** müşteri yedikten sonra öder, para kendiliğinden kasaya girer. Mutlu müşteriler bahşiş bırakır.
 - **Nefis uygulaması:** her müşteri yorum yazar. Tablette puan özeti, yıldız dağılımı, en çok söylenen etiketler, gün gün puan grafiği ve tüm yorumlar var. Yorumlara cevap verebilirsin: nazik cevap bazen puanı düzeltir, kaba cevap düşürür.
 - **Gün grafiği:** haritada ve gün sonunda her günün kârı ve Nefis puanı grafikte görünür.
 - **Talimatlar:** sadece 1. günde (Pıtırcık adım adım gösterir). Sonra yok.

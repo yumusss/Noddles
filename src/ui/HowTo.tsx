@@ -30,12 +30,12 @@ const PAGES: { pic: Pic; title: L; points: L[] }[] = [
     title: { tr: 'Nigiri', en: 'Nigiri' },
     points: [
       {
-        tr: 'Pirinç kabını basılı tut, gösterge “tam”dayken bırak.',
-        en: 'Hold the rice tub, let go when the gauge says “just right”.',
+        tr: 'Pirinç kabına dokun, sonra tabakta istediğin yere dokun.',
+        en: 'Tap the rice tub, then tap the plate where you want it.',
       },
       {
-        tr: 'Tabakta her dokunuş bir pirinç topu koyar. Sonra balığa, sonra pirinç topuna dokun.',
-        en: 'Each tap on the plate places a rice ball. Then tap the fish, then the rice ball.',
+        tr: 'Her dokunuş bir pirinç topu koyar. Sonra balığa, sonra pirinç topuna dokun.',
+        en: 'Each tap places a rice ball. Then tap the fish, then the rice ball.',
       },
     ],
   },
@@ -83,15 +83,15 @@ const PAGES: { pic: Pic; title: L; points: L[] }[] = [
   },
   {
     pic: 'change',
-    title: { tr: 'Para üstü', en: 'Change' },
+    title: { tr: 'Ödeme ve bahşiş', en: 'Paying and tips' },
     points: [
       {
-        tr: 'Müşteri sadece parayı uzatır. Para üstü kasanın yanındaki küçük kutuda yazar.',
-        en: 'The customer just hands over the money. The change is shown in the little box by the register.',
+        tr: 'Müşteri yedikten sonra öder, para kendiliğinden kasaya girer.',
+        en: 'After eating the customer pays; the money goes into the register by itself.',
       },
       {
-        tr: 'Çekmeceden o kadarını seç ve “Ver”e bas.',
-        en: 'Pick that much from the drawer and tap “Give”.',
+        tr: 'Mutlu müşteriler bahşiş kavanozuna bahşiş bırakır.',
+        en: 'Happy customers drop a tip in the jar.',
       },
     ],
   },
